@@ -17,6 +17,6 @@ It aims to support genomic surveillance, research, and integration within a **On
 ## 🚀 Installation
 
 ```bash
-git clone https://github.com/your-username/FluTyper.git
+git clone https://github.com/ValldHebron-Bioinformatics/FluTyper.git
 cd FluTyper
 ```
