@@ -12,8 +12,12 @@ It aims to support genomic surveillance, research, and integration within a **On
 - 🧪 Support for avian and swine influenza strains
 - 📊 Outputs suitable for surveillance and downstream analysis
 - 🌍 Designed with One Health integration in mind
+<<<<<<< HEAD
 - First addition
 
+=======
+- hi
+>>>>>>> f7cb6dfc6b78d37997b6b3bbc1e3eaf8d2823b6e
 ---
 
 ## 🚀 Installation
