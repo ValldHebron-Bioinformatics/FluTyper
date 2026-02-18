@@ -2,8 +2,18 @@ import pandas as pd
 from Bio import Entrez, SeqIO
 import time
 import re
+import os
 
-Entrez.email = "marcperez02@gmail.com"
+# Prompt the user for their email address
+Entrez.email = input("Please enter your email address: ")
+
+# Update paths to use absolute paths
+base_dir = os.path.dirname(os.path.abspath(__file__))
+csv_file = os.path.join(base_dir, "../clades/CLADECLASSIFICATION.csv")
+output_fasta = os.path.join(base_dir, "../datasets/blast_database_with_clades.fasta")
+
+# Ensure the output directory exists
+os.makedirs(os.path.dirname(output_fasta), exist_ok=True)
 
 # --- 1. Load and Clean Data ---
 df = pd.read_csv('CLADECLASSIFICATION.csv')
@@ -80,7 +90,7 @@ def add_clade_to_fasta(fasta_file, csv_file, output_file):
     for record in SeqIO.parse(fasta_file, "fasta"):
         # Normalize accession number by removing version numbers
         accession = record.id.split("|")[0].split('.')[0]  # Remove version number
-        clade = clade_mapping[accession]  # Get clade (all accessions are guaranteed to have clades)
+        clade = clade_mapping.get(accession, "Unknown")  # Get clade or default to "Unknown"
         record.description += f" | Clade: {clade}"  # Append clade to description
         updated_sequences.append(record)
 
@@ -91,4 +101,4 @@ def add_clade_to_fasta(fasta_file, csv_file, output_file):
     print(f"Updated FASTA file written to {output_file}")
 
 # Call the function to update the FASTA file
-add_clade_to_fasta("blast_database.fasta", "CLADECLASSIFICATION.csv", "blast_database_with_clades.fasta")
+add_clade_to_fasta("blast_database.fasta", csv_file, output_fasta)
