@@ -2,36 +2,41 @@ import json
 import sys
 
 def compare_clades(json_file):
+    """
+    Llegeix un JSON de Nextclade, filtra les seqüències per qualitat i 
+    calcula la precisió comparant el clade real amb el predit.
+    Si la seqüència no té una qualitat 'good' o el clade és 'unassigned', 
+    es descarta de l'anàlisi.
+    """
     try:
-        # Load the JSON file
         with open(json_file, 'r') as file:
             data = json.load(file)
 
-        # Initialize counters for accuracy calculation
         total_sequences = 0
         correct_predictions = 0
 
-        # Print header
         print("seqID\treal_clade\tpredicted_clade\tmatch")
 
-        # Compare real clade and predicted clade
-        for seq in data['results']:
-            seq_id = seq.get('seqName', 'N/A')  # Default to 'N/A' if seqName is missing
-            predicted_clade = seq.get('clade', 'N/A')  # Default to 'N/A' if clade is missing
+        for seq in data.get('results', []):
+            seq_id = seq.get('seqName', 'N/A')
+            predicted_clade = seq.get('clade', 'N/A')
+            
+            qc_status = seq.get('qc', {}).get('overallStatus', 'N/A')
 
-            # Extract the real clade from the seqID (after the last '/')
+            if qc_status != 'good':
+                continue
+            if predicted_clade == 'unassigned':
+                continue    
+            total_sequences += 1
+
             real_clade = seq_id.split('|')[-1] if '|' in seq_id else 'N/A'
-
-            # Check if the predicted clade matches the real clade
+        
             match = real_clade == predicted_clade
             if match:
                 correct_predictions += 1
-            total_sequences += 1
 
-            # Print the comparison
             print(f"{seq_id}\t{real_clade}\t{predicted_clade}\t{match}")
 
-        # Calculate and print accuracy
         accuracy = (correct_predictions / total_sequences) * 100 if total_sequences > 0 else 0
         print(f"\nAccuracy: {accuracy:.2f}% ({correct_predictions}/{total_sequences} correct)")
 
