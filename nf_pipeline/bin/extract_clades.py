@@ -7,17 +7,16 @@ def compare_clades(json_file):
         with open(json_file, 'r') as file:
             data = json.load(file)
 
-        # Initialize counters for accuracy calculation
         total_sequences = 0
         correct_predictions = 0
 
-        # Print header
         print("seqID\treal_clade\tpredicted_clade\tmatch")
 
         # Compare real clade and predicted clade
         for seq in data['results']:
             seq_id = seq.get('seqName', 'N/A')  # Default to 'N/A' if seqName is missing
             predicted_clade = seq.get('clade', 'N/A')  # Default to 'N/A' if clade is missing
+            qc_status = seq.get('status', 'N/A')  # Default to 'N/A' if qc.overallStatus is missing
 
             # Extract the real clade from the seqID (after the last '/')
             real_clade = seq_id.split('|')[-1] if '|' in seq_id else 'N/A'
