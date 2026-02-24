@@ -30,8 +30,11 @@ process GenotypingNextclade {
 
         # Això és extra, només em serveix ara per verificar que l'assignació de clades de Nextclade és fiable, s'acabarà eliminant.
         python ${params.workDir}/${params.programs.extractClades} \
-        nextclade_results_${params.sample}.csv > seqid_clade_${params.sample}.csv
-    """
+        nextclade_results_${params.sample}.csv > clade_check_${params.sample}.csv
+
+        python ${params.workDir}/${params.programs.createCSV} \
+        nextclade_results_${params.sample}.csv seqid_clade_${params.sample}.csv 
+        """
 }
 
 

@@ -18,11 +18,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-  <meta name="description" content="Nextflow workflow report for run id [confident_roentgen]">
+  <meta name="description" content="Nextflow workflow report for run id [backstabbing_elion]">
   <meta name="author" content="Paolo Di Tommaso, Phil Ewels">
   <link rel="icon" type="image/png" href="https://www.nextflow.io/img/favicon.png" />
 
-  <title>[confident_roentgen] Nextflow Workflow Report</title>
+  <title>[backstabbing_elion] Nextflow Workflow Report</title>
 
   <style type="text/css">
   /*!
@@ -137,7 +137,7 @@ table.DTCR_clonedTable.dataTable{position:absolute !important;background-color:r
         <li class="nav-item"><a class="nav-link" href="#tasks">Tasks</a></li>
       </ul>
       <span class="navbar-text">
-        [confident_roentgen]
+        [backstabbing_elion]
       </span>
     </div>
   </nav>
@@ -146,7 +146,7 @@ table.DTCR_clonedTable.dataTable{position:absolute !important;background-color:r
     <div class="container">
 
       <h1 class="display-3">Nextflow workflow report</h1>
-      <h2 class="text-muted mb-4"><samp>[confident_roentgen]</samp> </h2>
+      <h2 class="text-muted mb-4"><samp>[backstabbing_elion]</samp> </h2>
 
       
           <div class="alert alert-success mb-4">
@@ -157,13 +157,13 @@ table.DTCR_clonedTable.dataTable{position:absolute !important;background-color:r
       <dl>
         <dt>Run times</dt>
         <dd>
-          <span id="workflow_start">24-Feb-2026 11:02:16</span> - <span id="workflow_complete">24-Feb-2026 11:02:49</span>
-          (<span id="completed_fromnow"></span>duration: <strong>33.4s</strong>)
+          <span id="workflow_start">24-Feb-2026 16:23:31</span> - <span id="workflow_complete">24-Feb-2026 16:23:35</span>
+          (<span id="completed_fromnow"></span>duration: <strong>3.8s</strong>)
         </dd>
 
         <dl>
           <div class="progress" style="height: 1.6rem; margin: 1.2rem auto; border-radius: 0.20rem;">
-            <div style="width: 100.0%" class="progress-bar bg-success" data-toggle="tooltip" data-placement="top" title="1 tasks succeeded"><span class="text-truncate">&nbsp; 1 succeeded &nbsp;</span></div>
+            <div style="width: 100.0%" class="progress-bar bg-success" data-toggle="tooltip" data-placement="top" title="2 tasks succeeded"><span class="text-truncate">&nbsp; 2 succeeded &nbsp;</span></div>
             <div style="width: 0.0%" class="progress-bar bg-secondary" data-toggle="tooltip" data-placement="top" title="0 tasks were cached"><span class="text-truncate">&nbsp; 0 cached &nbsp;</span></div>
             <div style="width: 0.0%" class="progress-bar bg-warning" data-toggle="tooltip" data-placement="top" title="0 tasks failed and were ignored"><span class="text-truncate">&nbsp; 0 ignored &nbsp;</span></div>
             <div style="width: 0.0%" class="progress-bar bg-danger" data-toggle="tooltip" data-placement="top" title="0 tasks failed"><span class="text-truncate">&nbsp; 0 failed (0 retries) &nbsp;</span></div>
@@ -171,7 +171,7 @@ table.DTCR_clonedTable.dataTable{position:absolute !important;background-color:r
         </dl>
 
         <dt>Nextflow command</dt>
-        <dd><pre class="nfcommand"><code>nextflow run nf_pipeline/main.nf --sample example.fasta</code></pre></dd>
+        <dd><pre class="nfcommand"><code>nextflow run nf_pipeline/main.nf --sample converted.fasta</code></pre></dd>
       </dl>
 
       <dl class="row small">
@@ -194,11 +194,11 @@ table.DTCR_clonedTable.dataTable{position:absolute !important;background-color:r
 
         
           <dt class="col-sm-3">Script ID</dt>
-          <dd class="col-sm-9"><code>6887f07fd6c11e06952d4ef18d8e63a2</code></dd>
+          <dd class="col-sm-9"><code>c95be576119939656f02b53c86b56365</code></dd>
         
 
         <dt class="col-sm-3">Workflow session</dt>
-        <dd class="col-sm-9"><code>f0ecc192-b5cd-4a18-b34c-763fcc610868</code></dd>
+        <dd class="col-sm-9"><code>7e19c9ec-ace1-4c23-ad64-64578a11c857</code></dd>
 
         
 
@@ -1032,7 +1032,7 @@ $(function() {
 
   // Nextflow report data
   window.data = { "trace":[
-{"task_id":"1","hash":"a0\/352086","native_id":"52250","process":"GenotypingNextclade","module":"-","container":"-","tag":"-","name":"GenotypingNextclade (1)","status":"COMPLETED","exit":"0","submit":"1771927336916","start":"1771927336952","complete":"1771927369458","duration":"32542","realtime":"32498","%cpu":"348.1","%mem":"35.6","rss":"5868306432","vmem":"5874573312","peak_rss":"5868306432","peak_vmem":"5874573312","rchar":"1919832740","wchar":"3777126440","syscr":"3080","syscw":"22590","read_bytes":"618496","write_bytes":"3777114112","attempt":"1","workdir":"\/home\/vhir\/Desktop\/FluTyper\/work\/a0\/3520861963ef5fb8faea0313094a1c","script":"\n    # Filtra el FASTA original per quedar-se nom\u00E9s amb les cap\u00E7aleres que contenen |HA| o (HA)\n    # El format de l\'awk busca les l\u00EDnies que comencen per \'>\' i contenen el patr\u00F3\n    awk \'\/^>\/ {f=($0 ~ \/\\|HA\\|\/ || $0 ~ \/\\(HA\\)\/)} f\' \/home\/vhir\/Desktop\/FluTyper\/docs\/example.fasta > filtered_HA.fasta\n\n    # Descarrega el dataset de refer\u00E8ncia\n    nextclade dataset get --name \'community\/moncla-lab\/iav-h5\/ha\/2.3.4.4\' --output-dir nextclade_dataset\n    \n    # Executa analisi Nextclade\n    nextclade run         --input-dataset nextclade_dataset         --output-json nextclade_results_example.fasta.json         filtered_HA.fasta\n\n        # Aix\u00F2 \u00E9s extra, nom\u00E9s em serveix ara per verificar que l\'assignaci\u00F3 de clades de Nextclade \u00E9s fiable, s\'acabar\u00E0 eliminant.\n        python \/home\/vhir\/Desktop\/FluTyper\/nf_pipeline\/bin\/extract_clades.py         nextclade_results_example.fasta.json > seqid_clade_example.fasta.csv\n    ","scratch":"-","queue":"-","cpus":"1","memory":"-","disk":"-","time":"-","env":"PATH=$PATH:\/home\/vhir\/Desktop\/FluTyper\/nf_pipeline\/bin\n","error_action":"-","vol_ctxt":"1224","inv_ctxt":"64","hostname":"-","cpu_model":"12th Gen Intel(R) Core(TM) i7-12700"}], "summary":[{"cpuUsage":{"mean":348.1,"min":348.1,"q1":348.1,"q2":348.1,"q3":348.1,"max":348.1,"minLabel":"GenotypingNextclade (1)","maxLabel":"GenotypingNextclade (1)","q1Label":"GenotypingNextclade (1)","q2Label":"GenotypingNextclade (1)","q3Label":"GenotypingNextclade (1)"},"process":"GenotypingNextclade","mem":{"mean":5868306432,"min":5868306432,"q1":5868306432,"q2":5868306432,"q3":5868306432,"max":5868306432,"minLabel":"GenotypingNextclade (1)","maxLabel":"GenotypingNextclade (1)","q1Label":"GenotypingNextclade (1)","q2Label":"GenotypingNextclade (1)","q3Label":"GenotypingNextclade (1)"},"memUsage":null,"timeUsage":null,"vmem":{"mean":5874573312,"min":5874573312,"q1":5874573312,"q2":5874573312,"q3":5874573312,"max":5874573312,"minLabel":"GenotypingNextclade (1)","maxLabel":"GenotypingNextclade (1)","q1Label":"GenotypingNextclade (1)","q2Label":"GenotypingNextclade (1)","q3Label":"GenotypingNextclade (1)"},"reads":{"mean":1919832740,"min":1919832740,"q1":1919832740,"q2":1919832740,"q3":1919832740,"max":1919832740,"minLabel":"GenotypingNextclade (1)","maxLabel":"GenotypingNextclade (1)","q1Label":"GenotypingNextclade (1)","q2Label":"GenotypingNextclade (1)","q3Label":"GenotypingNextclade (1)"},"cpu":{"mean":348.1,"min":348.1,"q1":348.1,"q2":348.1,"q3":348.1,"max":348.1,"minLabel":"GenotypingNextclade (1)","maxLabel":"GenotypingNextclade (1)","q1Label":"GenotypingNextclade (1)","q2Label":"GenotypingNextclade (1)","q3Label":"GenotypingNextclade (1)"},"time":{"mean":32498,"min":32498,"q1":32498,"q2":32498,"q3":32498,"max":32498,"minLabel":"GenotypingNextclade (1)","maxLabel":"GenotypingNextclade (1)","q1Label":"GenotypingNextclade (1)","q2Label":"GenotypingNextclade (1)","q3Label":"GenotypingNextclade (1)"},"writes":{"mean":3777126440,"min":3777126440,"q1":3777126440,"q2":3777126440,"q3":3777126440,"max":3777126440,"minLabel":"GenotypingNextclade (1)","maxLabel":"GenotypingNextclade (1)","q1Label":"GenotypingNextclade (1)","q2Label":"GenotypingNextclade (1)","q3Label":"GenotypingNextclade (1)"}}] };
+{"task_id":"2","hash":"67\/3ae39e","native_id":"187221","process":"GenotypingNextclade","module":"-","container":"-","tag":"-","name":"GenotypingNextclade (1)","status":"COMPLETED","exit":"0","submit":"1771946612451","start":"1771946612534","complete":"1771946615456","duration":"3005","realtime":"2969","%cpu":"194.7","%mem":"0.5","rss":"78180352","vmem":"162652160","peak_rss":"78180352","peak_vmem":"229085184","rchar":"52456140","wchar":"32277069","syscr":"2788","syscw":"5996","read_bytes":"0","write_bytes":"32292864","attempt":"1","workdir":"\/home\/vhir\/Desktop\/FluTyper\/work\/67\/3ae39e755bff84b66ea970157f992e","script":"\n    # Filtra el FASTA original per quedar-se nom\u00E9s amb les cap\u00E7aleres que contenen |HA| o (HA)\n    # El format de l\'awk busca les l\u00EDnies que comencen per \'>\' i contenen el patr\u00F3\n    awk \'\/^>\/ {f=($0 ~ \/\\|HA\\|\/ || $0 ~ \/\\_HA\\_\/)} f\' \/home\/vhir\/Desktop\/FluTyper\/docs\/converted.fasta > filtered_HA.fasta\n\n    # Descarrega el dataset de refer\u00E8ncia\n    nextclade dataset get --name \'community\/moncla-lab\/iav-h5\/ha\/2.3.4.4\' --output-dir nextclade_dataset\n    \n    # Executa analisi Nextclade\n    nextclade run         --input-dataset nextclade_dataset         --output-csv nextclade_results_converted.fasta.csv         filtered_HA.fasta\n\n        # Aix\u00F2 \u00E9s extra, nom\u00E9s em serveix ara per verificar que l\'assignaci\u00F3 de clades de Nextclade \u00E9s fiable, s\'acabar\u00E0 eliminant.\n        python \/home\/vhir\/Desktop\/FluTyper\/nf_pipeline\/bin\/extract_clades.py         nextclade_results_converted.fasta.csv > clade_check_converted.fasta.csv\n\n        python \/home\/vhir\/Desktop\/FluTyper\/nf_pipeline\/bin\/CSVFileCreation.py         nextclade_results_converted.fasta.csv seqid_clade_converted.fasta.csv \n        ","scratch":"-","queue":"-","cpus":"1","memory":"-","disk":"-","time":"-","env":"PATH=$PATH:\/home\/vhir\/Desktop\/FluTyper\/nf_pipeline\/bin\n","error_action":"-","vol_ctxt":"1968","inv_ctxt":"7","hostname":"-","cpu_model":"12th Gen Intel(R) Core(TM) i7-12700"},{"task_id":"1","hash":"83\/2324b5","native_id":"187242","process":"OrganizeBySpecies","module":"-","container":"-","tag":"-","name":"OrganizeBySpecies (1)","status":"COMPLETED","exit":"0","submit":"1771946612465","start":"1771946612537","complete":"1771946612539","duration":"74","realtime":"33","%cpu":"100.0","%mem":"0.0","rss":"3690496","vmem":"7647232","peak_rss":"3690496","peak_vmem":"7647232","rchar":"427223","wchar":"55932","syscr":"675","syscw":"48","read_bytes":"0","write_bytes":"98304","attempt":"1","workdir":"\/home\/vhir\/Desktop\/FluTyper\/work\/83\/2324b5a293b615089df68aec4032f8","script":"\n    mkdir -p converted.fasta\n\n    species_list=$(grep \"^>\" \/home\/vhir\/Desktop\/FluTyper\/docs\/converted.fasta | sed \'s\/^>\/\/\' | cut -d\'_\' -f1 | sort -u)\n    for species in $species_list; do\n        mkdir -p \"converted.fasta\/${species}\/proteins\"\n    done\n\n   awk \'\n      \/^>\/ {\n        split(substr($0, 2), a, \"_\")\n        species = a[1]\n        protein = a[2]\n\n        dir = \"\'\"converted.fasta\"\'\/\" species\n        prot_dir = dir \"\/proteins\"\n        system(\"mkdir -p \" prot_dir)\n\n        cons_file = dir \"\/consensus.fasta\"\n        prot_file = prot_dir \"\/\" protein \".fasta\"\n      }\n      {\n        if (cons_file != \"\") {\n          print $0 >> cons_file\n          print $0 >> prot_file\n        }\n      }\n    \' \/home\/vhir\/Desktop\/FluTyper\/docs\/converted.fasta\n    ","scratch":"-","queue":"-","cpus":"1","memory":"-","disk":"-","time":"-","env":"PATH=$PATH:\/home\/vhir\/Desktop\/FluTyper\/nf_pipeline\/bin\n","error_action":"-","vol_ctxt":"6","inv_ctxt":"1","hostname":"-","cpu_model":"12th Gen Intel(R) Core(TM) i7-12700"}], "summary":[{"cpuUsage":{"mean":100,"min":100,"q1":100,"q2":100,"q3":100,"max":100,"minLabel":"OrganizeBySpecies (1)","maxLabel":"OrganizeBySpecies (1)","q1Label":"OrganizeBySpecies (1)","q2Label":"OrganizeBySpecies (1)","q3Label":"OrganizeBySpecies (1)"},"process":"OrganizeBySpecies","mem":{"mean":3690496,"min":3690496,"q1":3690496,"q2":3690496,"q3":3690496,"max":3690496,"minLabel":"OrganizeBySpecies (1)","maxLabel":"OrganizeBySpecies (1)","q1Label":"OrganizeBySpecies (1)","q2Label":"OrganizeBySpecies (1)","q3Label":"OrganizeBySpecies (1)"},"memUsage":null,"timeUsage":null,"vmem":{"mean":7647232,"min":7647232,"q1":7647232,"q2":7647232,"q3":7647232,"max":7647232,"minLabel":"OrganizeBySpecies (1)","maxLabel":"OrganizeBySpecies (1)","q1Label":"OrganizeBySpecies (1)","q2Label":"OrganizeBySpecies (1)","q3Label":"OrganizeBySpecies (1)"},"reads":{"mean":427223,"min":427223,"q1":427223,"q2":427223,"q3":427223,"max":427223,"minLabel":"OrganizeBySpecies (1)","maxLabel":"OrganizeBySpecies (1)","q1Label":"OrganizeBySpecies (1)","q2Label":"OrganizeBySpecies (1)","q3Label":"OrganizeBySpecies (1)"},"cpu":{"mean":100,"min":100,"q1":100,"q2":100,"q3":100,"max":100,"minLabel":"OrganizeBySpecies (1)","maxLabel":"OrganizeBySpecies (1)","q1Label":"OrganizeBySpecies (1)","q2Label":"OrganizeBySpecies (1)","q3Label":"OrganizeBySpecies (1)"},"time":{"mean":33,"min":33,"q1":33,"q2":33,"q3":33,"max":33,"minLabel":"OrganizeBySpecies (1)","maxLabel":"OrganizeBySpecies (1)","q1Label":"OrganizeBySpecies (1)","q2Label":"OrganizeBySpecies (1)","q3Label":"OrganizeBySpecies (1)"},"writes":{"mean":55932,"min":55932,"q1":55932,"q2":55932,"q3":55932,"max":55932,"minLabel":"OrganizeBySpecies (1)","maxLabel":"OrganizeBySpecies (1)","q1Label":"OrganizeBySpecies (1)","q2Label":"OrganizeBySpecies (1)","q3Label":"OrganizeBySpecies (1)"}},{"cpuUsage":{"mean":194.7,"min":194.7,"q1":194.7,"q2":194.7,"q3":194.7,"max":194.7,"minLabel":"GenotypingNextclade (1)","maxLabel":"GenotypingNextclade (1)","q1Label":"GenotypingNextclade (1)","q2Label":"GenotypingNextclade (1)","q3Label":"GenotypingNextclade (1)"},"process":"GenotypingNextclade","mem":{"mean":78180352,"min":78180352,"q1":78180352,"q2":78180352,"q3":78180352,"max":78180352,"minLabel":"GenotypingNextclade (1)","maxLabel":"GenotypingNextclade (1)","q1Label":"GenotypingNextclade (1)","q2Label":"GenotypingNextclade (1)","q3Label":"GenotypingNextclade (1)"},"memUsage":null,"timeUsage":null,"vmem":{"mean":229085184,"min":229085184,"q1":229085184,"q2":229085184,"q3":229085184,"max":229085184,"minLabel":"GenotypingNextclade (1)","maxLabel":"GenotypingNextclade (1)","q1Label":"GenotypingNextclade (1)","q2Label":"GenotypingNextclade (1)","q3Label":"GenotypingNextclade (1)"},"reads":{"mean":52456140,"min":52456140,"q1":52456140,"q2":52456140,"q3":52456140,"max":52456140,"minLabel":"GenotypingNextclade (1)","maxLabel":"GenotypingNextclade (1)","q1Label":"GenotypingNextclade (1)","q2Label":"GenotypingNextclade (1)","q3Label":"GenotypingNextclade (1)"},"cpu":{"mean":194.7,"min":194.7,"q1":194.7,"q2":194.7,"q3":194.7,"max":194.7,"minLabel":"GenotypingNextclade (1)","maxLabel":"GenotypingNextclade (1)","q1Label":"GenotypingNextclade (1)","q2Label":"GenotypingNextclade (1)","q3Label":"GenotypingNextclade (1)"},"time":{"mean":2969,"min":2969,"q1":2969,"q2":2969,"q3":2969,"max":2969,"minLabel":"GenotypingNextclade (1)","maxLabel":"GenotypingNextclade (1)","q1Label":"GenotypingNextclade (1)","q2Label":"GenotypingNextclade (1)","q3Label":"GenotypingNextclade (1)"},"writes":{"mean":32277069,"min":32277069,"q1":32277069,"q2":32277069,"q3":32277069,"max":32277069,"minLabel":"GenotypingNextclade (1)","maxLabel":"GenotypingNextclade (1)","q1Label":"GenotypingNextclade (1)","q2Label":"GenotypingNextclade (1)","q3Label":"GenotypingNextclade (1)"}}] };
 
   </script>
 
