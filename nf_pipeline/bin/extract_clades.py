@@ -1,58 +1,57 @@
-import json
+import pandas as pd
 import sys
+import re
 
-def compare_clades(json_file):
+def compare_clades(csv_file):
     """
-    Llegeix un JSON de Nextclade, filtra les seqüències per qualitat i 
-    calcula la precisió comparant el clade real amb el predit.
-    Si la seqüència no té una qualitat 'good' o el clade és 'unassigned', 
-    es descarta de l'anàlisi.
+    Llegeix un CSV de Nextclade i calcula la precisió comparant el clade 
+    real (últim element després de | o _) amb el clade predit.
     """
     try:
-        with open(json_file, 'r') as file:
-            data = json.load(file)
+        # Carreguem les dades especificant el delimitador de punt i coma
+        df = pd.read_csv(csv_file, sep=';')
 
         total_sequences = 0
         correct_predictions = 0
 
-        print("seqID\treal_clade\tpredicted_clade\tmatch")
+        # Definim les capçaleres de la taula per a una visualització clara
+        print(f"{'seqID':<60}\t{'real_clade':<15}\t{'predicted_clade':<15}\t{'match'}")
 
-        for seq in data.get('results', []):
-            seq_id = seq.get('seqName', 'N/A')
-            predicted_clade = seq.get('clade', 'N/A')
-            
-            qc_status = seq.get('qc', {}).get('overallStatus', 'N/A')
+        for index, row in df.iterrows():
+            seq_id = str(row.get('seqName', 'N/A'))
+            predicted_clade = str(row.get('clade', 'N/A'))
+            qc_status = str(row.get('qc.overallStatus', 'N/A'))
 
-            if qc_status != 'good':
+            # Només analitzem seqüències amb bona qualitat i amb clade assignat
+            if qc_status != 'good' or predicted_clade == 'unassigned':
                 continue
-            if predicted_clade == 'unassigned':
-                continue    
+            
             total_sequences += 1
 
-            real_clade = seq_id.split('|')[-1] if '|' in seq_id else 'N/A'
+            # Extraiem l'últim segment de l'ID usant | o _ com a delimitadors
+            # La funció re.split permet separar per múltiples caràcters alhora
+            segments = re.split(r'[|_]', seq_id)
+            real_clade = segments[-1] if segments else 'N/A'
         
-            match = real_clade == predicted_clade
+            match = (real_clade == predicted_clade)
             if match:
                 correct_predictions += 1
 
-            print(f"{seq_id}\t{real_clade}\t{predicted_clade}\t{match}")
+            print(f"{seq_id:<60}\t{real_clade:<15}\t{predicted_clade:<15}\t{match}")
 
+        # Calculem el percentatge d'encert final
         accuracy = (correct_predictions / total_sequences) * 100 if total_sequences > 0 else 0
         print(f"\nAccuracy: {accuracy:.2f}% ({correct_predictions}/{total_sequences} correct)")
 
     except FileNotFoundError:
-        print(f"Error: File '{json_file}' not found.")
-    except json.JSONDecodeError:
-        print(f"Error: File '{json_file}' is not a valid JSON file.")
-    except KeyError as e:
-        print(f"Error: Missing expected key in JSON data: {e}")
+        print(f"Error: No s'ha pogut trobar el fitxer '{csv_file}'.")
     except Exception as e:
-        print(f"Unexpected error: {e}")
+        print(f"S'ha produït un error durant el processament: {e}")
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print("Usage: python compare_clades.py <nextclade_results.json>")
+        print("Ús: python compare_clades.py <nextclade_results.csv>")
         sys.exit(1)
 
-    json_file = sys.argv[1]
-    compare_clades(json_file)
+    input_file = sys.argv[1]
+    compare_clades(input_file)
