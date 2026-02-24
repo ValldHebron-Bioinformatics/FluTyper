@@ -18,11 +18,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-  <meta name="description" content="Nextflow workflow report for run id [fabulous_booth]">
+  <meta name="description" content="Nextflow workflow report for run id [admiring_ramanujan]">
   <meta name="author" content="Paolo Di Tommaso, Phil Ewels">
   <link rel="icon" type="image/png" href="https://www.nextflow.io/img/favicon.png" />
 
-  <title>[fabulous_booth] Nextflow Workflow Report</title>
+  <title>[admiring_ramanujan] Nextflow Workflow Report</title>
 
   <style type="text/css">
   /*!
@@ -137,7 +137,7 @@ table.DTCR_clonedTable.dataTable{position:absolute !important;background-color:r
         <li class="nav-item"><a class="nav-link" href="#tasks">Tasks</a></li>
       </ul>
       <span class="navbar-text">
-        [fabulous_booth]
+        [admiring_ramanujan]
       </span>
     </div>
   </nav>
@@ -146,24 +146,34 @@ table.DTCR_clonedTable.dataTable{position:absolute !important;background-color:r
     <div class="container">
 
       <h1 class="display-3">Nextflow workflow report</h1>
-      <h2 class="text-muted mb-4"><samp>[fabulous_booth]</samp> </h2>
+      <h2 class="text-muted mb-4"><samp>[admiring_ramanujan]</samp> </h2>
 
       
-          <div class="alert alert-success mb-4">
-              Workflow execution completed successfully!
+          <div class="alert alert-danger mb-4">
+              <h4>Workflow execution completed unsuccessfully!</h4>
+              <p>The exit status of the task that caused the workflow execution to fail was: <code>null</code>.</p>
+              <p>The full error message was:</p>
+              <pre>Error executing process > 'GenotypingNextclade (1)'
+
+Caused by:
+  Not a valid path value: '~/Desktop/Flutyper/docs'
+
+
+
+Tip: you can try to figure out what's wrong by changing to the process work dir and showing the script file named `.command.sh`</pre>
           </div>
       
 
       <dl>
         <dt>Run times</dt>
         <dd>
-          <span id="workflow_start">24-Feb-2026 09:31:38</span> - <span id="workflow_complete">24-Feb-2026 09:32:14</span>
-          (<span id="completed_fromnow"></span>duration: <strong>35.9s</strong>)
+          <span id="workflow_start">24-Feb-2026 10:25:14</span> - <span id="workflow_complete">24-Feb-2026 10:25:14</span>
+          (<span id="completed_fromnow"></span>duration: <strong>626ms</strong>)
         </dd>
 
         <dl>
           <div class="progress" style="height: 1.6rem; margin: 1.2rem auto; border-radius: 0.20rem;">
-            <div style="width: 100.0%" class="progress-bar bg-success" data-toggle="tooltip" data-placement="top" title="1 tasks succeeded"><span class="text-truncate">&nbsp; 1 succeeded &nbsp;</span></div>
+            <div style="width: 0.0%" class="progress-bar bg-success" data-toggle="tooltip" data-placement="top" title="0 tasks succeeded"><span class="text-truncate">&nbsp; 0 succeeded &nbsp;</span></div>
             <div style="width: 0.0%" class="progress-bar bg-secondary" data-toggle="tooltip" data-placement="top" title="0 tasks were cached"><span class="text-truncate">&nbsp; 0 cached &nbsp;</span></div>
             <div style="width: 0.0%" class="progress-bar bg-warning" data-toggle="tooltip" data-placement="top" title="0 tasks failed and were ignored"><span class="text-truncate">&nbsp; 0 ignored &nbsp;</span></div>
             <div style="width: 0.0%" class="progress-bar bg-danger" data-toggle="tooltip" data-placement="top" title="0 tasks failed"><span class="text-truncate">&nbsp; 0 failed (0 retries) &nbsp;</span></div>
@@ -171,7 +181,7 @@ table.DTCR_clonedTable.dataTable{position:absolute !important;background-color:r
         </dl>
 
         <dt>Nextflow command</dt>
-        <dd><pre class="nfcommand"><code>nextflow run nf_pipeline/main.nf --sample example.fasta -with-report</code></pre></dd>
+        <dd><pre class="nfcommand"><code>nextflow run nf_pipeline/main.nf --sample example.fasta</code></pre></dd>
       </dl>
 
       <dl class="row small">
@@ -198,7 +208,7 @@ table.DTCR_clonedTable.dataTable{position:absolute !important;background-color:r
         
 
         <dt class="col-sm-3">Workflow session</dt>
-        <dd class="col-sm-9"><code>278a7637-2855-406c-a9e3-ccebf235f80a</code></dd>
+        <dd class="col-sm-9"><code>ffbd9d8d-3ae3-4b7d-bd7b-860a2da613fc</code></dd>
 
         
 
@@ -1032,7 +1042,7 @@ $(function() {
 
   // Nextflow report data
   window.data = { "trace":[
-{"task_id":"1","hash":"32\/7398de","native_id":"5514","process":"GenotypingNextclade","module":"-","container":"-","tag":"-","name":"GenotypingNextclade (1)","status":"COMPLETED","exit":"0","submit":"1771921898942","start":"1771921898957","complete":"1771921934127","duration":"35185","realtime":"35143","%cpu":"315.6","%mem":"30.8","rss":"5076144128","vmem":"5082419200","peak_rss":"5076144128","peak_vmem":"5082419200","rchar":"1919832589","wchar":"3777126342","syscr":"3079","syscw":"22577","read_bytes":"9719808","write_bytes":"3777118208","attempt":"1","workdir":"\/home\/vhir\/Desktop\/FluTyper\/work\/32\/7398de35f86277af29c5c75752155f","script":"\n    # Filtra el FASTA original per quedar-se nom\u00E9s amb les cap\u00E7aleres que contenen |HA| o (HA)\n    # El format de l\'awk busca les l\u00EDnies que comencen per \'>\' i contenen el patr\u00F3\n    awk \'\/^>\/ {f=($0 ~ \/\\|HA\\|\/ || $0 ~ \/\\(HA\\)\/)} f\' docs\/example.fasta > filtered_HA.fasta\n\n    # Descarrega el dataset de refer\u00E8ncia\n    nextclade dataset get --name \'community\/moncla-lab\/iav-h5\/ha\/2.3.4.4\' --output-dir nextclade_dataset\n    \n    # Executa analisi Nextclade\n    nextclade run         --input-dataset nextclade_dataset         --output-json nextclade_results_example.fasta.json         filtered_HA.fasta\n\n        # Aix\u00F2 \u00E9s extra, nom\u00E9s em serveix ara per verificar que l\'assignaci\u00F3 de clades de Nextclade \u00E9s fiable, s\'acabar\u00E0 eliminant.\n        python \/home\/vhir\/Desktop\/FluTyper\/nf_pipeline\/bin\/extract_clades.py         nextclade_results_example.fasta.json > seqid_clade_example.fasta.csv\n    ","scratch":"-","queue":"-","cpus":"1","memory":"-","disk":"-","time":"-","env":"PATH=$PATH:\/home\/vhir\/Desktop\/FluTyper\/nf_pipeline\/bin\n","error_action":"-","vol_ctxt":"1758","inv_ctxt":"102","hostname":"-","cpu_model":"12th Gen Intel(R) Core(TM) i7-12700"}], "summary":[{"cpuUsage":{"mean":315.6,"min":315.6,"q1":315.6,"q2":315.6,"q3":315.6,"max":315.6,"minLabel":"GenotypingNextclade (1)","maxLabel":"GenotypingNextclade (1)","q1Label":"GenotypingNextclade (1)","q2Label":"GenotypingNextclade (1)","q3Label":"GenotypingNextclade (1)"},"process":"GenotypingNextclade","mem":{"mean":5076144128,"min":5076144128,"q1":5076144128,"q2":5076144128,"q3":5076144128,"max":5076144128,"minLabel":"GenotypingNextclade (1)","maxLabel":"GenotypingNextclade (1)","q1Label":"GenotypingNextclade (1)","q2Label":"GenotypingNextclade (1)","q3Label":"GenotypingNextclade (1)"},"memUsage":null,"timeUsage":null,"vmem":{"mean":5082419200,"min":5082419200,"q1":5082419200,"q2":5082419200,"q3":5082419200,"max":5082419200,"minLabel":"GenotypingNextclade (1)","maxLabel":"GenotypingNextclade (1)","q1Label":"GenotypingNextclade (1)","q2Label":"GenotypingNextclade (1)","q3Label":"GenotypingNextclade (1)"},"reads":{"mean":1919832589,"min":1919832589,"q1":1919832589,"q2":1919832589,"q3":1919832589,"max":1919832589,"minLabel":"GenotypingNextclade (1)","maxLabel":"GenotypingNextclade (1)","q1Label":"GenotypingNextclade (1)","q2Label":"GenotypingNextclade (1)","q3Label":"GenotypingNextclade (1)"},"cpu":{"mean":315.6,"min":315.6,"q1":315.6,"q2":315.6,"q3":315.6,"max":315.6,"minLabel":"GenotypingNextclade (1)","maxLabel":"GenotypingNextclade (1)","q1Label":"GenotypingNextclade (1)","q2Label":"GenotypingNextclade (1)","q3Label":"GenotypingNextclade (1)"},"time":{"mean":35143,"min":35143,"q1":35143,"q2":35143,"q3":35143,"max":35143,"minLabel":"GenotypingNextclade (1)","maxLabel":"GenotypingNextclade (1)","q1Label":"GenotypingNextclade (1)","q2Label":"GenotypingNextclade (1)","q3Label":"GenotypingNextclade (1)"},"writes":{"mean":3777126342,"min":3777126342,"q1":3777126342,"q2":3777126342,"q3":3777126342,"max":3777126342,"minLabel":"GenotypingNextclade (1)","maxLabel":"GenotypingNextclade (1)","q1Label":"GenotypingNextclade (1)","q2Label":"GenotypingNextclade (1)","q3Label":"GenotypingNextclade (1)"}}] };
+], "summary":[] };
 
   </script>
 
