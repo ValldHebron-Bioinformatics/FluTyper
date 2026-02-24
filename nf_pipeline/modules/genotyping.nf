@@ -21,38 +21,24 @@ process GenotypingNextclade {
 
     script:
     """
+    # Filtra el FASTA original per quedar-se només amb les capçaleres que contenen |HA| o (HA)
+    # El format de l'awk busca les línies que comencen per '>' i contenen el patró
+    awk '/^>/ {f=(\$0 ~ /\\|HA\\|/ || \$0 ~ /\\(HA\\)/)} f' ${dirSample}/${sample} > filtered_HA.fasta
+
     # Descarrega el dataset de referència
     nextclade dataset get --name 'community/moncla-lab/iav-h5/ha/2.3.4.4' --output-dir nextclade_dataset
     
     # Executa analisi Nextclade
-    nextclade run \\
-        --input-dataset nextclade_dataset \\
-        --output-json nextclade_results_${sample}.json \\
-        ${dirSample}/${sample}
+    nextclade run \
+        --input-dataset nextclade_dataset \
+        --output-json nextclade_results_${sample}.json \
+        filtered_HA.fasta
 
-        python /home/vhir/Desktop/FluTyper/nf_pipeline/bin/extract_clades.py \\
+        # Això és extra, només em serveix ara per verificar que l'assignació de clades de Nextclade és fiable, s'acabarà eliminant.
+        python $projectDir/${params.programs.extractClades} \
         nextclade_results_${sample}.json > seqid_clade_${sample}.csv
     """
 }
 
-// Flux de treball principal
-workflow {
-    main:
-    // Crea el canal d'entrada des dels paràmetres
-    input_ch = channel.of( [ params.sample, params.dirSample ] )
 
-    // Executa el procés amb el canal creat
-    GenotypingNextclade(input_ch)
 
-    publish:
-    res = GenotypingNextclade.out
-}
-
-// Bloc final de publicació de resultats
-output {
-    res {
-        // Usa el primer element de la tupla (sample) per crear la carpeta
-        path { "${params.sample}" }
-        mode "copy"
-    }
-}
