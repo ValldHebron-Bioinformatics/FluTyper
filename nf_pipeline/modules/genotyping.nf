@@ -19,7 +19,7 @@ process GenotypingNextclade {
     """
     # Filtra el FASTA original per quedar-se només amb les capçaleres que contenen |HA| o (HA)
     # El format de l'awk busca les línies que comencen per '>' i contenen el patró
-    awk '/^>/ {f=(\$0 ~ /\\|HA\\|/ || \$0 ~ /\\(HA\\)/)} f' ${params.dirSample}/${params.sample} > filtered_HA.fasta
+    awk '/^>/ {f=(\$0 ~ /\\|HA\\|/ || \$0 ~ /\\_HA\\_/)} f' ${params.dirSample}/${params.sample} > filtered_HA.fasta
 
     # Descarrega el dataset de referència
     nextclade dataset get --name 'community/moncla-lab/iav-h5/ha/2.3.4.4' --output-dir nextclade_dataset
@@ -27,12 +27,12 @@ process GenotypingNextclade {
     # Executa analisi Nextclade
     nextclade run \
         --input-dataset nextclade_dataset \
-        --output-json nextclade_results_${params.sample}.json \
+        --output-csv nextclade_results_${params.sample}.csv \
         filtered_HA.fasta
 
         # Això és extra, només em serveix ara per verificar que l'assignació de clades de Nextclade és fiable, s'acabarà eliminant.
         python ${params.workDir}/${params.programs.extractClades} \
-        nextclade_results_${params.sample}.json > seqid_clade_${params.sample}.csv
+        nextclade_results_${params.sample}.csv > seqid_clade_${params.sample}.csv
     """
 }
 
