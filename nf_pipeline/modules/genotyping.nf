@@ -2,9 +2,7 @@
 
 // Activa la sintaxi DSL2
 nextflow.enable.dsl=2
-params {
-    
-}
+
 // Procés per analitzar clades amb Nextclade
 process GenotypingNextclade {
     errorStrategy 'ignore' // Ignora errors i continua
