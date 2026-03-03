@@ -33,8 +33,7 @@ workflow {
     publish:
     res = GenotypingNextclade.out
     folder = TranslateToProtein.out
-    subtype_minimizers = SubtypeDetection.out.minimizers
-    subtype_inferred = SubtypeDetection.out.inferred
+    subtype = SubtypeDetection.out
     mut = mut_out
 }
 // Bloc final de publicació de resultats
@@ -48,11 +47,7 @@ output {
         path { "${params.sample}" }
         mode "copy"
     }
-    subtype_minimizers {
-        path { "${params.sample}" }
-        mode "copy"
-    }
-    subtype_inferred {
+    subtype {
         path { "${params.sample}" }
         mode "copy"
     }
