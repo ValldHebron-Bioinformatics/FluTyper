@@ -1,19 +1,22 @@
 #!/usr/bin/env nextflow
 
 nextflow.enable.dsl = 2
-// No hi ha absolutament res definitiu aquí, només era per poder incloure a main.nf
+
 process MutationsFinder {
-    errorStrategy 'ignore' // Ignora errors i continua
+    errorStrategy 'ignore'
 
     input:
-    tuple val(sample), path(dirSample) // Rep nom del fitxer i directori
+    tuple val(sample), path(dirSample)
 
     output:
-    tuple val(sample), path("mutations_${sample}.csv") // Output resultant
+    tuple val(sample), path("mutations_translated.csv")
 
     script:
     """
-    # Descarrega el dataset de referència
-    nextclade dataset get --name 'community/moncla-lab/iav-h5/ha/
+    cd ${params.workDir}/..
+
+    python3 ${params.workDir}/${params.programs.mutationsDictionary} \
+      --subtype ${params.mutationsSubtype ?: (params.protocol ? params.protocol.toString().trim().toUpperCase() : '')} \
+      --output ${task.workDir}/mutations_translated.csv
     """
 }

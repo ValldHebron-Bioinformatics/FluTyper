@@ -4,5 +4,6 @@ __pycache__/
 work
 docs/fastas/
 docs/reports/
-docs/Presentations/
+docs/TFM
 protocols/
+.venv/

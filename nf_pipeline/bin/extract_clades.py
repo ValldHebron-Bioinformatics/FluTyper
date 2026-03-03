@@ -22,18 +22,24 @@ def compare_clades(csv_file):
             predicted_clade = str(row.get('clade', 'N/A'))
             qc_status = str(row.get('qc.overallStatus', 'N/A'))
 
-            # Només analitzem seqüències amb bona qualitat i amb clade assignat
-            if qc_status != 'good' or predicted_clade == 'unassigned':
+            # Només analitzem seqüències amb bona qualitat
+            if qc_status != 'good':
                 continue
-            
-            total_sequences += 1
 
             # Extraiem l'últim segment de l'ID usant | o _ com a delimitadors
             # La funció re.split permet separar per múltiples caràcters alhora
             segments = re.split(r'[|_]', seq_id)
             real_clade = segments[-1] if segments else 'N/A'
-        
-            match = (real_clade == predicted_clade)
+
+            # Normalitzem: si el clade real NO pertany a 2.3.4.4*
+            # (2.3.4.4a, 2.3.4.4b, 2.3.4.4c, ...), el considerem 'unassigned'
+            if not real_clade.startswith('2.3.4.4'):
+                real_clade = 'unassigned'
+
+            total_sequences += 1
+
+            is_2344_like_match = real_clade.startswith('2.3.4.4') and predicted_clade == '2.3.4.4-like'
+            match = (real_clade == predicted_clade) or is_2344_like_match
             if match:
                 correct_predictions += 1
 
