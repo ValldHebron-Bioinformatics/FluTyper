@@ -1,10 +1,11 @@
-# A(H5) all-clades dataset with A/Goose/Guangdong/1/96 reference
+# A(H5) clade 2.3.4.4 dataset with A/Astrakhan/3212/2020 reference
 
 | attribute            | value                                    |
 | -------------------- | ---------------------------------------- |
-| dataset name         | A(H5) all-clades (provisional)          |
-| reference strain     | A/Goose/Guangdong/1/96(H5N1)             |
-| reference accession  | AF144305.1                               |
+| authors              |[Jordan Ort](https://lmoncla.github.io/monclalab/team/JordanOrt/), [Louise Moncla](https://lmoncla.github.io/monclalab/team/LouiseMoncla/)|
+| dataset name         | A(H5) clade 2.3.4.4 (provisional)         |
+| reference strain     | A/Astrakhan/3212/2020(H5N8)              |
+| reference accession  | EPI1846961                               |
 
 ## Authors and contacts
 
@@ -20,7 +21,7 @@ Ort, J. T., Shepard, S. S., Zolnoski, S. A., Lam, T. T.-Y., Davis, C. T., Neher,
 
 ## Scope of this dataset
 
-This dataset uses the first highly pathogenic avian influenza (HPAI) isolate (A/Goose/Guangdong/1/96) as a reference and is suitable for the analysis of circulating and historical A(H5) sequences, including low pathogenici avian influenza (LPAI) isolates.
+This dataset uses an A(H5) candidate vaccine virus (CVV) from clade `2.3.4.4` (A/Astrakhan/3212/2020) as a reference and is suitable for the analysis of A(H5) sequences belonging to clade `2.3.4.4` and its sub-clades `2.3.4.4a` through `2.3.4.4h`. Sequences belonging to other clades cannot be annotated by this dataset and will be left `unassigned`.
 
 ## Features
 
@@ -33,18 +34,19 @@ This dataset supports
 
 ## Clades of A(H5) avian influenza viruses
 
-The FAO/WHO/WOAH H5 Nomenclature Working Group define "clades" as genetically divergent groups of viruses, based on their HA gene segment.
-Viruses falling into a given clade share a common ancestor with significant bootstrap support and have low levels of within-clade diversity.
-When significant within-clade diversity is seen, these clades can be further split into sub-clades; for example, clade `2.3.4.4` is being split into eight additional sub-clades, named `2.3.4.4a` through `2.3.4.4h` due to high circulating diversity within the clade.
-This Nextclade dataset incorporates these provisional `2.3.4.4` sub-clades, as well as sub-clades `2.3.2.1a` through `2.3.2.1g` for the `2.3.2.1` split.
+The FAO/WHO/WOAH H5 Nomenclature Working Group define "clades" using HA gene seguences, and define clades as genetically distinct, monophyletic groups of viruses. Viruses falling into a given clade share a common ancestor with significant bootstrap support and have low levels of within-clade diversity. [Past nomenclature updates](https://onlinelibrary.wiley.com/doi/10.1111/irv.12324) have required viruses in the same clade to be monophyletic with bootstrap suppor of at least 60%, with within-clade pairwise distances of less than 1.5%. These requirements are sometimes relaxed, and clades are periodically updated to account for expanding viral diversity.
+
+Since 2006, clade `2.3.4.4` viruses have circulated continuously and diversified extensively into multiple sub-clades. To account for this expansion, clade `2.3.4.4` is being split into eight additional sub-clades, named `2.3.4.4a` through `2.3.4.4h` due to high circulating diversity within the clade.
+
+This Nextclade dataset incorporates these provisional `2.3.4.4` sub-clades.
 
 ## Alternative, and complementary approaches for A(H5) clade assignment
 
-Two additional tools exist for assigning clades to A(H5) viruses, which also accommodate the recent `2.3.2.1` and `2.3.4.4` clade splits.
+Two additional tools exist for assigning clades to A(H5) viruses that accommodate the recent `2.3.4.4` clade splits.
 
 1. [LABEL](https://wonder.cdc.gov/amd/flu/label/): this command-line tool is built and maintained by Sam Shepard, and performs clade assignment for all current `2.3.2.1` and `2.3.4.4` clade splits.
 2. [BVBRC Subspecies Classification Tool](https://www.bv-brc.org/app/SubspeciesClassification): this is a drag and drop tool that classifies a variety of viruses, including influenza A H1N1, H3N2, and H5N1.
 
-The clade assignments in this Nextclade dataset were validated against LABEL assignments and shown to be generally well-matched across subclades. The figure below shows a direct comparison of assignments for 19,833 HA sequences from GISAID, performed using LABEL and this NextClade dataset for all A(H5) clades. Note that the results for clades `2.3.2.1`, `2.3.4.4`, and their subclades are not shown in this figure.
+The clade assignments in this Nextclade dataset were validated against LABEL assignments and shown to be generally well-matched across subclades. The figure below shows a direct comparison of assignments for 9,924 HA sequences from GISAID, performed using LABEL and this NextClade dataset for clade `2.3.4.4` and its subclades.
 
-![Figure 1: Comparison between LABEL and Nextclade for all-clade assignments](https://raw.githubusercontent.com/moncla-lab/h5-nextclade/refs/heads/main/figures-for-dataset-readmes/all-clades.svg)
+![Figure 1: Comparison between LABEL and Nextclade for 2.3.4.4 assignments](https://raw.githubusercontent.com/moncla-lab/h5-nextclade/refs/heads/main/figures-for-dataset-readmes/2344.svg)

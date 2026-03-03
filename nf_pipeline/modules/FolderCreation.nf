@@ -19,7 +19,12 @@ process OrganizeBySpecies {
     awk '
       /^>/ {
         # Extreu espècie i segment del header
-        split(substr(\$0, 2), a, "_")
+        header = substr(\$0, 2)
+        if (index(header, "|") > 0) {
+          split(header, a, "|")
+        } else {
+          split(header, a, "_")
+        }
         species = a[1]
         segment = a[2]
 
