@@ -5,12 +5,12 @@
     "terminalBandwidth": 100,
     "allowedMismatches": 4,
     "gapAlignmentSide": "right",
-    "minSeedCover": 0.05
+    "minSeedCover": 0.1
   },
   "attributes": {
-    "name": "H5Nx (all clades)",
-    "reference accession": "AF144305.1",
-    "reference name": "A/Goose/Guangdong/1/96(H5N1)",
+    "name": "H5Nx clade 2.3.4.4",
+    "reference accession": "EPI1846961",
+    "reference name": "A/Astrakhan/3212/2020(H5N8)",
     "segment": "ha",
     "experimental": false
   },
@@ -48,9 +48,9 @@
       "mixedSitesThreshold": 4
     },
     "privateMutations": {
-      "cutoff": 97,
+      "cutoff": 18,
       "enabled": true,
-      "typical": 24
+      "typical": 6
     },
     "snpClusters": {
       "clusterCutOff": 5,
@@ -74,7 +74,7 @@
           "ranges": [
             {
               "begin": 0,
-              "end": 533
+              "end": 532
             }
           ]
         }
@@ -94,13 +94,13 @@
           "ranges": [
             {
               "begin": 340,
-              "end": 346
+              "end": 345
             }
           ]
         }
       ],
       "motifs": [
-        "[A-Z-]{6}"
+        "[A-Z-]{5}"
       ]
     },
     {
@@ -114,7 +114,7 @@
           "ranges": [
             {
               "begin": 340,
-              "end": 346
+              "end": 345
             }
           ]
         }
