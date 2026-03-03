@@ -11,7 +11,7 @@ process GenotypingNextclade {
     tuple val(params.sample), path(params.dirSample) // Rep nom del fitxer i directori
 
     output:
-    tuple val(params.sample), path("seqid_clade_${params.sample}.csv") // Output resultant
+    tuple val(params.sample), path("seqid_clade_${params.sample}.csv"), path("clade_check_${params.sample}.csv") // Outputs resultants
 
     script:
     """

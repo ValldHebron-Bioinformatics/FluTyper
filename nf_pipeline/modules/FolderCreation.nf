@@ -18,21 +18,21 @@ process OrganizeBySpecies {
 
     awk '
       /^>/ {
-        # Extreu espècie i proteïna del header
+        # Extreu espècie i segment del header
         split(substr(\$0, 2), a, "_")
         species = a[1]
-        protein = a[2]
+        segment = a[2]
 
         # Rutes de sortida
         dir = "sequences/" species
-        prot_dir = dir "/proteins"
+        prot_dir = dir "/segments"
         system("mkdir -p " prot_dir)
 
         cons_file = dir "/consensus.fasta"
-        prot_file = prot_dir "/" protein ".fasta"
+        prot_file = prot_dir "/" segment ".fasta"
       }
       {
-        # Escriu a consensus i per proteïna
+        # Escriu a consensus i per segment
         if (cons_file != "") {
           print \$0 >> cons_file
           print \$0 >> prot_file
