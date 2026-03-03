@@ -6,40 +6,35 @@ include { GenotypingNextclade } from './modules/genotyping'
 include { OrganizeBySpecies   } from './modules/FolderCreation'
 include { MutationsFinder     } from './modules/mutations'
 include { TranslateToProtein  } from './modules/Translation'
+include { SubtypeDetection    } from './modules/SubtypeDetection'
 
 // Flux de treball principal
 workflow {
     main:
 
-    // Valida que el subtipus final estigui definit i sigui compatible.
-    def validMutationSubtypes = ['H1', 'H3', 'H5', 'H7', 'H9'] as Set
-    def resolvedMutationSubtype = params.mutationsSubtype ?: (params.protocol ? params.protocol.toString().trim().toUpperCase() : null)
-    if (!resolvedMutationSubtype) {
-        error "No s'ha pogut resoldre 'mutationsSubtype'. Revisa --protocol (per defecte H5) o passa --mutationsSubtype."
-    }
-    if (!(resolvedMutationSubtype in validMutationSubtypes)) {
-        error "mutationsSubtype '${resolvedMutationSubtype}' no és vàlid. Valors admesos: ${validMutationSubtypes.join(', ')}"
-    }
-
     // Crea el canal d'entrada des dels paràmetres
     input_ch = channel.of( [ params.sample, params.dirSample ] )
-    def resolvedProtocol = (params.protocol ? params.protocol.toString().trim().toUpperCase() : 'H5')
 
     // Executa el procés amb el canal creat
     OrganizeBySpecies(input_ch)
     GenotypingNextclade(input_ch)
     TranslateToProtein(OrganizeBySpecies.out)
+    SubtypeDetection(input_ch)
 
-    // Si el protocol és H5, s'omet la traducció de mutacions.
+    // Mutacions opcional: només si es passa --mutationsSubtype
     def mut_out = channel.empty()
-    if (resolvedProtocol != 'H5') {
+    if (params.mutationsSubtype) {
         MutationsFinder(input_ch)
         mut_out = MutationsFinder.out
+    } else {
+        log.info "MutationsFinder omès: passa --mutationsSubtype per activar-lo."
     }
 
     publish:
     res = GenotypingNextclade.out
     folder = TranslateToProtein.out
+    subtype_minimizers = SubtypeDetection.out.minimizers
+    subtype_inferred = SubtypeDetection.out.inferred
     mut = mut_out
 }
 // Bloc final de publicació de resultats
@@ -50,6 +45,14 @@ output {
         mode "copy"
     }
     folder {
+        path { "${params.sample}" }
+        mode "copy"
+    }
+    subtype_minimizers {
+        path { "${params.sample}" }
+        mode "copy"
+    }
+    subtype_inferred {
         path { "${params.sample}" }
         mode "copy"
     }

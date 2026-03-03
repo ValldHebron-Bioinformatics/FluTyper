@@ -2,6 +2,20 @@ import pandas as pd
 import sys
 import re
 
+
+def infer_real_clade(seq_id: str) -> str:
+    pipe_parts = seq_id.split('|')
+    if pipe_parts:
+        candidate = pipe_parts[-1].strip()
+        if candidate.startswith('2.3.4.4'):
+            return candidate
+
+    match = re.search(r'2\.3\.4\.4[\w.-]*', seq_id)
+    if match:
+        return match.group(0)
+
+    return 'unassigned'
+
 def compare_clades(csv_file):
     """
     Llegeix un CSV de Nextclade i calcula la precisió comparant el clade 
@@ -26,15 +40,7 @@ def compare_clades(csv_file):
             if qc_status != 'good':
                 continue
 
-            # Extraiem l'últim segment de l'ID usant | o _ com a delimitadors
-            # La funció re.split permet separar per múltiples caràcters alhora
-            segments = re.split(r'[|_]', seq_id)
-            real_clade = segments[-1] if segments else 'N/A'
-
-            # Normalitzem: si el clade real NO pertany a 2.3.4.4*
-            # (2.3.4.4a, 2.3.4.4b, 2.3.4.4c, ...), el considerem 'unassigned'
-            if not real_clade.startswith('2.3.4.4'):
-                real_clade = 'unassigned'
+            real_clade = infer_real_clade(seq_id)
 
             total_sequences += 1
 
