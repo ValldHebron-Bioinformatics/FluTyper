@@ -3,8 +3,7 @@ __pycache__/
 .nextflow
 work
 docs/fastas/
-docs/reports/
 docs/TFM
-protocols/
 .venv/
 results/
+protocols/AVIAN/v1/config.yaml

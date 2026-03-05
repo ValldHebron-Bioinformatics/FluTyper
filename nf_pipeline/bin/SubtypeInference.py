@@ -3,7 +3,7 @@
 import csv
 import re
 
-# 1. Competició de puntuacions (Quedar-se amb el millor match)
+# 1. Quedar-se amb el millor score
 # Aquí guardem la millor peça trobada fins ara per a cada (mostra, segment)
 best_match = {}
 
