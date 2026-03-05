@@ -135,7 +135,6 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument('--sequences-dir', '--input', dest='sequences_dir', required=True)
     parser.add_argument('--output-dir', '--output', dest='output_dir', required=True)
-    parser.add_argument('--protocol', default='')
     args = parser.parse_args()
 
     sequences_dir = Path(args.sequences_dir)

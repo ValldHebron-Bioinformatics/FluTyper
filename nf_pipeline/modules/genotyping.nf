@@ -16,7 +16,7 @@ process GenotypingNextclade {
     script:
     """
     # Filtra només capçaleres HA
-    awk '/^>/ {f=(\$0 ~ /\\|HA\\|/ || \$0 ~ /_HA_/)} f' ${params.dirSample}/${params.sample} > filtered_HA.fasta
+    awk '/^>/ {f=(index(\$0, "|HA|") > 0 || index(\$0, "_HA_") > 0)} f' "${params.dirSample}/${params.sample}" > filtered_HA.fasta
 
     # Dataset Nextclade: usa local i, si no existeix, el descarrega
     DATASET_NAME='community/moncla-lab/iav-h5/ha/2.3.4.4'

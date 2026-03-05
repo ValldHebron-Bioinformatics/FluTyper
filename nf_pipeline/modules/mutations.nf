@@ -16,7 +16,7 @@ process MutationsFinder {
     cd ${params.workDir}/..
 
     python3 ${params.workDir}/${params.programs.mutationsDictionary} \
-      --subtype ${params.mutationsSubtype ?: (params.protocol ? params.protocol.toString().trim().toUpperCase() : '')} \
+      --subtype ${params.mutationsSubtype ?: ''} \
       --output ${task.workDir}/mutations_translated.csv
     """
 }
