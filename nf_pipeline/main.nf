@@ -7,6 +7,7 @@ include { OrganizeBySpecies   } from './modules/FolderCreation'
 include { MutationsFinder     } from './modules/mutations'
 include { TranslateToProtein  } from './modules/Translation'
 include { SubtypeDetection    } from './modules/SubtypeDetection'
+include { GetCDS              } from './modules/GetCDS'
 
 // Flux de treball principal
 workflow {
@@ -18,8 +19,9 @@ workflow {
     // Executa el procés amb el canal creat
     OrganizeBySpecies(input_ch)
     GenotypingNextclade(input_ch)
-    TranslateToProtein(OrganizeBySpecies.out)
     SubtypeDetection(input_ch)
+    GetCDS(OrganizeBySpecies.out, SubtypeDetection.out)
+    TranslateToProtein(GetCDS.out)
 
     // Mutacions opcional: només si es passa --mutationsSubtype
     def mut_out = channel.empty()

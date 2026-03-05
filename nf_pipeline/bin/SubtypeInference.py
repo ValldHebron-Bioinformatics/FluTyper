@@ -2,17 +2,22 @@
 
 import csv
 import re
+import sys
 
 # 1. Quedar-se amb el millor score
 # Aquí guardem la millor peça trobada fins ara per a cada (mostra, segment)
 best_match = {}
+missing_score_ha_na = []
 
 with open('minimizers_results.tsv', 'r') as f:
     lector = csv.DictReader(f, delimiter='\t')
     for line in lector:
-        seqName = line['seqName']
-        score = float(line['score'])
-        match = line['dataset']
+        seqName = (line.get('seqName') or '').strip()
+        score_raw = (line.get('score') or '').strip()
+        match = (line.get('dataset') or '').strip()
+
+        if not seqName:
+            continue
 
         # Extraiem mostra i segment poden estar separades per '|' o '_'
         parts = re.split(r'[|_]', seqName)
@@ -20,11 +25,31 @@ with open('minimizers_results.tsv', 'r') as f:
             id = parts[0]
             segment = parts[1].upper()
 
+            if segment in ["HA", "NA"] and not score_raw:
+                missing_score_ha_na.append(seqName)
+                continue
+
+            try:
+                score = float(score_raw)
+            except ValueError:
+                if segment in ["HA", "NA"]:
+                    missing_score_ha_na.append(seqName)
+                continue
+
+            if not match:
+                continue
+
             if segment in ["HA", "NA"]:
                 key = (id, segment)
                 # Només guardem si el score és més alt que l'anterior
                 if key not in best_match or score > best_match[key]['score']:
                     best_match[key] = {'dataset': match, 'score': score}
+
+if missing_score_ha_na:
+    unique_missing = sorted(set(missing_score_ha_na))
+    print(f"[SubtypeInference] WARNING: Missing/invalid score for {len(unique_missing)} HA/NA sequences", file=sys.stderr)
+    for seq_name in unique_missing:
+        print(f"[SubtypeInference] Missing score: {seq_name}", file=sys.stderr)
 
 # 2. Unió de H + N per a cada mostra
 

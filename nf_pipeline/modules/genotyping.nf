@@ -10,8 +10,7 @@ process GenotypingNextclade {
 
     output:
     tuple val(params.sample),
-          path("seqid_clade_${params.sample}.csv"),
-          path("clade_check_${params.sample}.csv")
+            path("seqid_clade_${params.sample}.csv")
 
     script:
     """
@@ -30,7 +29,7 @@ process GenotypingNextclade {
         --output-csv nextclade_results_${params.sample}.csv \
         filtered_HA.fasta
 
-    python ${params.workDir}/${params.programs.extractClades} \
+    ### python ${params.workDir}/${params.programs.extractClades} \
         nextclade_results_${params.sample}.csv > clade_check_${params.sample}.csv
 
     python ${params.workDir}/${params.programs.createCSV} \

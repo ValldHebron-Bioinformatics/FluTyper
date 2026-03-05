@@ -7,3 +7,4 @@ docs/TFM
 .venv/
 results/
 protocols/AVIAN/v1/config.yaml
+.gitignore
