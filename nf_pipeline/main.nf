@@ -22,7 +22,22 @@ workflow {
     
     // Executa el procés amb el canal creat
     OrganizeBySample(SampleInput_ch)
-    //SubtypeDetection(OrganizeBySample.out)
+    SubtypeInput_ch = OrganizeBySample.out.map { sample_id, sample_dir ->
+        tuple(
+            sample_id,
+            file("${sample_dir}/segments/HA/${sample_id}_HA.fasta"),
+            file("${sample_dir}/segments/NA/${sample_id}_NA.fasta")
+        )
+    }
+    SubtypeDetection(SubtypeInput_ch)
+    subtype_merged_ch = SubtypeDetection.out
+        .map { _sample_id, subtype_file -> subtype_file }
+        .collectFile(
+            name: 'inferred_subtypes.tsv',
+            seed: 'seqName\tinferred_subtype\n',
+            storeDir: "${launchDir}/${params.outDir}",
+            newLine: false
+        )
     //GenotypingNextclade(SampleInput_ch, SubtypeDetection.out)
     //GetCDS(OrganizeBySample.out, SubtypeDetection.out)
     //TranslateToProtein(GetCDS.out)
@@ -38,7 +53,7 @@ workflow {
 
     publish:
     folder = OrganizeBySample.out
-    //subtype = SubtypeDetection.out
+    subtype = subtype_merged_ch
     //res = GenotypingNextclade.out
     //prot = TranslateToProtein.out
     //mut = mut_out
@@ -55,9 +70,10 @@ output {
         mode "copy"
     }
     //subtype {
-    //    path { "${params.outDir}" }
-    //    mode "copy"
-    //}
+    subtype {
+        path { "${launchDir}/${params.outDir}" }
+        mode "copy"
+    }
     //mut {
     //    path { "${params.outDir}" }
     //    mode "copy"
