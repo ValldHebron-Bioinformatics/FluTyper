@@ -6,16 +6,17 @@ process GenotypingNextclade {
     errorStrategy 'ignore'
 
     input:
-    tuple val(params.sample), path(params.dirSample)
+    tuple val(sample_id), path(sample_fasta)
+    path(inferred_subtypes)
 
     output:
-    tuple val(params.sample),
-            path("seqid_clade_${params.sample}.csv")
+    tuple val(sample_id),
+            path("seqid_clade_${sample_id}.csv")
 
     script:
     """
     # Filtra només capçaleres HA
-    awk '/^>/ {f=(index(\$0, "|HA|") > 0 || index(\$0, "_HA_") > 0)} f' "${params.dirSample}/${params.sample}" > filtered_HA.fasta
+    awk '/^>/ {f=(index(\$0, "|HA|") > 0 || index(\$0, "_HA_") > 0)} f' "${sample_fasta}" > filtered_HA.fasta
 
     # Dataset Nextclade: usa local i, si no existeix, el descarrega
     DATASET_NAME='community/moncla-lab/iav-h5/ha/2.3.4.4'
@@ -26,14 +27,14 @@ process GenotypingNextclade {
     # Executa anàlisi Nextclade
     nextclade run \
         --input-dataset nextclade_dataset \
-        --output-csv nextclade_results_${params.sample}.csv \
+        --output-csv nextclade_results_${sample_id}.csv \
         filtered_HA.fasta
 
     ### python ${params.workDir}/${params.programs.extractClades} \
-        nextclade_results_${params.sample}.csv > clade_check_${params.sample}.csv
+        nextclade_results_${sample_id}.csv > clade_check_${sample_id}.csv
 
     python ${params.workDir}/${params.programs.createCSV} \
-        nextclade_results_${params.sample}.csv seqid_clade_${params.sample}.csv 
+        nextclade_results_${sample_id}.csv seqid_clade_${sample_id}.csv 
     """
 }
 

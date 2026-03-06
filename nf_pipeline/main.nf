@@ -3,7 +3,7 @@
 nextflow.enable.dsl = 2
 
 include { GenotypingNextclade } from './modules/genotyping'
-include { OrganizeBySpecies   } from './modules/FolderCreation'
+include { OrganizeBySample   } from './modules/OrganizeBySample'
 include { MutationsFinder     } from './modules/mutations'
 include { TranslateToProtein  } from './modules/Translation'
 include { SubtypeDetection    } from './modules/SubtypeDetection'
@@ -14,47 +14,52 @@ workflow {
     main:
 
     // Crea el canal d'entrada des dels paràmetres
-    input_ch = channel.of( [ params.sample, params.dirSample ] )
-
+    SampleInput_ch = channel
+    .fromPath(params.inputFasta, checkIfExists: true)
+    .splitFasta(record: [id: true])
+    .map { rec -> tuple(rec.id.tokenize('[|_]')[0], file(params.inputFasta)) }
+    .unique { record -> record[0] }
+    
     // Executa el procés amb el canal creat
-    OrganizeBySpecies(input_ch)
-    GenotypingNextclade(input_ch)
-    SubtypeDetection(input_ch)
-    GetCDS(OrganizeBySpecies.out, SubtypeDetection.out)
-    TranslateToProtein(GetCDS.out)
+    OrganizeBySample(SampleInput_ch)
+    //SubtypeDetection(OrganizeBySample.out)
+    //GenotypingNextclade(SampleInput_ch, SubtypeDetection.out)
+    //GetCDS(OrganizeBySample.out, SubtypeDetection.out)
+    //TranslateToProtein(GetCDS.out)
 
     // Mutacions opcional: només si es passa --mutationsSubtype
-    def mut_out = channel.empty()
-    if (params.mutationsSubtype) {
-        MutationsFinder(input_ch)
-        mut_out = MutationsFinder.out
-    } else {
-        log.info "MutationsFinder omès: passa --mutationsSubtype per activar-lo."
-    }
+    //def mut_out = channel.empty()
+    //if (params.mutationsSubtype) {
+    //    MutationsFinder(SampleId_ch)
+    //    mut_out = MutationsFinder.out
+    //} else {
+    //    log.info "MutationsFinder omès: passa --mutationsSubtype per activar-lo."
+    //}
 
     publish:
-    res = GenotypingNextclade.out
-    folder = TranslateToProtein.out
-    subtype = SubtypeDetection.out
-    mut = mut_out
+    folder = OrganizeBySample.out
+    //subtype = SubtypeDetection.out
+    //res = GenotypingNextclade.out
+    //prot = TranslateToProtein.out
+    //mut = mut_out
 }
 // Bloc final de publicació de resultats
 output {
-    res {
+    //res {
         // Usa el primer element dl tuple (sample) per crear la carpeta
-        path { "${params.sample}" }
-        mode "copy"
-    }
+    //    path { "${params.outDir}" }
+    //    mode "copy"
+    //}
     folder {
-        path { "${params.sample}" }
+        path { "${launchDir}/${params.outDir}" }
         mode "copy"
     }
-    subtype {
-        path { "${params.sample}" }
-        mode "copy"
-    }
-    mut {
-        path { "${params.sample}" }
-        mode "copy"
-    }
+    //subtype {
+    //    path { "${params.outDir}" }
+    //    mode "copy"
+    //}
+    //mut {
+    //    path { "${params.outDir}" }
+    //    mode "copy"
+    //}
 }

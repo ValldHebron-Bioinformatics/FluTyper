@@ -6,14 +6,14 @@ process SubtypeDetection {
     errorStrategy 'ignore'
 
     input:
-    tuple val(params.sample), path(params.dirSample)
+    tuple val(sample_id), path(sample_fasta)
 
     output:
-    path("inferred_subtypes.tsv")
+    tuple val(sample_id), path("inferred_subtypes.tsv")
 
     script:
     """
-    input_fasta="${params.dirSample}/${params.sample}"
+    input_fasta="${sample_fasta}"
 
     if [[ "${params.protocol}" == "AVIAN" ]]; then
         echo "Subtype detection for AVIAN protocol"

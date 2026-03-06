@@ -4,7 +4,6 @@ nextflow.enable.dsl = 2
 
 process GetCDS {
     errorStrategy 'ignore'
-    
 
     input:
     path(sequences_dir)
@@ -15,100 +14,170 @@ process GetCDS {
 
     script:
     """
-    cp -rL ${sequences_dir} sequences_work
-    rm -f sequences
-    mv sequences_work sequences
-
-    export SEQUENCES_DIR="sequences"
-    export INFERRED_SUBTYPES="${inferred_subtypes}"
+    cp -rL ${sequences_dir} sequences_work && rm -rf sequences && mv sequences_work sequences
     export REFERENCES_FASTA="${params.protocols[params.protocol].resources}/CDS_references.fasta"
+    export INFERRED_SUBTYPES="${inferred_subtypes}"
+    export SEQUENCE_DIR="sequences"
 
     python3 - <<'PY'
-import csv
-import os
-import re
-import subprocess
-import tempfile
+import csv, os, re, subprocess, tempfile
 from pathlib import Path
 
-def parse_fasta(source):
-    '''Yield (header, seq) from a file path or a string of FASTA text.'''
-    if isinstance(source, Path):
-        with open(source, "r") as fh:
-            lines = fh.readlines()
-    else:
-        lines = source.splitlines()
+def parse_fasta(p):
+    if not Path(p).exists():
+        return []
+    out = []
+    with open(p) as f:
+        for g in [g.splitlines() for g in f.read().split(">") if g.strip()]:
+            h = g[0].strip()
+            s = "".join(x.strip() for x in g[1:] if x.strip()).upper()
+            out.append((h, s))
+    return out
 
-    header, seq = None, []
-    for raw in lines:
-        line = raw.strip()
-        if not line:
-            continue
-        if line.startswith(">"):
-            if header is not None:
-                yield header, "".join(seq).upper()
-            header, seq = line[1:], []
-        else:
-            seq.append(line)
-    if header is not None:
-        yield header, "".join(seq).upper()
+# Call mafft to align ref and query
+def run_mafft(ref, qry):
+    key = (ref, qry)
+    if key in run_mafft._cache:
+        return run_mafft._cache[key]
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.fa') as t:
+        t.write(f">R\\n{ref}\\n>Q\\n{qry}\\n")
+        t.flush()
+        res = subprocess.run(
+            ["mafft", "--auto", "--op", "3.0", "--quiet", t.name],
+            capture_output=True, text=True
+        ) 
+        if res.returncode != 0:
+            run_mafft._cache[key] = ("", "")
+            return run_mafft._cache[key]
+        d = {l.strip(): "".join(lines).strip()
+             for l, *lines in [g.splitlines() for g in res.stdout.split(">") if g.strip()]}
+        run_mafft._cache[key] = (d.get("R", ""), d.get("Q", ""))
+        return run_mafft._cache[key]
+run_mafft._cache = {} 
 
+# Extract CDS from aligned sequences, trimming leading/trailing gaps and ensuring length is a multiple of 3
+def get_cds(r_aln, q_aln):
+    if not r_aln or not q_aln:
+        return ""
+    s, e = 0, len(r_aln) - 1
+    while s <= e and (r_aln[s] == '-' or q_aln[s] == '-'):
+        s += 1
+    while e >= s and (r_aln[e] == '-' or q_aln[e] == '-'):
+        e -= 1
+    if s > e:
+        return ""
+    cds = "".join(q for r, q in zip(r_aln[s:e+1], q_aln[s:e+1]) if r != '-')
+    ungapped = sum(1 for c in cds if c != '-')
+    usable = (ungapped // 3) * 3
+    if usable <= 0:
+        return ""
+    out, seen = [], 0
+    for c in cds:
+        if c != '-':
+            if seen >= usable:
+                break
+            seen += 1
+        out.append(c)
+    return "".join(out)
+# Score alignment by counting gaps and mismatches (gaps worse than mismatches)
+def aln_score(r_aln, q_aln):
+    if not r_aln or not q_aln:
+        return (10**12, -10**12) # Worst possible score for failed alignments
+    gaps = q_aln.count('-') + r_aln.count('-')
+    matches = sum(1 for r, q in zip(r_aln, q_aln) if r == q and r != '-')
+    return (gaps, -matches)
 
-def write_fasta(path, records):
-    with open(path, "w") as fh:
-        for h, s in records:
-            print(">" + h, file=fh)
-            print(s, file=fh)
+# Among candidates, pick the one with the best alignment score to the query
+def best_by_alignment(cands, query_seq):
+    best, best_score = None, (10**12, -10**12)
+    for c in cands:
+        r_aln, q_aln = run_mafft(c['s'], query_seq)
+        sc = aln_score(r_aln, q_aln)
+        if sc < best_score:
+            best, best_score = c, sc
+    return best
+# Choose reference sequence based on inferred subtype, segment, and variant, with fallbacks
+def choose_ref(refs, inferred_subtype, seg, var, query_seq):
+    h = (re.search(r"H\d+", inferred_subtype) or [None])[0]
+    n = (re.search(r"N\d+", inferred_subtype) or [None])[0]
+    # For H5/H7, prioritize HPAI/LPAI matches; for other segments, just pick the best by alignment among subtype/variant matches
+    def hp_lp_filter(cands):
+        if h in ("H5", "H7"):
+            filtered = [r for r in cands if r['p'] in ("HPAI", "LPAI")]
+            if filtered:
+                return filtered
+        return cands
 
-# Ref map
+    if seg == "HA" and h:
+        # strict H-match for HA segment (allow HA fallback for derived HA variants)
+        cands = hp_lp_filter([r for r in refs if r['h'] == h and r['v'] in ("HA", var)])
+        best = best_by_alignment(cands, query_seq) if cands else None
+        if best and best['h'] == h:
+            return best['s'], best['id']
 
-def get_ref_map(ref_fasta):
-    '''Build refs[subtype][pathotype][variant] = seq from CDS_references.fasta.'''
-    refs = {}
-    for header, seq in parse_fasta(Path(ref_fasta)):
-        parts = header.split("_")
-        if len(parts) < 3:
-            continue
-        subtype = parts[0]
-        variant = parts[1]
-        pathotype = parts[-1]
-        if not re.fullmatch(r"H[0-9]+N[0-9]+", subtype):
-            continue
-        if pathotype not in ("HPAI", "LPAI"):
-            continue
-        refs.setdefault(subtype, {}).setdefault(pathotype, {})[variant] = seq
-    return refs
+        # If no H-match, default fallback to H5N1 HPAI
+        fb = [r for r in refs if r['sub'] == "H5N1" and r['p'] == "HPAI" and r['v'] in ("HA", var)]
+        if fb:
+            return fb[0]['s'], fb[0]['id']
+        return None, "None"
 
+    if seg == "NA" and n:
+        # strict N-match for NA segment
+        cands = hp_lp_filter([r for r in refs if r['v'] == "NA" and r['n'] == n])
+        best = best_by_alignment(cands, query_seq) if cands else None
+        if best and best['n'] == n:
+            return best['s'], best['id']
 
-def load_subtype_map(tsv_path):
-    '''Return {sample_id: inferred_subtype} from the TSV.'''
+        # If no N-match, default fallback to H5N1 HPAI
+        fb = [r for r in refs if r['sub'] == "H5N1" and r['p'] == "HPAI" and r['v'] == "NA"]
+        if fb:
+            return fb[0]['s'], fb[0]['id']
+        return None, "None"
+
+    # Remaining segments: pick by protein variant
+    if h in ("H5", "H7", "H9"):
+        cands = hp_lp_filter([r for r in refs if r['v'] == var and r['h'] == h])
+        best = best_by_alignment(cands, query_seq) if cands else None
+        if best:
+            return best['s'], best['id']
+
+    # Final fallback: H5N1 HPAI by protein variant
+    fallback = [r for r in refs if r['sub'] == "H5N1" and r['v'] == var and r['p'] == "HPAI"]
+    if fallback:
+        return fallback[0]['s'], fallback[0]['id']
+    return None, "None"
+
+# Main
+refs_raw = parse_fasta(os.environ["REFERENCES_FASTA"])
+refs = []
+for h, s in refs_raw:
+    p = h.split("_")
+    if len(p) < 2:
+        continue
+    refs.append({'id': h, 'sub': p[0].upper(), 'v': p[1], 'p': p[-1].upper(),
+                 'h': (re.search(r"H\d+", p[0].upper()) or [None])[0],
+                 'n': (re.search(r"N\d+", p[0].upper()) or [None])[0], 's': s})
+
+def load_subtypes(tsv_path):
     out = {}
     with open(tsv_path) as fh:
-        reader = csv.DictReader(fh, delimiter=chr(9))
+        reader = csv.DictReader(fh, delimiter='\t')
+        if not reader.fieldnames:
+            return out
         sample_col = "seqName" if "seqName" in reader.fieldnames else "sample"
         subtype_col = "inferred_subtype" if "inferred_subtype" in reader.fieldnames else "subtype"
         for row in reader:
             sid = (row.get(sample_col) or "").strip()
+            st  = (row.get(subtype_col) or "").strip().upper()
             if sid:
-                out[sid] = (row.get(subtype_col) or "").strip()
+                out[sid] = st
     return out
 
+subtypes = load_subtypes(os.environ["INFERRED_SUBTYPES"])
+report = []
 
-_FAMILY = {
-    r"H5N[0-9]+": ("H5N1", "HPAI"),
-    r"H7N[0-9]+": ("H7N9", "HPAI"),
-    r"H9N[0-9]+": ("H9N2", "LPAI"),
-}
-
-def choose_family(inferred):
-    for pattern, family in _FAMILY.items():
-        if re.fullmatch(pattern, inferred or ""):
-            return family
-    return "H5N1", "HPAI"          # fallback
-
-
-VARIANT_MAP = {
-    "HA":  ["HA", "HA(-SP)", "HA1", "HA1(-SP)", "HA2"],
+v_map = {
+    "HA":  ["HA", "HA(-SP)", "HA1(-SP)", "HA2"],
     "PA":  ["PA", "PA-X"],
     "PB1": ["PB1", "PB1-F2"],
     "PB2": ["PB2"],
@@ -118,103 +187,62 @@ VARIANT_MAP = {
     "MP":  ["M1", "M2"],
 }
 
+for s_dir in filter(Path.is_dir, Path("sequences").iterdir()):
+    sub = subtypes.get(s_dir.name, "H5N1").upper()
+    seg_dir = s_dir / "segments"
+    if not seg_dir.exists():
+        continue
 
-def choose_ref_seq(refs, canonical, preferred_pathotype, variant):
-    '''Return the best matching reference sequence, falling back broadly.'''
-    alt = "LPAI" if preferred_pathotype == "HPAI" else "HPAI"
+    (seg_dir / "CDS").mkdir(exist_ok=True)
 
-    for subtype in [canonical] + [s for s in refs if s != canonical]:
-        for pathotype in [preferred_pathotype, alt]:
-            seq = refs.get(subtype, {}).get(pathotype, {}).get(variant)
-            if seq:
-                return seq
-    return ""
-
-def extract_cds(query_seq, ref_seq):
-    '''Align query to ref with MAFFT and return the CDS-trimmed query sequence.'''
-    with tempfile.TemporaryDirectory() as tdir:
-        pair_fa = Path(tdir) / "pair.fa"
-        write_fasta(pair_fa, [("REF", ref_seq), ("QRY", query_seq)])
-
-        proc = subprocess.run(
-            ["mafft", "--globalpair", "--op", "3.0", "--ep", "0.5", "--quiet", str(pair_fa)],
-            capture_output=True, text=True, check=False,
-        )
-        if proc.returncode != 0:
-            return ""
-
-        aln = dict(parse_fasta(proc.stdout))
-        ref_aln, qry_aln = aln.get("REF", ""), aln.get("QRY", "")
-        if not ref_aln or not qry_aln:
-            return ""
-
-        cds = "".join(q for r, q in zip(ref_aln, qry_aln) if r != "-")
-        cds = cds.replace("-", "").upper()
-        cds = re.sub(r"[^ACGTN]", "", cds)
-
-        usable = (len(cds) // 3) * 3
-        return cds[:usable] if usable > 0 else ""
-
-def main():
-    sequences_dir = Path(os.environ["SEQUENCES_DIR"])
-    inferred_tsv = Path(os.environ["INFERRED_SUBTYPES"])
-    references_fa = Path(os.environ["REFERENCES_FASTA"])
-
-    refs = get_ref_map(references_fa)
-    subtype_map = load_subtype_map(inferred_tsv)
-
-    for sample_dir in filter(Path.is_dir, sequences_dir.iterdir()):
-        seg_dir = sample_dir / "segments"
-        if not seg_dir.is_dir():
+    for f in seg_dir.glob("*.fasta"):
+        if "_CDS" in f.name:
+            continue
+        q_records = parse_fasta(f)
+        if not q_records:
             continue
 
-        sample_id = sample_dir.name
-        inferred = subtype_map.get(sample_id, "")
-        canonical, pref = choose_family(inferred)
+        variants = v_map.get(f.stem, [])
+        if not variants:
+            continue
 
-        if not re.fullmatch(r"H(5|7|9)N[0-9]+", inferred or ""):
-            print(f"[GetCDS] WARNING: Unexpected subtype for {sample_id} ({inferred}). "
-                  f"Falling back to H5N1_*_HPAI", flush=True)
+        query0 = q_records[0][1]
 
-        cds_dir = seg_dir / "CDS"
-        cds_dir.mkdir(parents=True, exist_ok=True)
+        # HA/NA are segment-driven; remaining segments are variant-driven
+        seg_ref = None
+        if f.stem in ("HA", "NA"):
+            seg_ref = choose_ref(refs, sub, f.stem, None, query0)
 
-        for seg_fa in seg_dir.glob("*.fasta"):
-            seg_name = seg_fa.stem
-            if seg_name.endswith("_CDS"):
-                continue
+        for var in variants:
+            if seg_ref is not None:
+                r_s, r_id = seg_ref
+            else:
+                r_s, r_id = choose_ref(refs, sub, f.stem, var, query0)
 
-            variants = VARIANT_MAP.get(seg_name, [])
-            query_records = list(parse_fasta(seg_fa))
-            if not variants or not query_records:
-                continue
+            if r_s:
+                res = [(f"{qh}|{var}", get_cds(*run_mafft(r_s, qs)))
+                       for qh, qs in q_records]
+                res = [(h, s) for h, s in res if s]
+                if res:
+                    with open(seg_dir / "CDS" / f"{var}_CDS.fasta", "w") as out:
+                        for h, s in res:
+                            out.write(f">{h}\\n{s}\\n")
+                report.append({
+                    "sample": s_dir.name, "segment": f.stem, "cds_variant": var,
+                    "inferred_subtype": sub, "ref": r_id,
+                    "status": "Success" if res else "Failed"
+                })
+            else:
+                report.append({
+                    "sample": s_dir.name, "segment": f.stem, "cds_variant": var,
+                    "inferred_subtype": sub, "ref": "None", "status": "Failed-NoRef"
+                })
 
-            for variant in variants:
-                ref_seq = choose_ref_seq(refs, canonical, pref, variant)
-                out_path = cds_dir / f"{variant}_CDS.fasta"
-
-                if not ref_seq:
-                    out_path.unlink(missing_ok=True)
-                    continue
-
-                results = [
-                    (f"{qh}|{variant}", extract_cds(qs, ref_seq))
-                    for qh, qs in query_records
-                ]
-                results = [(h, s) for h, s in results if s]
-
-                if results:
-                    write_fasta(out_path, results)
-                else:
-                    out_path.unlink(missing_ok=True)
-
-
-if __name__ == "__main__":
-    main()
-
+with open("sequences/cds_report.csv", "w") as f:
+    w = csv.DictWriter(f, fieldnames=["sample", "segment", "cds_variant",
+                                      "inferred_subtype", "ref", "status"])
+    w.writeheader()
+    w.writerows(report)
 PY
-
     """
 }
-
-
