@@ -2,10 +2,10 @@
 
 nextflow.enable.dsl = 2
 
-include { GenotypingNextclade } from './modules/genotyping'
+include { GenotypingNextclade } from './modules/GenotypingNextclade'
 include { OrganizeBySample   } from './modules/OrganizeBySample'
-include { MutationsFinder     } from './modules/mutations'
-include { TranslateToProtein  } from './modules/Translation'
+include { MutationsFinder     } from './modules/MutationsFinder'
+include { TranslateToProtein  } from './modules/TranslateToProtein'
 include { SubtypeDetection    } from './modules/SubtypeDetection'
 include { GetCDS              } from './modules/GetCDS'
 
@@ -30,16 +30,26 @@ workflow {
         )
     }
     SubtypeDetection(SubtypeInput_ch)
-    subtype_merged_ch = SubtypeDetection.out
+
+    // Agafa la sortida del procés, elimina el sample_id i conserva només el fitxer TSV
+    // de cada mostra per poder-los fusionar en un únic fitxer final
+    SubtypeMerged_ch = SubtypeDetection.out
         .map { _sample_id, subtype_file -> subtype_file }
+        // Uneix tots els TSV individuals en un únic fitxer de resultats
         .collectFile(
+            // Nom del fitxer agregat final
             name: 'inferred_subtypes.tsv',
+            // Header inicial que s'escriu abans del contingut recopilat
             seed: 'seqName\tinferred_subtype\n',
+            // Directori on es desa el fitxer final
             storeDir: "${launchDir}/${params.outDir}",
             newLine: false
         )
-    //GenotypingNextclade(SampleInput_ch, SubtypeDetection.out)
-    //GetCDS(OrganizeBySample.out, SubtypeDetection.out)
+        .first()
+
+    GenotypingNextclade(SampleInput_ch, SubtypeMerged_ch)
+    
+    GetCDS(OrganizeBySample.out, SubtypeDetection.out)
     //TranslateToProtein(GetCDS.out)
 
     // Mutacions opcional: només si es passa --mutationsSubtype
@@ -53,18 +63,18 @@ workflow {
 
     publish:
     folder = OrganizeBySample.out
-    subtype = subtype_merged_ch
-    //res = GenotypingNextclade.out
+    subtype = SubtypeMerged_ch
+    genotyping = GenotypingNextclade.out
+    CDS = GetCDS.out
     //prot = TranslateToProtein.out
     //mut = mut_out
 }
 // Bloc final de publicació de resultats
 output {
-    //res {
-        // Usa el primer element dl tuple (sample) per crear la carpeta
-    //    path { "${params.outDir}" }
-    //    mode "copy"
-    //}
+    genotyping {
+        path { "${launchDir}/${params.outDir}" }
+        mode "copy"
+    }
     folder {
         path { "${launchDir}/${params.outDir}" }
         mode "copy"
