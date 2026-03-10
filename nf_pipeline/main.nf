@@ -2,57 +2,101 @@
 
 nextflow.enable.dsl = 2
 
-include { GenotypingNextclade } from './modules/genotyping'
-include { OrganizeBySpecies   } from './modules/FolderCreation'
-include { MutationsFinder     } from './modules/mutations'
-include { TranslateToProtein  } from './modules/Translation'
+include { GenotypingNextclade } from './modules/GenotypingNextclade'
+include { OrganizeBySample   } from './modules/OrganizeBySample'
+include { MutationsFinder     } from './modules/MutationsFinder'
+include { TranslateToProtein  } from './modules/TranslateToProtein'
 include { SubtypeDetection    } from './modules/SubtypeDetection'
+include { GetCDS              } from './modules/GetCDS'
 
 // Flux de treball principal
 workflow {
     main:
 
     // Crea el canal d'entrada des dels paràmetres
-    input_ch = channel.of( [ params.sample, params.dirSample ] )
-
+    SampleInput_ch = channel
+    .fromPath(params.inputFasta, checkIfExists: true)
+    .splitFasta(record: [id: true])
+    .map { rec -> tuple(rec.id.tokenize('[|_]')[0], file(params.inputFasta)) }
+    .unique { record -> record[0] }
+    
     // Executa el procés amb el canal creat
-    OrganizeBySpecies(input_ch)
-    GenotypingNextclade(input_ch)
-    TranslateToProtein(OrganizeBySpecies.out)
-    SubtypeDetection(input_ch)
+    OrganizeBySample(SampleInput_ch)
+    SubtypeInput_ch = OrganizeBySample.out.map { sample_id, sample_dir ->
+        tuple(
+            sample_id,
+            file("${sample_dir}/segments/HA/${sample_id}_HA.fasta"),
+            file("${sample_dir}/segments/NA/${sample_id}_NA.fasta")
+        )
+    }
+    SubtypeDetection(SubtypeInput_ch)
+
+    // Agafa la sortida del procés, elimina el sample_id i conserva només el fitxer TSV
+    // de cada mostra per poder-los fusionar en un únic fitxer final
+    SubtypeMerged_ch = SubtypeDetection.out
+        .map { _sample_id, subtype_file -> subtype_file }
+        // Uneix tots els TSV individuals en un únic fitxer de resultats
+        .collectFile(
+            // Nom del fitxer agregat final
+            name: 'inferred_subtypes.tsv',
+            // Header inicial que s'escriu abans del contingut recopilat
+            seed: 'seqName\tinferred_subtype\n',
+            // Directori on es desa el fitxer final
+            storeDir: "${launchDir}/${params.outDir}",
+        )
+        .first()
+
+    GenotypingNextclade(SampleInput_ch, SubtypeMerged_ch)
+    
+    
+    // Unim els canals una sola vegada i creem una tupla neta
+    //GetCDS_ch = OrganizeBySample.out.join(SubtypeDetection.out)
+    //    .map { sample_id, sample_dir, subtype_file -> 
+    //        tuple(sample_id, sample_dir, subtype_file) 
+    //    }
+    //
+    // Passem el canal sencer al procés
+    //GetCDS(GetCDS_ch)
+    //TranslateToProtein(GetCDS.out)
 
     // Mutacions opcional: només si es passa --mutationsSubtype
-    def mut_out = channel.empty()
-    if (params.mutationsSubtype) {
-        MutationsFinder(input_ch)
-        mut_out = MutationsFinder.out
-    } else {
-        log.info "MutationsFinder omès: passa --mutationsSubtype per activar-lo."
-    }
+    //def mut_out = channel.empty()
+    //if (params.mutationsSubtype) {
+    //    MutationsFinder(SampleId_ch)
+    //    mut_out = MutationsFinder.out
+    //} else {
+    //    log.info "MutationsFinder omès: passa --mutationsSubtype per activar-lo."
+    //}
 
     publish:
-    res = GenotypingNextclade.out
-    folder = TranslateToProtein.out
-    subtype = SubtypeDetection.out
-    mut = mut_out
+    folder = OrganizeBySample.out
+    subtype = SubtypeMerged_ch
+    genotyping = GenotypingNextclade.out
+    //CDS = GetCDS.out
+    //prot = TranslateToProtein.out
+    //mut = mut_out
 }
 // Bloc final de publicació de resultats
 output {
-    res {
-        // Usa el primer element dl tuple (sample) per crear la carpeta
-        path { "${params.sample}" }
+    genotyping {
+        path { "${launchDir}/${params.outDir}" }
         mode "copy"
     }
     folder {
-        path { "${params.sample}" }
+        path { "${launchDir}/${params.outDir}" }
         mode "copy"
     }
+    
     subtype {
-        path { "${params.sample}" }
+        path { "${launchDir}/${params.outDir}" }
         mode "copy"
     }
-    mut {
-        path { "${params.sample}" }
-        mode "copy"
-    }
+    //CDS {
+    //    path { "${launchDir}/${params.outDir}" }
+    //    mode "copy"
+    //}
+    //mut {
+    //    path { "${params.outDir}" }
+    //    mode "copy"
+    //}
 }

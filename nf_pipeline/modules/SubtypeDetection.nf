@@ -6,33 +6,38 @@ process SubtypeDetection {
     errorStrategy 'ignore'
 
     input:
-    tuple val(params.sample), path(params.dirSample)
+    tuple val(sample_id), path(ha_fasta), path(na_fasta)
 
     output:
-    path("inferred_subtypes.tsv")
+    tuple val(sample_id), path("inferred_subtypes_${sample_id}.tsv")
 
     script:
     """
-    input_fasta="${params.dirSample}/${params.sample}"
+    input_fasta="${sample_id}_HA_NA.fasta"
+    cat ${ha_fasta} ${na_fasta} > "\${input_fasta}"
 
     if [[ "${params.protocol}" == "AVIAN" ]]; then
-        echo "Subtype detection for AVIAN protocol"
         minimizer_index="${params.protocols.AVIAN.resources}/Avian_minimizers.json"
     elif [[ "${params.protocol}" == "SWINE" ]]; then
-        echo "Subtype detection for SWINE protocol"
         minimizer_index="${params.protocols.SWINE.resources}/Swine_minimizers.json"
     else
         echo "No valid protocol specified for subtype detection: ${params.protocol}"
         : > minimizers_results.tsv
-        printf 'id\tha_match\tha_score\tna_match\tna_score\tinferred_subtype\n' > inferred_subtypes.tsv
+        printf '%s\tIncomplete\n' "${sample_id}" > inferred_subtypes_${sample_id}.tsv
         exit 0
     fi
 
     nextclade sort -m "\${minimizer_index}" -r minimizers_results.tsv "\${input_fasta}"
 
-    python3 ${params.workDir}/${params.programs.subtypeInference}
-
-        
+    
+    h_tag=\$(grep -E '^0\t' minimizers_results.tsv | head -n 1 | cut -f3 | grep -oE 'H[0-9]+' | head -n 1 || true)
+    n_tag=\$(grep -E '^1\t' minimizers_results.tsv | head -n 1 | cut -f3 | grep -oE 'N[0-9]+' | head -n 1 || true)
+    if [[ -n "\${h_tag}" && -n "\${n_tag}" ]]; then
+        subtype="\${h_tag}\${n_tag}"
+    else
+        subtype="Incomplete"
+    fi
+    printf '%s\t%s\n' "${sample_id}" "\${subtype}" > inferred_subtypes_${sample_id}.tsv
 
     """
 }
