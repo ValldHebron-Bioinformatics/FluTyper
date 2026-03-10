@@ -9,9 +9,8 @@ process SubtypeDetection {
     tuple val(sample_id), path(ha_fasta), path(na_fasta)
 
     output:
-    tuple val(sample_id), path("inferred_subtypes_${sample_id}.tsv"), 
-    val("h_tag"), val("n_tag")
-
+    tuple val(sample_id), path("inferred_subtypes_${sample_id}.tsv")
+    
     script:
     """
     input_fasta="${sample_id}_HA_NA.fasta"
