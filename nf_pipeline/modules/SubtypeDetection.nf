@@ -29,25 +29,14 @@ process SubtypeDetection {
 
     nextclade sort -m "\${minimizer_index}" -r minimizers_results.tsv "\${input_fasta}"
 
-    ha_line=\$(grep -E '^0[[:space:]]' minimizers_results.tsv | head -n 1 || true)
-    na_line=\$(grep -E '^1[[:space:]]' minimizers_results.tsv | head -n 1 || true)
-
-    if [[ -z "\${ha_line}" && -z "\${na_line}" ]]; then
-        printf '%s\tIncomplete\n' "${sample_id}" > inferred_subtypes_${sample_id}.tsv
-        exit 0
-    fi
-
-    ha_match=\$(printf '%s' "\${ha_line}" | cut -f3)
-    na_match=\$(printf '%s' "\${na_line}" | cut -f3)
-
-    h_tag=\$(printf '%s' "\${ha_match}" | grep -oE 'H[0-9]+' | head -n 1 || true)
-    n_tag=\$(printf '%s' "\${na_match}" | grep -oE 'N[0-9]+' | head -n 1 || true)
+    
+    h_tag=\$(grep -E '^0\t' minimizers_results.tsv | head -n 1 | cut -f3 | grep -oE 'H[0-9]+' | head -n 1 || true)
+    n_tag=\$(grep -E '^1\t' minimizers_results.tsv | head -n 1 | cut -f3 | grep -oE 'N[0-9]+' | head -n 1 || true)
     if [[ -n "\${h_tag}" && -n "\${n_tag}" ]]; then
         subtype="\${h_tag}\${n_tag}"
     else
         subtype="Incomplete"
     fi
-
     printf '%s\t%s\n' "${sample_id}" "\${subtype}" > inferred_subtypes_${sample_id}.tsv
 
     """

@@ -10,19 +10,18 @@ process GenotypingNextclade {
 
     script:
     """
-    # # Primer identifiquem el subtipus H de la mostra actual consultant el fitxer de subtipus inferits
-    h_subtype=\$(grep -m 1 -E "^${sample_id}\b" "${inferred_subtypes}" | cut -f2 | grep -oE 'H[0-9]+' | head -n 1 || true)
+    # # Primer identifiquem el subtipus H de la mostra actual amb el subtipus inferit.
+    h_subtype=\$(grep -E "^${sample_id}\b" "${inferred_subtypes}" | cut -f2 | grep -oE 'H[0-9]+' | head -n 1 || true)
 
-    # Filtrem el fitxer de subtipus per extreure els IDs que coincideixen amb el subtipus global demanat
-    # Fem servir una variable personalitzada en awk per evitar conflictes amb paraules reservades del sistema
-    awk -F'\t' -v mysub="${params.subtype}" '\$2 ~ "^"mysub {print \$1}' "${inferred_subtypes}" > target_ids.txt
+    # Filtrem el fitxer de subtipus per extreure els IDs que coincideixen amb el subtipus global demanat, per defecte H5
+    grep -P "\t${params.subtype}" "${inferred_subtypes}" | cut -f1 > target_ids.txt
     
     # Preparem el fitxer FASTA temporal per a les seqüències HA que passaran a l'anàlisi
     touch filtered_HA_subtype.fasta
     
     # Si hem trobat IDs coincidents, extraiem les seves seqüències HA del FASTA d'entrada
     # La regex gestiona tant el format d'ID amb [|_]
-    if [ -s target_ids.txt ]; then
+    if [ -s target_ids.txt ]; then # -s true if file not empty
         for id in \$(cat target_ids.txt); do
             seqkit grep -r -p "^\${id}[|_]HA[|_]" "${input_fasta}" >> filtered_HA_subtype.fasta
         done
@@ -38,7 +37,7 @@ process GenotypingNextclade {
     fi
 
     # Si tenim una seqüència vàlida i un dataset assignat, procedim amb l'anàlisi
-    if [[ -n "\${DATASET_NAME}" && "\${DATASET_NAME}" != "COMING SOON" ]]; then
+    if [[ -n "\${DATASET_NAME}" && "\${DATASET_NAME}" != "TO BE DECIDED" ]]; then
 
         # Verifiquem la disponibilitat del dataset localment i el copiem a l'entorn de treball
         LOCAL_DATASET="${params.workDir}/../docs/nextclade_dataset"
@@ -68,14 +67,14 @@ with open("nextclade_results_${sample_id}.csv", newline='') as infile, open("gen
         match = re.match(r"([^_|]+)", seqid)
         only_id = match.group(1) if match else seqid
         writer.writerow([
-            only_id,  # ID net
+            only_id,  # ID
             row.get("clade", ""),  # Clade predit
-            row.get("qc.overallStatus", ""),  # Estat QC
-            row.get("qc.overallScore", "")    # Puntuació QC
+            row.get("qc.overallStatus", ""),  # QC
+            row.get("qc.overallScore", "")    # QC score
         ])
 EOF
     else
-        echo "Skipping genotyping: No matching or supported subtype found for \${h_subtype}"
+        echo "Skipping genotyping: No matching or valid subtype found for \${h_subtype}"
     fi
     """
 }

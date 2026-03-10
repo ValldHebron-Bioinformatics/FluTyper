@@ -2,7 +2,6 @@ __pycache__/
 .nextflow.log*
 .nextflow
 work
-docs/fastas/
 docs/TFM
 .venv/
 results/

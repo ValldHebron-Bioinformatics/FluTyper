@@ -43,13 +43,20 @@ workflow {
             seed: 'seqName\tinferred_subtype\n',
             // Directori on es desa el fitxer final
             storeDir: "${launchDir}/${params.outDir}",
-            newLine: false
         )
         .first()
 
     GenotypingNextclade(SampleInput_ch, SubtypeMerged_ch)
     
-    GetCDS(OrganizeBySample.out, SubtypeDetection.out)
+    
+    // Unim els canals una sola vegada i creem una tupla neta
+    //GetCDS_ch = OrganizeBySample.out.join(SubtypeDetection.out)
+    //    .map { sample_id, sample_dir, subtype_file -> 
+    //        tuple(sample_id, sample_dir, subtype_file) 
+    //    }
+    //
+    // Passem el canal sencer al procés
+    //GetCDS(GetCDS_ch)
     //TranslateToProtein(GetCDS.out)
 
     // Mutacions opcional: només si es passa --mutationsSubtype
@@ -65,7 +72,7 @@ workflow {
     folder = OrganizeBySample.out
     subtype = SubtypeMerged_ch
     genotyping = GenotypingNextclade.out
-    CDS = GetCDS.out
+    //CDS = GetCDS.out
     //prot = TranslateToProtein.out
     //mut = mut_out
 }
@@ -79,11 +86,15 @@ output {
         path { "${launchDir}/${params.outDir}" }
         mode "copy"
     }
-    //subtype {
+    
     subtype {
         path { "${launchDir}/${params.outDir}" }
         mode "copy"
     }
+    //CDS {
+    //    path { "${launchDir}/${params.outDir}" }
+    //    mode "copy"
+    //}
     //mut {
     //    path { "${params.outDir}" }
     //    mode "copy"
