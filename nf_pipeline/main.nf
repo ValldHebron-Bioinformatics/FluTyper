@@ -3,10 +3,11 @@
 nextflow.enable.dsl = 2
 
 include { GenotypingNextclade } from './modules/GenotypingNextclade'
-include { OrganizeBySample   } from './modules/OrganizeBySample'
+include { OrganizeBySample    } from './modules/OrganizeBySample'
 include { MutationsFinder     } from './modules/MutationsFinder'
 include { TranslateToProtein  } from './modules/TranslateToProtein'
 include { SubtypeDetection    } from './modules/SubtypeDetection'
+include { GetDatasets         } from './modules/GetDatasets'
 include { GetCDS              } from './modules/GetCDS'
 
 // Flux de treball principal
@@ -33,8 +34,9 @@ workflow {
 
     // Agafa la sortida del procés, elimina el sample_id i conserva només el fitxer TSV
     // de cada mostra per poder-los fusionar en un únic fitxer final
+    // Debug: view output of SubtypeDetection
     SubtypeMerged_ch = SubtypeDetection.out
-        .map { _sample_id, subtype_file -> subtype_file }
+        .map { arr -> arr[1] }
         // Uneix tots els TSV individuals en un únic fitxer de resultats
         .collectFile(
             // Nom del fitxer agregat final
@@ -44,20 +46,22 @@ workflow {
             // Directori on es desa el fitxer final
             storeDir: "${launchDir}/${params.outDir}",
         )
-        .first()
+    
 
-    GenotypingNextclade(SampleInput_ch, SubtypeMerged_ch)
+    GetDatasets(SubtypeMerged_ch)
+
+    //GenotypingNextclade(SampleInput_ch, SubtypeMerged_ch)
     
     
     // Unim els canals una sola vegada i creem una tupla neta
-    GetCDS_ch = OrganizeBySample.out.join(SubtypeDetection.out)
-        .map { sample_id, sample_dir, subtype_file ->
-            def segments_dir = file("${sample_dir}/segments")
-            tuple(sample_id, segments_dir, subtype_file)
-        }
-
-    // Passem el canal sencer al procés
-    GetCDS(GetCDS_ch)
+    //GetCDS_ch = OrganizeBySample.out.join(SubtypeDetection.out)
+    //    .map { sample_id, sample_dir, subtype_file ->
+    //        def segments_dir = file("${sample_dir}/segments")
+    //        tuple(sample_id, segments_dir, subtype_file)
+    //    }
+    //
+    //// Passem el canal sencer al procés
+    //GetCDS(GetCDS_ch)
     //TranslateToProtein(GetCDS.out)
 
     // Mutacions opcional: només si es passa --mutationsSubtype
@@ -72,15 +76,20 @@ workflow {
     publish:
     folder = OrganizeBySample.out
     subtype = SubtypeMerged_ch
-    genotyping = GenotypingNextclade.out
-    CDS = GetCDS.out
+    datasets = GetDatasets.out
+    //genotyping = GenotypingNextclade.out
+    //CDS = GetCDS.out
     //prot = TranslateToProtein.out
     //mut = mut_out
 }
 // Bloc final de publicació de resultats
 output {
-    genotyping {
-        path { "${launchDir}/${params.outDir}" }
+    //genotyping {
+    //    path { "${launchDir}/${params.outDir}" }
+    //    mode "copy"
+    //}
+    datasets {
+        path { "${launchDir}/protocols/${params.protocol}/v1/resources" }
         mode "copy"
     }
     folder {
@@ -92,10 +101,10 @@ output {
         path { "${launchDir}/${params.outDir}" }
         mode "copy"
     }
-    CDS {
-        path { "${launchDir}/${params.outDir}" }
-        mode "copy"
-    }
+    //CDS {
+    //    path { "${launchDir}/${params.outDir}" }
+    //    mode "copy"
+    //}
     //mut {
     //    path { "${params.outDir}" }
     //    mode "copy"

@@ -9,7 +9,8 @@ process SubtypeDetection {
     tuple val(sample_id), path(ha_fasta), path(na_fasta)
 
     output:
-    tuple val(sample_id), path("inferred_subtypes_${sample_id}.tsv")
+    tuple val(sample_id), path("inferred_subtypes_${sample_id}.tsv"), 
+    val("h_tag"), val("n_tag")
 
     script:
     """
@@ -34,6 +35,10 @@ process SubtypeDetection {
     n_tag=\$(grep -E '^1\t' minimizers_results.tsv | head -n 1 | cut -f3 | grep -oE 'N[0-9]+' | head -n 1 || true)
     if [[ -n "\${h_tag}" && -n "\${n_tag}" ]]; then
         subtype="\${h_tag}\${n_tag}"
+    elif [[ -n "\${h_tag}" ]]; then
+        subtype="\${h_tag}Nx"
+    elif [[ -n "\${n_tag}" ]]; then
+        subtype="Hx\${n_tag}"
     else
         subtype="Incomplete"
     fi

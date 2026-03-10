@@ -16,23 +16,23 @@ process GetCDS {
     # Definim la referència i l'entrada de l'HA
     export REFERENCES="${params.protocols[params.protocol].resources}/CDS_references.fasta"
 
-    # Identify HA subtype
+    # Identify HA subtype and na_subtype from the inferred_subtypes file
     h_subtype=\$(grep -P "^${sample_id}\t" "${inferred_subtypes}" | head -n 1 | cut -f2 | grep -oE 'H[0-9]+' | head -n 1 || true)
+    n_subtype=\$(grep -P "^${sample_id}\t" "${inferred_subtypes}" | head -n 1 | cut -f2 | grep -oE '+N[0-9]' | head -n 1 || true)
     pathotype=""
     if [[ "\$h_subtype" == "H5" || "\$h_subtype" == "H7" ]]; then
         pathotype=\$(grep ">" "\${REFERENCES}" | grep -E "^>\${h_subtype}_" | grep -oE "HPAI|LPAI" | head -n 1 || true)
     fi
     ref_pattern="\$h_subtype"
-    if [[ -n "\$pathotype" ]]; then
-        ref_pattern="\${h_subtype}.*\${pathotype}"
-        
-    fi
+    
     mkdir -p "samples/${sample_id}/segments/CDS"
-    seqkit grep -r -p "^\$ref_pattern" "\${REFERENCES}" > HA_CDS_ref.fasta || true
-    for seg in ${params.segments.join(' ')}; do
+    
+    for seg, prot in ${params.proteins.keys}, ${params.proteins.values}; do
+        if [[ -n "\$pathotype" ]]; then
+            ref_pattern="\${h_subtype}_\$prot_.*_\${pathotype}"
+        fi
         seg_file="$segments_dir/\${seg}/${sample_id}_\${seg}.fasta"
-        echo "Segment \$seg file: \$seg_file"
-        touch "samples/${sample_id}/segments/CDS/${sample_id}_CDS_\${seg}.fasta"
+        seqkit grep -r -p "^\$ref_pattern" "\${REFERENCES}" > _CDS_ref.fasta || true
     done
     
 
