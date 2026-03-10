@@ -6,11 +6,10 @@ process GetCDS {
     errorStrategy 'ignore'
 
     input:
-    tuple val(sample_id), path(sample_dir), path(inferred_subtypes)
-    
+    tuple val(sample_id), path(segments_dir), path(inferred_subtypes)
 
     output:
-    tuple val(sample_id), path("samples/${sample_dir}/segments/CDS/${sample_id}_CDS_HA.fasta")
+    tuple val(sample_id), path("samples/${sample_id}/segments/CDS/${sample_id}_CDS_*.fasta")
 
     script:
     """
@@ -26,30 +25,35 @@ process GetCDS {
     ref_pattern="\$h_subtype"
     if [[ -n "\$pathotype" ]]; then
         ref_pattern="\${h_subtype}.*\${pathotype}"
-        echo "DEBUG: sample_dir=${sample_dir}"
-        echo "DEBUG: inferred_subtypes=${inferred_subtypes}"
+        
     fi
-    mkdir -p "samples/${sample_dir}/segments/CDS"
+    mkdir -p "samples/${sample_id}/segments/CDS"
     seqkit grep -r -p "^\$ref_pattern" "\${REFERENCES}" > HA_CDS_ref.fasta || true
-    HA_INPUT_FILE="samples/${sample_dir}/segments/HA/${sample_id}_HA.fasta"
-    OUTFILE="samples/${sample_dir}/segments/CDS/${sample_id}_CDS_HA.fasta"
-    if [[ -s HA_CDS_ref.fasta && -s "\$HA_INPUT_FILE" ]]; then
-        cat HA_CDS_ref.fasta "\$HA_INPUT_FILE" > mafft_input_HA.fasta
-        mafft --auto mafft_input_HA.fasta > "\$OUTFILE"
-    else
-        echo "DEBUG: checking HA_INPUT_FILE: \$HA_INPUT_FILE"
-        echo "DEBUG: checking OUTFILE: \$OUTFILE"
-        if [ -f "\$HA_INPUT_FILE" ]; then
-            echo "DEBUG: \$HA_INPUT_FILE exists"
-            ls -l "\$HA_INPUT_FILE"
-        else
-            echo "DEBUG: \$HA_INPUT_FILE does NOT exist"
-        fi
-        if [[ ! -s "\$HA_INPUT_FILE" ]]; then
-            echo "DEBUG: \$HA_INPUT_FILE is missing or empty" >&2
-        fi
-        echo ">NO_HA_CDS_FOUND" > "\$OUTFILE"
-    fi
+    for seg in ${params.segments.join(' ')}; do
+        seg_file="$segments_dir/\${seg}/${sample_id}_\${seg}.fasta"
+        echo "Segment \$seg file: \$seg_file"
+        touch "samples/${sample_id}/segments/CDS/${sample_id}_CDS_\${seg}.fasta"
+    done
+    
 
+    ##if [[ -s HA_CDS_ref.fasta && -s "\$HA_INPUT_FILE" ]]; then
+    ##    cat HA_CDS_ref.fasta "\$HA_INPUT_FILE" > mafft_input_HA.fasta
+    ##    mafft --auto mafft_input_HA.fasta > "\$OUTFILE"
+    ##else
+    ##    echo "DEBUG: checking HA_INPUT_FILE: \$HA_INPUT_FILE"
+    ##    echo "DEBUG: checking OUTFILE: \$OUTFILE"
+    ##    if [ -f "\$HA_INPUT_FILE" ]; then
+    ##        echo "DEBUG: \$HA_INPUT_FILE exists"
+    ##        ls -l "\$HA_INPUT_FILE"
+    ##    else
+    ##        echo "DEBUG: \$HA_INPUT_FILE does NOT exist"
+    ##    fi
+    ##    if [[ ! -s "\$HA_INPUT_FILE" ]]; then
+    ##        echo "DEBUG: \$HA_INPUT_FILE is missing or empty" >&2
+    ##    fi
+    ##    echo ">NO_HA_CDS_FOUND" > "\$OUTFILE"
+    ##fi
+##
+ 
     """
 }
