@@ -2,7 +2,7 @@ __pycache__/
 .nextflow.log*
 .nextflow
 work
-docs
+docs/
 .venv/
 results/
 protocols/AVIAN/v1/config.yaml
