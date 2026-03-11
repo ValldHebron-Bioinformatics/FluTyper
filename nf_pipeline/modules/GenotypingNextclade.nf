@@ -5,7 +5,7 @@ process GenotypingNextclade {
     errorStrategy 'ignore'
     
     input:
-    tuple val(sample_id), path(ha_fasta), val(h_tag), val(n_tag), val(dataset_dir)
+    tuple val(sample_id), path(ha_fasta), val(h_tag), val(n_tag), val(pathotype), val(dataset_dir)
     output:
     path("nextclade_results_${sample_id}.csv")
     script:

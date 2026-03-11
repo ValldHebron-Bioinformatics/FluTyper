@@ -15,15 +15,17 @@ include { GenotypingResults   } from './modules/GenotypingResults'
 workflow {
     main:
 
-    // Crea el canal d'entrada des dels paràmetres
+    // 1. INPUT & INITIAL ORGANIZATION
     SampleInput_ch = channel
-    .fromPath(params.inputFasta, checkIfExists: true)
-    .splitFasta(record: [id: true])
-    .map { rec -> tuple(rec.id.tokenize('[|_]')[0], file(params.inputFasta)) }
-    .unique { record -> record[0] }
+        .fromPath(params.inputFasta, checkIfExists: true)
+        .splitFasta(record: [id: true])
+        .map { rec -> tuple(rec.id.tokenize('[|_]')[0], file(params.inputFasta)) }
+        .unique { record -> record[0] }
     
-    // Executa el procés amb el canal creat
     OrganizeBySample(SampleInput_ch)
+
+
+    // 2. SUBTYPE DETECTION
     SubtypeInput_ch = OrganizeBySample.out.map { sample_id, sample_dir ->
         tuple(
             sample_id,
@@ -31,52 +33,53 @@ workflow {
             file("${sample_dir}/segments/NA/${sample_id}_NA.fasta")
         )
     }
+
     SubtypeDetection(SubtypeInput_ch)
 
-    // Agafa la sortida del procés, elimina el sample_id i conserva només el fitxer TSV
-    // de cada mostra per poder-los fusionar en un únic fitxer final
-    // Debug: view output of SubtypeDetection
+    // Parse subtyping results immediately for use in downstream filtering
+    GenotypingInfo_ch = SubtypeDetection.out.map { sample_id, tsv_file ->
+        def line = tsv_file.readLines()[0]
+        def parts = line.split('\t')
+        def full_subtype = parts[1] 
+        def pathotype = parts.size() > 2 ? parts[2] : ""
+
+        def h_match = (full_subtype =~ /H\d+/)
+        def n_match = (full_subtype =~ /N\d+/)
+        def h_tag = h_match ? h_match[0] : "Hx"
+        def n_tag = n_match ? n_match[0] : "Nx"
+
+        return tuple(sample_id, h_tag, n_tag, pathotype)
+    }
+
+    // Merge individual subtype files into a global report
     SubtypeMerged_ch = SubtypeDetection.out
         .map { arr -> arr[1] }
-        // Uneix tots els TSV individuals en un únic fitxer de resultats
         .collectFile(
-            // Nom del fitxer agregat final
             name: 'inferred_subtypes.tsv',
-            // Header inicial que s'escriu abans del contingut recopilat
-            seed: 'seqName\tinferred_subtype\n',
-            // Directori on es desa el fitxer final
+            seed: 'seqName\tinferred_subtype\tpathotype\n',
             storeDir: "${launchDir}/${params.outDir}",
         )
 
+
+    // 3. DATASET PREPARATION
+    // GetDatasets depends on the merged list to know which H-types to download
     GetDatasets(SubtypeMerged_ch)
+
+
+    // 4. GENOTYPING ANALYSIS (NEXTCLADE)
     GenotypingHfile_ch = OrganizeBySample.out.map { sample_id, sample_dir -> 
         tuple(sample_id, file("${sample_dir}/segments/HA/${sample_id}_HA.fasta"))
     }
 
-    // Keep the sample_id (arr[0]) so the join works, but extract the H and N tags from the inferred_subtypes.tsv content
-    GenotypingTags_ch = SubtypeDetection.out.map { sample_id, tsv_file ->
-        // Read the line (format: sample_id \t subtype)
-        def line = tsv_file.readLines()[0]
-        def full_subtype = line.split('\t')[1] // e.g., "H5N1"
-
-        // Extract H and N parts using regex
-        def h_match = (full_subtype =~ /H\d+/)
-        def n_match = (full_subtype =~ /N\d+/)
-
-        def h_tag = h_match ? h_match[0] : "Hx"
-        def n_tag = n_match ? n_match[0] : "Nx"
-
-        return tuple(sample_id, h_tag, n_tag)
-    }
-
-    // GenotypingNextclade: only for samples with a matching dataset_dir 
     GenotypingNextcladeInput_ch = GenotypingHfile_ch
-        .join(GenotypingTags_ch)
+        .join(GenotypingInfo_ch)
         .combine(GetDatasets.out.flatten())
-        .filter { _sample_id, _input_fasta, h_tag, _n_tag, dataset_dir -> dataset_dir.name.contains(h_tag) }
-        .map { sample_id, input_fasta, h_tag, n_tag, dataset_dir -> tuple(sample_id, input_fasta, h_tag, n_tag, dataset_dir) }
+        .filter { _sample_id, _input_fasta, h_tag, _n_tag, _pathotype, dataset_dir -> 
+            dataset_dir.name.contains(h_tag) 
+        }
 
     GenotypingNextclade(GenotypingNextcladeInput_ch)
+
     GenotypingMerged_ch = GenotypingNextclade.out
         .collectFile(
             name: 'genotyping_results.csv',
@@ -85,50 +88,42 @@ workflow {
         )
 
 
-    // Give the Nextclade output its sample_id key back so they match
+    // 5. FINAL REPORTING & CDS EXTRACTION
+    // Re-associate Nextclade files with their IDs for the final join
     NextcladeTuple_ch = GenotypingNextclade.out
         .map { csv_file ->
-            // Extract "200929" from "nextclade_results_200929.csv"
             def id = csv_file.name.replace('nextclade_results_', '').replace('.csv', '')
             return tuple(id, csv_file)
         }
 
-    // Now the join will successfully find 25 matches and leave 13 remainders (38 total)
-    GenotypingResultsInput_ch = GenotypingTags_ch
+    GenotypingResultsInput_ch = GenotypingInfo_ch
         .join(NextcladeTuple_ch, remainder: true)
         .map { row ->
             def sample_id = row[0]
             def h_tag     = row[1]
             def n_tag     = row[2]
-            def csv_path  = (row.size() > 3 && row[3] != null) ? row[3] : []
-
-            return tuple(sample_id, h_tag, n_tag, csv_path)
+            def pathotype = row[3]
+            def csv_path  = (row.size() > 4 && row[4] != null) ? row[4] : []
+            return tuple(sample_id, h_tag, n_tag, pathotype, csv_path)
         }
 
-    GenotypingResults(GenotypingResultsInput_ch,GetDatasets.out.collect())
+    GenotypingResults(GenotypingResultsInput_ch, GetDatasets.out.collect())
+    
     GenotypingFinal_ch = GenotypingResults.out
         .collectFile(
             name: 'final_genotyping_results.csv',
             keepHeader: true,
             storeDir: "${launchDir}/${params.outDir}"
         )
-    //Pathotype_ch = SubtypeDetection.out
-    //    .map { sample_id, tsv_file ->
-    //        def parts = tsv_file.readLines()[0].split('\t')
-    //        def pathotype = parts.size() > 2 ? parts[2] : ""
-    //        
-    //        return tuple(sample_id, pathotype)
-    //    }
-//
-    // Chain the joins to bring Tags, Pathotype, and Directories together
-    //CDSInput_ch = GenotypingTags_ch
-    //    .join(Pathotype_ch)
-    //    .join(OrganizeBySample.out)
-    //    .map { sample_id, h_tag, n_tag, pathotype, sample_dir ->
-    //        // Rearrange to output: h_tag, n_tag, sample_id, pathotype, sample_dir
-    //        return tuple(h_tag, n_tag, sample_id, pathotype, sample_dir)
-    //    }
-    //GetCDS(CDSInput_ch)
+
+    // Prepare inputs for sequence extraction
+    CDSInput_ch = GenotypingInfo_ch
+        .join(OrganizeBySample.out)
+        .map { sample_id, h_tag, n_tag, pathotype, sample_dir ->
+            return tuple(h_tag, n_tag, sample_id, pathotype, sample_dir)
+        }
+
+    GetCDS(CDSInput_ch)
     //TranslateToProtein(GetCDS.out)
 
     // Mutacions opcional: només si es passa --mutationsSubtype
@@ -146,7 +141,7 @@ workflow {
     datasets = GetDatasets.out
     genotyping = GenotypingMerged_ch
     results = GenotypingFinal_ch
-    //CDS = GetCDS.out
+    CDS = GetCDS.out
     //prot = TranslateToProtein.out
     //mut = mut_out
 }
@@ -173,10 +168,10 @@ output {
         path { "${launchDir}/${params.outDir}" }
         mode "copy"
     }
-    //CDS {
-    //    path { "${launchDir}/${params.outDir}" }
-    //    mode "copy"
-    //}
+    CDS {
+        path { "${launchDir}/${params.outDir}" }
+        mode "copy"
+    }
     //mut {
     //    path { "${params.outDir}" }
     //    mode "copy"

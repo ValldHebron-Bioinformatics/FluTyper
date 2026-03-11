@@ -32,9 +32,12 @@ process SubtypeDetection {
     
     h_tag=\$(grep -E '^0\t' minimizers_results.tsv | head -n 1 | cut -f3 | grep -oE 'H[0-9]+' | head -n 1 || true)
     n_tag=\$(grep -E '^1\t' minimizers_results.tsv | head -n 1 | cut -f3 | grep -oE 'N[0-9]+' | head -n 1 || true)
-    pathotype=""
+    pathotype="" # Default pathotype for non-H5/H7, will be updated later if needed
     if [[ "\$h_tag" == "H5" || "\$h_tag" == "H7" ]]; then
         pathotype=\$(grep -E '^0\t' minimizers_results.tsv | head -n 1 | cut -f3 |grep -oE "HPAI|LPAI" | head -n 1 || true)
+    fi
+    if [[ "\$h_tag" == "H9" ]]; then
+        pathotype="LPAI"
     fi
     if [[ -n "\${h_tag}" && -n "\${n_tag}" ]]; then
         subtype="\${h_tag}\${n_tag}"
