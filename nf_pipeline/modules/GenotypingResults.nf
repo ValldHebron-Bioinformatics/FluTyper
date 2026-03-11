@@ -2,36 +2,77 @@
 nextflow.enable.dsl=2
 
 process GenotypingResults {
-    errorStrategy 'ignore'
-
     input:
-    tuple val(sample_id), path("nextclade_results_${sample_id}.csv"), val(h_tag), val(n_tag)
-    path("*/nextclade_*_dataset")
+    tuple val(sample_id), val(h_tag), val(n_tag), path(csv_path)
+    path("datasets/*") 
 
     output:
-    path("final_genotyping_results.csv")
+    path "final_genotyping_results_${sample_id}.csv"
 
     script:
     """
-    if [[ ${h_tag} == "H5" ]]; then
-        dataset_dir = \$(find . -type d -name "nextclade_H5_dataset" | head -n 1)
-        version = \$(grep '^## ' "\${dataset_dir}/CHANGELOG.md" | head -n 1 | cut -d ' ' -f 2)
-    elif [[ ${h_tag} == "H7" ]]; then
-        dataset_dir = \$(find . -type d -name "nextclade_H7_dataset" | head -n 1)
-        version = \$(grep '^## ' "\${dataset_dir}/CHANGELOG.md" | head -n 1 | cut -d ' ' -f 2)
-    elif [[ ${h_tag} == "H9" ]]; then
-        dataset_dir = \$(find . -type d -name "nextclade_H9_dataset" | head -n 1)
-        version = \$(grep '^## ' "\${dataset_dir}/CHANGELOG.md" | head -n 1 | cut -d ' ' -f 2)
-    else
-        dataset_dir = ""
-        version =""
-    fi
-    subtype = "${h_tag}${n_tag}"
-    clade = \$(cat "nextclade_results_${sample_id}.csv" | tail -n +2 | cut -d ',' -f5 | head -n 1)
-    echo "SampleID,Subtype,Dataset,Version,Clade,qc.status,qc.score" > final_genotyping_results.csv
-    echo "\${sample_id},\${subtype},\${dataset_dir},\${version},\${clade}" >> final_genotyping_results.csv
+    #!/usr/bin/env python3
+    import os, csv
 
+    csv_path = "${csv_path}"
+    # Creem la ruta esperada de la base de dades, dins el work dir, per comprovar si existeix
+    d_path = f"datasets/nextclade_{'${h_tag}'}_dataset"
+    
+    # Comprovem si la carpeta existeix realment
+    d_name = f"nextclade_{'${h_tag}'}_dataset" if os.path.isdir(d_path) else "-"
+    
+    # Definim els valors per defecte al principi per si falla alguna cosa
+    data = {
+        "SampleID": "${sample_id}", 
+        "Subtype": "${h_tag}${n_tag}", 
+        "Dataset": d_name, 
+        "Version": "-", 
+        "Clade": "-", 
+        "qc.status": "-", 
+        "qc.score": "-"
+    }
 
+    # Actualitzem els valors només si la base de dades existeix
+    if d_name != "-":
+        # Apuntem directament al fitxer CHANGELOG.md per extreure la versió
+        changelog_file = f"{d_path}/CHANGELOG.md"
+        if os.path.isfile(changelog_file):
+            # Extraiem la versió de la primera línia
+            # Obrim el fitxer i busquem la versió de forma molt més llegible
+            with open(changelog_file, 'r') as f:
+                for line in f:
+                    if line.startswith('##'):
+                        # Substituïm els coixinets per res i eliminem els espais en blanc
+                        data["Version"] = line.replace('##', '').strip()
+                        break
 
+        if os.path.isfile(csv_path):
+            best_row = None
+            min_score = float('inf') # ho posem a infinit perquè qualsevol score real serà més petit
+            
+            # Llegim el fitxer CSV línia per línia
+            for row in csv.DictReader(open(csv_path), delimiter=';'):
+                score_str = row.get('qc.overallScore', row.get('qc.score', '-'))
+                try:
+                    score = float(score_str)
+                except ValueError:
+                    score = float('inf')
+                
+                # Ens quedem només amb la fila que tingui el score més baix
+                if score < min_score:
+                    min_score = score
+                    best_row = row
+            
+            # Si hem trobat una fila vàlida, actualitzem el diccionari final
+            if best_row:
+                data["Clade"] = best_row.get('clade', 'unclassified')
+                data["qc.status"] = best_row.get('qc.overallStatus', best_row.get('qc.status', '-'))
+                data["qc.score"] = best_row.get('qc.overallScore', best_row.get('qc.score', '-'))
+
+    # Escrivim la capçalera i la fila amb el millor resultat en el nou CSV
+    with open("final_genotyping_results_${sample_id}.csv", 'w', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=data.keys())
+        writer.writeheader()
+        writer.writerow(data)
     """
 }

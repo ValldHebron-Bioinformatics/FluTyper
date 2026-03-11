@@ -25,12 +25,13 @@ process GetDatasets {
                 ;;
             H7)
                 DATASET_NAME='TO_BE_DECIDED_H7'
-                #mkdir -p H7
+                mkdir -p H7/nextclade_H7_dataset
+                
                 #nextclade dataset get --name "\${DATASET_NAME}" --output-dir H7/nextclade_H7_dataset
                 ;;
             H9)
                 DATASET_NAME='TO_BE_DECIDED_H9'
-                #mkdir -p H9
+                mkdir -p H9/nextclade_H9_dataset
                 #nextclade dataset get --name "\${DATASET_NAME}" --output-dir H9/nextclade_H9_dataset
                 ;;
             *)

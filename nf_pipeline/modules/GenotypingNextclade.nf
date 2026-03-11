@@ -1,12 +1,20 @@
+#!/usr/bin/env nextflow
+nextflow.enable.dsl=2
+
 process GenotypingNextclade {
     errorStrategy 'ignore'
     
     input:
-    tuple val(sample_id), path(ha_fasta), val(h_tag), val(n_tag), path(dataset_dir)
+    tuple val(sample_id), path(ha_fasta), val(h_tag), val(n_tag), val(dataset_dir)
     output:
-    tuple val(sample_id), path("nextclade_results_${sample_id}.csv"), val(h_tag), val(n_tag)
+    path("nextclade_results_${sample_id}.csv")
     script:
     """
+    if [ ! -d "${dataset_dir}" ]; then
+        echo "[WARNING] No valid dataset_dir for ${sample_id}, skipping."
+        touch nextclade_results_${sample_id}.csv
+        exit 0
+    fi
     if [[ ${h_tag} == "H5" ]]; then
         dataset_dir="${dataset_dir}/H5/nextclade_H5_dataset"
     elif [[ ${h_tag} == "H7" ]]; then

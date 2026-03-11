@@ -69,27 +69,51 @@ workflow {
         return tuple(sample_id, h_tag, n_tag)
     }
 
-    GenotypingInput_ch = GenotypingHfile_ch
-        .join(GenotypingTags_ch) // Joins on sample_id
+    // GenotypingNextclade: only for samples with a matching dataset_dir 
+    GenotypingNextcladeInput_ch = GenotypingHfile_ch
+        .join(GenotypingTags_ch)
         .combine(GetDatasets.out.flatten())
-        .map { sample_id, input_fasta, h_tag, n_tag, dataset_dir ->
-            // Filter: Only proceed if the dataset directory matches the H-tag
-            if (dataset_dir.name.contains(h_tag)) {
-                return tuple(sample_id, input_fasta, h_tag, n_tag, dataset_dir)
-            }
-        }
+        .filter { _sample_id, _input_fasta, h_tag, _n_tag, dataset_dir -> dataset_dir.name.contains(h_tag) }
+        .map { sample_id, input_fasta, h_tag, n_tag, dataset_dir -> tuple(sample_id, input_fasta, h_tag, n_tag, dataset_dir) }
 
-    GenotypingNextclade(GenotypingInput_ch)
+    GenotypingNextclade(GenotypingNextcladeInput_ch)
     GenotypingMerged_ch = GenotypingNextclade.out
-        .map { arr -> arr[1] } // Extract the path to the CSV file from the tuple
         .collectFile(
             name: 'genotyping_results.csv',
             keepHeader: true,
             skip: 1,
             storeDir: "${launchDir}/${params.outDir}"
         )
-      
-    GenotypingResults(GenotypingNextclade.out, GetDatasets.out)
+
+
+    // Give the Nextclade output its sample_id key back so they match
+    NextcladeTuple_ch = GenotypingNextclade.out
+        .map { csv_file ->
+            // Extract "200929" from "nextclade_results_200929.csv"
+            def id = csv_file.name.replace('nextclade_results_', '').replace('.csv', '')
+            return tuple(id, csv_file)
+        }
+
+    // Now the join will successfully find 25 matches and leave 13 remainders (38 total)
+    GenotypingResultsInput_ch = GenotypingTags_ch
+        .join(NextcladeTuple_ch, remainder: true)
+        .map { row ->
+            def sample_id = row[0]
+            def h_tag     = row[1]
+            def n_tag     = row[2]
+            def csv_path  = (row.size() > 3 && row[3] != null) ? row[3] : []
+
+            return tuple(sample_id, h_tag, n_tag, csv_path)
+        }
+
+    GenotypingResults(GenotypingResultsInput_ch,GetDatasets.out.collect())
+    GenotypingFinal_ch = GenotypingResults.out
+        .collectFile(
+            name: 'final_genotyping_results.csv',
+            keepHeader: true,
+            skip: 1,
+            storeDir: "${launchDir}/${params.outDir}"
+        )
     
     
     // Unim els canals una sola vegada i creem una tupla neta
@@ -117,7 +141,7 @@ workflow {
     subtype = SubtypeMerged_ch
     datasets = GetDatasets.out
     genotyping = GenotypingMerged_ch
-    results = GenotypingResults.out
+    results = GenotypingFinal_ch
     //CDS = GetCDS.out
     //prot = TranslateToProtein.out
     //mut = mut_out
