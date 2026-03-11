@@ -10,7 +10,7 @@ process SubtypeDetection {
 
     output:
     tuple val(sample_id), path("inferred_subtypes_${sample_id}.tsv")
-
+    
     script:
     """
     input_fasta="${sample_id}_HA_NA.fasta"
@@ -32,12 +32,22 @@ process SubtypeDetection {
     
     h_tag=\$(grep -E '^0\t' minimizers_results.tsv | head -n 1 | cut -f3 | grep -oE 'H[0-9]+' | head -n 1 || true)
     n_tag=\$(grep -E '^1\t' minimizers_results.tsv | head -n 1 | cut -f3 | grep -oE 'N[0-9]+' | head -n 1 || true)
+    pathotype="" # Default pathotype for non-H5/H7, will be updated later if needed
+    if [[ "\$h_tag" == "H5" || "\$h_tag" == "H7" ]]; then
+        pathotype=\$(grep -E '^0\t' minimizers_results.tsv | head -n 1 | cut -f3 |grep -oE "HPAI|LPAI" | head -n 1 || true)
+    fi
+    if [[ "\$h_tag" == "H9" ]]; then
+        pathotype="LPAI"
+    fi
     if [[ -n "\${h_tag}" && -n "\${n_tag}" ]]; then
         subtype="\${h_tag}\${n_tag}"
+    elif [[ -n "\${h_tag}" ]]; then
+        subtype="\${h_tag}Nx"
+    elif [[ -n "\${n_tag}" ]]; then
+        subtype="Hx\${n_tag}"
     else
         subtype="Incomplete"
     fi
-    printf '%s\t%s\n' "${sample_id}" "\${subtype}" > inferred_subtypes_${sample_id}.tsv
-
+    printf '%s\t%s\t%s\n' "${sample_id}" "\${subtype}" "\${pathotype}" > inferred_subtypes_${sample_id}.tsv
     """
 }

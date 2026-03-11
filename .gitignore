@@ -2,8 +2,10 @@ __pycache__/
 .nextflow.log*
 .nextflow
 work
-docs/TFM
+docs
 .venv/
 results/
 protocols/AVIAN/v1/config.yaml
 .gitignore
+prova/
+
