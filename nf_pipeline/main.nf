@@ -81,7 +81,6 @@ workflow {
         .collectFile(
             name: 'genotyping_results.csv',
             keepHeader: true,
-            skip: 1,
             storeDir: "${launchDir}/${params.outDir}"
         )
 
@@ -111,20 +110,19 @@ workflow {
         .collectFile(
             name: 'final_genotyping_results.csv',
             keepHeader: true,
-            skip: 1,
             storeDir: "${launchDir}/${params.outDir}"
         )
     
     
     // Unim els canals una sola vegada i creem una tupla neta
-    //GetCDS_ch = OrganizeBySample.out.join(SubtypeDetection.out)
-    //    .map { sample_id, sample_dir, subtype_file ->
-    //        def segments_dir = file("${sample_dir}/segments")
-    //        tuple(sample_id, segments_dir, subtype_file)
-    //    }
-    //
-    //// Passem el canal sencer al procés
-    //GetCDS(GetCDS_ch)
+    GetCDS_ch = OrganizeBySample.out.join(SubtypeDetection.out)
+        .map { sample_id, sample_dir, subtype_file ->
+            def segments_dir = file("${sample_dir}/segments")
+            tuple(sample_id, segments_dir, subtype_file)
+        }
+    
+    // Passem el canal sencer al procés
+    GetCDS(GetCDS_ch)
     //TranslateToProtein(GetCDS.out)
 
     // Mutacions opcional: només si es passa --mutationsSubtype
@@ -142,7 +140,7 @@ workflow {
     datasets = GetDatasets.out
     genotyping = GenotypingMerged_ch
     results = GenotypingFinal_ch
-    //CDS = GetCDS.out
+    CDS = GetCDS.out
     //prot = TranslateToProtein.out
     //mut = mut_out
 }
@@ -169,10 +167,10 @@ output {
         path { "${launchDir}/${params.outDir}" }
         mode "copy"
     }
-    //CDS {
-    //    path { "${launchDir}/${params.outDir}" }
-    //    mode "copy"
-    //}
+    CDS {
+        path { "${launchDir}/${params.outDir}" }
+        mode "copy"
+    }
     //mut {
     //    path { "${params.outDir}" }
     //    mode "copy"

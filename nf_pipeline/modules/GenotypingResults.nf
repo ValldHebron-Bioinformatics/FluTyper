@@ -37,42 +37,37 @@ process GenotypingResults {
         # Apuntem directament al fitxer CHANGELOG.md per extreure la versió
         changelog_file = f"{d_path}/CHANGELOG.md"
         if os.path.isfile(changelog_file):
-            # Extraiem la versió de la primera línia
-            # Obrim el fitxer i busquem la versió de forma molt més llegible
+            # Obrim el fitxer i busquem la versió
             with open(changelog_file, 'r') as f:
                 for line in f:
                     if line.startswith('##'):
-                        # Substituïm els coixinets per res i eliminem els espais en blanc
+                        # Extreiem la versió de la línia, traiem els '##' i els espais sobrants
                         data["Version"] = line.replace('##', '').strip()
                         break
 
         if os.path.isfile(csv_path):
             best_row = None
             min_score = float('inf') # ho posem a infinit perquè qualsevol score real serà més petit
-            
-            # Llegim el fitxer CSV línia per línia
+            # Llegim el fitxer CSV línia per línia, utilitzem csv per accedir a les columnes pel nom
             for row in csv.DictReader(open(csv_path), delimiter=';'):
                 score_str = row.get('qc.overallScore', row.get('qc.score', '-'))
                 try:
                     score = float(score_str)
                 except ValueError:
-                    score = float('inf')
-                
+                    score = float('inf') # Error handling
                 # Ens quedem només amb la fila que tingui el score més baix
                 if score < min_score:
                     min_score = score
                     best_row = row
-            
-            # Si hem trobat una fila vàlida, actualitzem el diccionari final
+            # Actualitzem les dades de clade i QC només si hem trobat una fila vàlida amb un score numèric
             if best_row:
                 data["Clade"] = best_row.get('clade', 'unclassified')
                 data["qc.status"] = best_row.get('qc.overallStatus', best_row.get('qc.status', '-'))
                 data["qc.score"] = best_row.get('qc.overallScore', best_row.get('qc.score', '-'))
-
-    # Escrivim la capçalera i la fila amb el millor resultat en el nou CSV
+    # Escrivim el header i la fila amb el millor resultat en el nou CSV
     with open("final_genotyping_results_${sample_id}.csv", 'w', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=data.keys())
-        writer.writeheader()
+        writer = csv.DictWriter(f, fieldnames=data.keys()) # Escrivim el header només una vegada
+        writer.writeheader() 
         writer.writerow(data)
     """
 }
