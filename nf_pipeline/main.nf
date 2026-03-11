@@ -112,17 +112,23 @@ workflow {
             keepHeader: true,
             storeDir: "${launchDir}/${params.outDir}"
         )
-    
-    
-    // Unim els canals una sola vegada i creem una tupla neta
-    GetCDS_ch = OrganizeBySample.out.join(SubtypeDetection.out)
-        .map { sample_id, sample_dir, subtype_file ->
-            def segments_dir = file("${sample_dir}/segments")
-            tuple(sample_id, segments_dir, subtype_file)
-        }
-    
-    // Passem el canal sencer al procés
-    GetCDS(GetCDS_ch)
+    //Pathotype_ch = SubtypeDetection.out
+    //    .map { sample_id, tsv_file ->
+    //        def parts = tsv_file.readLines()[0].split('\t')
+    //        def pathotype = parts.size() > 2 ? parts[2] : ""
+    //        
+    //        return tuple(sample_id, pathotype)
+    //    }
+//
+    // Chain the joins to bring Tags, Pathotype, and Directories together
+    //CDSInput_ch = GenotypingTags_ch
+    //    .join(Pathotype_ch)
+    //    .join(OrganizeBySample.out)
+    //    .map { sample_id, h_tag, n_tag, pathotype, sample_dir ->
+    //        // Rearrange to output: h_tag, n_tag, sample_id, pathotype, sample_dir
+    //        return tuple(h_tag, n_tag, sample_id, pathotype, sample_dir)
+    //    }
+    //GetCDS(CDSInput_ch)
     //TranslateToProtein(GetCDS.out)
 
     // Mutacions opcional: només si es passa --mutationsSubtype
@@ -140,7 +146,7 @@ workflow {
     datasets = GetDatasets.out
     genotyping = GenotypingMerged_ch
     results = GenotypingFinal_ch
-    CDS = GetCDS.out
+    //CDS = GetCDS.out
     //prot = TranslateToProtein.out
     //mut = mut_out
 }
@@ -167,10 +173,10 @@ output {
         path { "${launchDir}/${params.outDir}" }
         mode "copy"
     }
-    CDS {
-        path { "${launchDir}/${params.outDir}" }
-        mode "copy"
-    }
+    //CDS {
+    //    path { "${launchDir}/${params.outDir}" }
+    //    mode "copy"
+    //}
     //mut {
     //    path { "${params.outDir}" }
     //    mode "copy"
