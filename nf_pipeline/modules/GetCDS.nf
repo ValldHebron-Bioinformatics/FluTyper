@@ -22,11 +22,12 @@ process GetCDS {
     sample_dir = "${sample_dir}"
     references_fasta = "${params.protocols[params.protocol].resources}/CDS_references.fasta"
     
-    out_dir = f"samples/{sample_id}/segments/CDS"
-    os.makedirs(out_dir, exist_ok=True)
+    cds_dir = f"samples/{sample_id}/segments/CDS"
+    os.makedirs(cds_dir, exist_ok=True)
 
-    # Hardcoded Python dictionary
-    proteins_map = {
+
+    # Python dictionary
+    prot_dict = {
         "HA":  ["HA", "HA-SP", "HA1-SP", "HA2"],
         "NA":  ["NA"],
         "PB2": ["PB2"],
@@ -37,8 +38,7 @@ process GetCDS {
         "NS":  ["NS1", "NEP"]
     }
 
-    for seg, prots in proteins_map.items():
-        # --- ROUTING LOGIC ---
+    for seg, prots in prot_dict.items():
         if seg == "NA":
             ref_tag = n_tag
             ref_patho = ""
@@ -60,10 +60,9 @@ process GetCDS {
             
         for prot in prots:
             pattern = f"^{ref_tag}_{prot}_.*_{ref_patho}" if (ref_patho and seg != "NA") else f"^{ref_tag}_{prot}_"
-            
-            ref_out = f"{out_dir}/{sample_id}_{prot}_ref.fasta"
-            mafft_in = f"{out_dir}/{sample_id}_{prot}_mafft_in.fasta"
-            mafft_out = f"{out_dir}/{sample_id}_{prot}_aligned.fasta"
+            ref_out = f"{cds_dir}/{sample_id}_{prot}_ref.fasta"
+            mafft_in = f"{cds_dir}/{sample_id}_{prot}_mafft_in.fasta"
+            mafft_out = f"{cds_dir}/{sample_id}_{prot}_aligned.fasta"
             
             subprocess.run(f"seqkit grep -r -p '{pattern}' {references_fasta} > {ref_out}", shell=True)
             
@@ -77,7 +76,7 @@ process GetCDS {
                     
                     if len(parts) >= 2:
                         ref_seq = parts[0][1].replace('\\n', '')
-                        sam_header, sam_seq = parts[1][0], parts[1][1].replace('\\n', '')
+                        aligned_header, aligned_seq = parts[1][0], parts[1][1].replace('\\n', '')
                         
                         start = len(ref_seq) - len(ref_seq.lstrip('-'))
                         end = len(ref_seq.rstrip('-'))
@@ -85,7 +84,7 @@ process GetCDS {
                         final_seq, temp_chunk = [], []
                         gap_len = 0
                         
-                        for r, s in zip(ref_seq[start:end], sam_seq[start:end]):
+                        for r, s in zip(ref_seq[start:end], aligned_seq[start:end]):
                             if r == '-':
                                 gap_len += 1
                                 if s != '-': temp_chunk.append(s)
@@ -97,8 +96,9 @@ process GetCDS {
                         if gap_len < 50: final_seq.extend(temp_chunk)
                         
                         clean_seq = "".join(final_seq)
-                        with open(f"{out_dir}/{sample_id}_{prot}_CDS.fasta", 'w') as f_out:
-                            f_out.write(f">{sam_header}\\n")
-                            f_out.write('\\n'.join(clean_seq[i:i+80] for i in range(0, len(clean_seq), 80)) + '\\n')
+                        with open(f"{cds_dir}/{sample_id}_{prot}_CDS.fasta", 'w') as f_out:
+                            f_out.write(f">{aligned_header}\\n")
+                            f_out.write('\\n'.join(clean_seq[i:i+80] for i in range(0, len(clean_seq), 80)) + '\\n') # https://softwareengineering.stackexchange.com/questions/148677/why-is-80-characters-the-standard-limit-for-code-width 
+    
     """
 }
