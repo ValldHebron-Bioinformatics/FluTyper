@@ -9,10 +9,11 @@ process GenotypingNextclade {
     output:
     path("nextclade_results_${sample_id}.csv")
     script:
+    def logDir = file(params.outDir).toAbsolutePath()
     """
     # Check if dataset_dir is valid and contains the expected subdirectory for the H tag, if not create an empty results file and exit
     if [ ! -d "${dataset_dir}" ]; then
-        echo "[WARNING] No valid dataset_dir for ${sample_id}, skipping."
+        echo "[WARNING] No valid dataset_dir for ${sample_id}, skipping." >> "${logDir}/errors.log"
         touch nextclade_results_${sample_id}.csv
         exit 0
     fi
@@ -27,7 +28,7 @@ process GenotypingNextclade {
         touch nextclade_results_${sample_id}.csv
         exit 0
     else
-        echo "No valid H subtype found for genotyping: ${h_tag}"
+        echo "No valid H subtype found for genotyping: ${h_tag}" >> "${logDir}/errors.log"
         touch nextclade_results_${sample_id}.csv
         exit 0
     fi

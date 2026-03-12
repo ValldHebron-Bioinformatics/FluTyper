@@ -13,6 +13,7 @@ process TranslateToProtein {
 
 
     script:
+    def logDir = file(params.outDir).toAbsolutePath()
     """
     mkdir -p "samples/${sample_dir}/proteins"
     for cds_fasta in *_CDS.fasta; do
@@ -21,6 +22,8 @@ process TranslateToProtein {
         if [[ -f "\${cds_fasta}" ]]; then
             # Use seqkit translate to convert the CDS fasta to protein fasta
             seqkit translate "\${cds_fasta}" > "samples/${sample_dir}/proteins/\${prot_fasta}"
+        else
+            echo "CDS FASTA file \${cds_fasta} not found for sample ${sample_id}, skipping translation for this file." >> "${logDir}/errors.log"
         fi
     done
     """
