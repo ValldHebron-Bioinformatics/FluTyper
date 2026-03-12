@@ -38,8 +38,16 @@ Pipe: >Sample01|NA|Hebei_SJ27
 
 ## 🔄 Nextflow channel flow (sequences_dir)
 
-1. input_ch = channel.of([params.sample, params.dirSample])
-2. OrganizeBySpecies(input_ch) creates and emits path("sequences")
-3. TranslateToProtein(OrganizeBySpecies.out) passes that emitted path into the process input
-4. Inside TranslateToProtein, path(sequences_dir) binds that incoming path to the variable sequences_dir
-5. The script uses ${sequences_dir} for --sequences-dir and --output-dir, then emits path("sequences") again
+## 🔄 Nextflow channel flow (main pipeline)
+
+1. **SampleInput_ch**: Created from the input FASTA file(s) using `channel.fromPath(params.inputFasta, checkIfExists: true).splitFasta(...)`. Emits tuples of (sample_id, fasta_file).
+2. **OrganizeBySample(SampleInput_ch)**: Organizes input sequences by sample, emitting (sample_id, sample_dir).
+3. **SubtypeDetection(OrganizeBySample.out)**: Receives (sample_id, sample_dir), emits (sample_id, tsv_file) with subtyping results.
+4. **GenotypingInfo_ch**: Parses subtyping results to extract (sample_id, h_tag, n_tag, pathotype).
+5. **GetDatasets(SubtypeMerged_ch)**: Uses merged subtyping results to determine which reference datasets to download.
+6. **GenotypingNextcladeInput_ch**: Joins sample HA files, subtyping info, and datasets, filtering by H-type.
+7. **GenotypingNextclade(GenotypingNextcladeInput_ch)**: Runs Nextclade genotyping, emits per-sample CSV results.
+8. **NextcladeTuple_ch**: Maps Nextclade output files to (sample_id, csv_file).
+9. **GenotypingResultsInput_ch**: Joins genotyping info with Nextclade results, emits (sample_id, h_tag, n_tag, pathotype, csv_file).
+10. **GenotypingResults(GenotypingResultsInput_ch, GetDatasets.out.collect())**: Prepares the final report.
+11. **GetCDS(CDSInput_ch)**: Prepares inputs for sequence extraction.
