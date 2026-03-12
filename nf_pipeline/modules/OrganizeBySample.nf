@@ -32,7 +32,6 @@ process OrganizeBySample {
         
         # Check if the generated file is empty (size 0)
         if [ ! -s "\${SEG_FILE}" ]; then
-            rm "\${SEG_FILE}"
             if [ "\${seg}" = "HA" ]; then
                 echo "No HA segment for sample ${sample_id}. Cannot determine subtype or clade. Stopping processing for this sample." >> "${logDir}/errors.log"
                 exit 1
