@@ -40,15 +40,15 @@ workflow {
     SubtypeMerged_ch = SubtypeDetection.out
         .map { arr -> arr[1] }
         .collectFile(
-            name: 'inferred_subtypes.tsv',
-            seed: 'seqName\tinferred_subtype\tpathotype\n',
+            name: 'inferred_subtypes.csv',
+            seed: 'seqName,inferred_subtype,pathotype\n',
             storeDir: "${launchDir}/${params.outDir}",
         )
 
     // Parse subtyping results immediately for use in downstream filtering
-    GenotypingInfo_ch = SubtypeDetection.out.map { sample_id, tsv_file ->
-        def line = tsv_file.readLines()[0]
-        def parts = line.split('\t')
+    GenotypingInfo_ch = SubtypeDetection.out.map { sample_id, csv_file ->
+        def line = csv_file.readLines()[0]
+        def parts = line.split(',')
         def full_subtype = parts[1] 
         def pathotype = parts.size() > 2 ? parts[2] : ""
 
@@ -129,7 +129,14 @@ workflow {
         }
 
     GetCDS(CDSInput_ch)
-    //TranslateToProtein(GetCDS.out)
+    TranslateToProtein_ch = GetCDS.out
+        .join(OrganizeBySample.out)
+        .map { sample_id, cds_files, sample_dir ->
+            return tuple(sample_id, cds_files, sample_dir)
+        }
+
+    
+    TranslateToProtein(TranslateToProtein_ch)
 
     // Mutacions opcional: només si es passa --mutationsSubtype
     //def mut_out = channel.empty()
@@ -147,7 +154,7 @@ workflow {
     genotyping = GenotypingMerged_ch
     results = GenotypingFinal_ch
     CDS = GetCDS.out
-    //prot = TranslateToProtein.out
+    prot = TranslateToProtein.out
     //mut = mut_out
 }
 // Bloc final de publicació de resultats
@@ -174,6 +181,10 @@ output {
         mode "copy"
     }
     CDS {
+        path { "${launchDir}/${params.outDir}" }
+        mode "copy"
+    }
+    prot {
         path { "${launchDir}/${params.outDir}" }
         mode "copy"
     }

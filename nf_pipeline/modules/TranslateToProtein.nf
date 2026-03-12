@@ -6,20 +6,24 @@ process TranslateToProtein {
     errorStrategy 'ignore'
 
     input:
-    path(sequences_dir)
+    tuple val(sample_id), path(cds_files), path(sample_dir)
 
     output:
-    path('sequences')
+    tuple val(sample_id), path("samples/${sample_dir}/PROTEINS/*_PROT.fasta")
+
 
     script:
     """
-    cp -rL ${sequences_dir} sequences_work
-
-    python3 ${params.workDir}/${params.programs.translateSegments} \
-      --sequences-dir sequences_work \
-      --output-dir sequences_work
-
-    rm -f sequences
-    mv sequences_work sequences
+    mkdir -p "samples/${sample_dir}/PROTEINS"
+    for cds_fasta in *_CDS.fasta; do
+        prot_fasta="\$(basename "\${cds_fasta}" _CDS.fasta)_PROT.fasta"
+        
+        if [[ -f "\${cds_fasta}" ]]; then
+            # Use seqkit translate to convert the CDS fasta to protein fasta
+            seqkit translate "\${cds_fasta}" > "samples/${sample_dir}/PROTEINS/\${prot_fasta}"
+        fi
+    done
     """
 }
+    
+

@@ -9,7 +9,7 @@ process SubtypeDetection {
     tuple val(sample_id), path(ha_fasta), path(na_fasta)
 
     output:
-    tuple val(sample_id), path("inferred_subtypes_${sample_id}.tsv")
+    tuple val(sample_id), path("inferred_subtypes_${sample_id}.csv")
     
     script:
     """
@@ -23,7 +23,7 @@ process SubtypeDetection {
     else
         echo "No valid protocol specified for subtype detection: ${params.protocol}"
         : > minimizers_results.tsv
-        printf '%s\tIncomplete\n' "${sample_id}" > inferred_subtypes_${sample_id}.tsv
+        printf '%s,%s,%s\n' "${sample_id}" "Incomplete" "" > inferred_subtypes_${sample_id}.csv
         exit 0
     fi
 
@@ -48,6 +48,6 @@ process SubtypeDetection {
     else
         subtype="Incomplete"
     fi
-    printf '%s\t%s\t%s\n' "${sample_id}" "\${subtype}" "\${pathotype}" > inferred_subtypes_${sample_id}.tsv
+    printf '%s,%s,%s\n' "${sample_id}" "\${subtype}" "\${pathotype}" > inferred_subtypes_${sample_id}.csv
     """
 }
