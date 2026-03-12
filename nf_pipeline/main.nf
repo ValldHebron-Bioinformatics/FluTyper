@@ -76,12 +76,13 @@ workflow {
         }
 
     GenotypingNextclade(GenotypingNextcladeInput_ch)
+    // I think this is not needed, ask Alejandra.
     // Merge individual genotyping results into a global report
-    GenotypingMerged_ch = GenotypingNextclade.out
-        .collectFile(
-            name: 'genotyping_results.csv',
-            keepHeader: true,
-        )
+    //GenotypingMerged_ch = GenotypingNextclade.out 
+    //    .collectFile(
+    //        name: 'genotyping_results.csv',
+    //        keepHeader: true,
+    //    )
 
     // RESULTS REPORTING & CDS EXTRACTION
     // Re-associate Nextclade files with their IDs for the final join
@@ -144,7 +145,7 @@ workflow {
     folder = OrganizeBySample.out
     subtype = SubtypeMerged_ch
     datasets = GetDatasets.out
-    genotyping = GenotypingMerged_ch
+    //genotyping = GenotypingMerged_ch
     results = GenotypingFinal_ch
     CDS = GetCDS.out
     prot = TranslateToProtein.out
@@ -152,10 +153,10 @@ workflow {
 }
 // Bloc final de publicació de resultats
 output {
-    genotyping {
-        path { "${launchDir}/${params.outDir}" }
-        mode "copy"
-    }
+    //genotyping {
+    //    path { "${launchDir}/${params.outDir}" }
+    //    mode "copy"
+    //}
     datasets {
         path { "${launchDir}/protocols/${params.protocol}/v1/resources" }
         mode "copy"
