@@ -4,7 +4,7 @@ nextflow.enable.dsl=2
 process GenotypingResults {
     input:
     tuple val(sample_id), val(h_tag), val(n_tag), val(pathotype), path(csv_path)
-    path("datasets/*") 
+    path("datasets/*") // datasets/ directory containing the downloaded datasets in the work dir.
 
     output:
     path "final_genotyping_results_${sample_id}.csv"
@@ -14,19 +14,13 @@ process GenotypingResults {
     #!/usr/bin/env python3
     import os, csv
 
-    csv_path = "${csv_path}"
-    # Creem la ruta esperada de la base de dades, dins el work dir, per comprovar si existeix
-    d_path = f"datasets/nextclade_{'${h_tag}'}_dataset"
+    # Determine dataset name and version based on the H tag
+    d_path = "datasets/nextclade_${h_tag}_dataset"
+    d_name = "nextclade_${h_tag}_dataset" if os.path.isdir(d_path) else "-"
     
-    # Comprovem si la carpeta existeix realment
-    d_name = f"nextclade_{'${h_tag}'}_dataset" if os.path.isdir(d_path) else "-"
-    
-    # Construïm el valor del subtipus abans de definir el diccionari
-    subtype_val = "${h_tag}${n_tag}"
-    if "${h_tag}" in ["H5", "H7", "H9"] and "${pathotype}":
-        subtype_val += f"(${pathotype})"
+    subtype_val = "${h_tag}${n_tag}(${pathotype})" if "${h_tag}" in ["H5", "H7", "H9"] and "${pathotype}" else "${h_tag}${n_tag}"
 
-    # Definim els valors per defecte al principi per si falla alguna cosa
+    # Prepare the data dictionary with default values
     data = {
         "SampleID": "${sample_id}", 
         "Subtype": subtype_val, 
@@ -36,43 +30,45 @@ process GenotypingResults {
         "qc.status": "-", 
         "qc.score": "-"
     }
-
-    # Actualitzem els valors només si la base de dades existeix
+    # Extract version from CHANGELOG.md if the dataset exists
     if d_name != "-":
-        # Apuntem directament al fitxer CHANGELOG.md per extreure la versió
         changelog_file = f"{d_path}/CHANGELOG.md"
         if os.path.isfile(changelog_file):
-            # Obrim el fitxer i busquem la versió
             with open(changelog_file, 'r') as f:
                 for line in f:
                     if line.startswith('##'):
-                        # Extreiem la versió de la línia, traiem els '##' i els espais sobrants
-                        data["Version"] = line.replace('##', '').strip()
+                        data["Version"] = line.replace('##', '').strip() 
                         break
 
-        if os.path.isfile(csv_path):
+        if os.path.isfile("${csv_path}"):
             best_row = None
-            min_score = float('inf') # ho posem a infinit perquè qualsevol score real serà més petit
-            # Llegim el fitxer CSV línia per línia, utilitzem csv per accedir a les columnes pel nom
-            for row in csv.DictReader(open(csv_path), delimiter=';'):
-                score_str = row.get('qc.overallScore', row.get('qc.score', '-'))
-                try:
-                    score = float(score_str)
-                except ValueError:
-                    score = float('inf') # Error handling
-                # Ens quedem només amb la fila que tingui el score més baix
-                if score < min_score:
-                    min_score = score
-                    best_row = row
-            # Actualitzem les dades de clade i QC només si hem trobat una fila vàlida amb un score numèric
+            min_score = float('inf') # We want to find the best (lowest) score among the rows in the CSV
+            
+            with open("${csv_path}", 'r') as f:
+                for row in csv.DictReader(f, delimiter=';'):
+                    score_str = row.get('qc.overallScore', '-')
+                    try:
+                        score = float(score_str)
+                        if score < min_score:
+                            min_score, best_row = score, row
+                    except ValueError:
+                        pass
+            
             if best_row:
                 data["Clade"] = best_row.get('clade', 'unclassified')
-                data["qc.status"] = best_row.get('qc.overallStatus', best_row.get('qc.status', '-'))
-                data["qc.score"] = best_row.get('qc.overallScore', best_row.get('qc.score', '-'))
-    # Escrivim el header i la fila amb el millor resultat en el nou CSV
+                data["qc.status"] = best_row.get('qc.overallStatus', '-')
+                data["qc.score"] = best_row.get('qc.overallScore', '-')
+
+    # Set up the CSV writer using the dictionary keys as column headers
+    # This ensures that data is always mapped to the correct column name
     with open("final_genotyping_results_${sample_id}.csv", 'w', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=data.keys()) # Escrivim el header només una vegada
+        # DictWriter uses 'fieldnames' to know which keys to look for in the data dictionary
+        writer = csv.DictWriter(f, fieldnames=data.keys())
+        
+        # Write the header row using the keys provided in fieldnames
         writer.writeheader() 
+        
+        # Write the data row; the writer matches the dictionary values to the correct headers
         writer.writerow(data)
     """
 }
