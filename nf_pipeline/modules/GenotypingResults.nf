@@ -21,10 +21,15 @@ process GenotypingResults {
     # Comprovem si la carpeta existeix realment
     d_name = f"nextclade_{'${h_tag}'}_dataset" if os.path.isdir(d_path) else "-"
     
+    # Construïm el valor del subtipus abans de definir el diccionari
+    subtype_val = "${h_tag}${n_tag}"
+    if "${h_tag}" in ["H5", "H7", "H9"] and "${pathotype}":
+        subtype_val += f"(${pathotype})"
+
     # Definim els valors per defecte al principi per si falla alguna cosa
     data = {
         "SampleID": "${sample_id}", 
-        "Subtype": "${h_tag}${n_tag}", 
+        "Subtype": subtype_val, 
         "Dataset": d_name, 
         "Version": "-", 
         "Clade": "-", 
