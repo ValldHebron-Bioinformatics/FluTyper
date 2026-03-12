@@ -21,7 +21,7 @@ process GetCDS {
     cds_dir = "samples/${sample_id}/CDS"
     os.makedirs(cds_dir, exist_ok=True)
 
-    # Define the map here, I wanted to keep it in params but it was too complex for Groovy interpolation
+    # Define the map here, I wanted to keep it in params but it was too complex for Groovy to python dict
     prot_dict = {
         "HA":  ["HA", "HA-SP", "HA1-SP", "HA2"],
         "NA":  ["NA"],

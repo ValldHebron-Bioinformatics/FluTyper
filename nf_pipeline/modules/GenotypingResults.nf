@@ -62,12 +62,10 @@ process GenotypingResults {
     # Set up the CSV writer using the dictionary keys as column headers
     # This ensures that data is always mapped to the correct column name
     with open("final_genotyping_results_${sample_id}.csv", 'w', newline='') as f:
-        # DictWriter uses 'fieldnames' to know which keys to look for in the data dictionary
+        # DictWriter uses 'fieldnames' to know which keys to look for in the data dictionary https://docs.python.org/3/library/csv.html
         writer = csv.DictWriter(f, fieldnames=data.keys())
-        
         # Write the header row using the keys provided in fieldnames
         writer.writeheader() 
-        
         # Write the data row; the writer matches the dictionary values to the correct headers
         writer.writerow(data)
     """
