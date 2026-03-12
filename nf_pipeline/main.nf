@@ -2,19 +2,18 @@
 
 nextflow.enable.dsl = 2
 
-include { GenotypingNextclade } from './modules/GenotypingNextclade'
 include { OrganizeBySample    } from './modules/OrganizeBySample'
-include { MutationsFinder     } from './modules/MutationsFinder'
-include { TranslateToProtein  } from './modules/TranslateToProtein'
 include { SubtypeDetection    } from './modules/SubtypeDetection'
 include { GetDatasets         } from './modules/GetDatasets'
-include { GetCDS              } from './modules/GetCDS'
+include { GenotypingNextclade } from './modules/GenotypingNextclade'
 include { GenotypingResults   } from './modules/GenotypingResults'
+include { GetCDS              } from './modules/GetCDS'
+include { TranslateToProtein  } from './modules/TranslateToProtein'
+include { MutationsFinder     } from './modules/MutationsFinder'
 
 // Flux de treball principal
 workflow {
     main:
-
     // INPUT & INITIAL FOLDER ORGANIZATION
     SampleInput_ch = channel
         .fromPath(params.inputFasta, checkIfExists: true)
@@ -23,7 +22,6 @@ workflow {
         .unique { record -> record[0] }
     
     OrganizeBySample(SampleInput_ch)
-
 
     // SUBTYPE DETECTION
     SubtypeInput_ch = OrganizeBySample.out.map { sample_id, sample_dir ->
@@ -65,7 +63,6 @@ workflow {
     // this way it is only run once and not per sample
     GetDatasets(SubtypeMerged_ch)
 
-
     // GENOTYPING ANALYSIS (NEXTCLADE)
     GenotypingHfile_ch = OrganizeBySample.out.map { sample_id, sample_dir -> 
         tuple(sample_id, file("${sample_dir}/segments/HA/${sample_id}_HA.fasta")) // Use HA segment for genotyping
@@ -84,9 +81,7 @@ workflow {
         .collectFile(
             name: 'genotyping_results.csv',
             keepHeader: true,
-            storeDir: "${launchDir}/${params.outDir}"
         )
-
 
     // RESULTS REPORTING & CDS EXTRACTION
     // Re-associate Nextclade files with their IDs for the final join
@@ -106,8 +101,7 @@ workflow {
             def n_tag     = row[2] 
             def pathotype = row[3] 
             // csv_path is the fifth element if it exists, otherwise an empty list.
-            // This handles cases where the join might not find a match in Nextclade results,
-            // e.g., H subtypes that did not have a Nextclade dataset.
+            // This handles cases where the join might not find a dataset for the inferred H subtype, so there is no Nextclade result for that sample.
             def csv_path  = (row.size() > 4 && row[4] != null) ? row[4] : [] 
             return tuple(sample_id, h_tag, n_tag, pathotype, csv_path)
         }
@@ -118,7 +112,6 @@ workflow {
         .collectFile(
             name: 'final_genotyping_results.csv',
             keepHeader: true,
-            storeDir: "${launchDir}/${params.outDir}"
         )
 
     // Prepare inputs for sequence extraction

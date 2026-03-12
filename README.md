@@ -25,7 +25,8 @@ cd FluTyper
 For the script to parse your data correctly, MultiFASTA headers must follow a specific naming convention using either an underscore (_) or a pipe (|) as a separator.
 
 Header Format
->{SequenceID}_{Protein}_{OptionalInformation}
+>{SequenceID}\_{Protein}\_{OptionalInformation}
+>{SequenceID}|{Protein}|{OptionalInformation}
 
 SequenceID: A unique identifier for the sample (e.g., Sample01, Chicken02).
 
