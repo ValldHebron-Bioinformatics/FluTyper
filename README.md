@@ -7,11 +7,15 @@ It aims to support genomic surveillance, research, and integration within a **On
 
 ## ✨ Features
 
-- 🧬 Influenza genotype assignment
-- 🔎 Mutation detection and annotation
-- 🧪 Support for avian and swine influenza strains
-- 📊 Outputs suitable for surveillance and downstream analysis
-- 🌍 Designed with One Health integration in mind
+• Automated organization of input samples and extraction of individual segments
+• Subtype detection (H/N typing and pathotype inference) from sequence data
+• Reference dataset selection and download based on detected subtypes
+• Genotyping using Nextclade with per-sample and merged reports
+• Extraction of coding sequences (CDS) and translation to protein sequences
+• Mutation detection and annotation (optional, configurable)
+• Outputs designed for genomic surveillance, research, and downstream analysis
+• Support for both avian and swine influenza viruses
+• Modular, reproducible workflow built with Nextflow DSL2
 
 
 ## 🚀 Installation
@@ -25,7 +29,8 @@ cd FluTyper
 For the script to parse your data correctly, MultiFASTA headers must follow a specific naming convention using either an underscore (_) or a pipe (|) as a separator.
 
 Header Format
->{SequenceID}_{Protein}_{OptionalInformation}
+>{SequenceID}\_{Protein}\_{OptionalInformation}
+>{SequenceID}|{Protein}|{OptionalInformation}
 
 SequenceID: A unique identifier for the sample (e.g., Sample01, Chicken02).
 
@@ -35,8 +40,6 @@ Examples
 Underscore: >Sample01_HA_2024_Spain
 
 Pipe: >Sample01|NA|Hebei_SJ27
-
-## 🔄 Nextflow channel flow (sequences_dir)
 
 ## 🔄 Nextflow channel flow (main pipeline)
 
@@ -51,3 +54,5 @@ Pipe: >Sample01|NA|Hebei_SJ27
 9. **GenotypingResultsInput_ch**: Joins genotyping info with Nextclade results, emits (sample_id, h_tag, n_tag, pathotype, csv_file).
 10. **GenotypingResults(GenotypingResultsInput_ch, GetDatasets.out.collect())**: Prepares the final report.
 11. **GetCDS(CDSInput_ch)**: Prepares inputs for sequence extraction.
+12. **TranslateToProtein_ch**: Joins the CDS output with sample directories, emitting (sample_id, cds_files, sample_dir).
+13. **TranslateToProtein(TranslateToProtein_ch)**: Translates nucleotide CDS sequences to protein sequences for each sample.

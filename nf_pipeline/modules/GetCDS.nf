@@ -11,6 +11,7 @@ process GetCDS {
     tuple val(sample_id), path("samples/${sample_id}/CDS/*_CDS.fasta")
 
     script:
+    def logDir = file(params.outDir).toAbsolutePath()
     """
     #!/usr/bin/env python3
     import os, subprocess, re
@@ -21,7 +22,7 @@ process GetCDS {
     cds_dir = "samples/${sample_id}/CDS"
     os.makedirs(cds_dir, exist_ok=True)
 
-    # Define the map here, I wanted to keep it in params but it was too complex for Groovy interpolation
+    # Define the map here, I wanted to keep it in params but it was too complex for Groovy to python dict
     prot_dict = {
         "HA":  ["HA", "HA-SP", "HA1-SP", "HA2"],
         "NA":  ["NA"],
@@ -52,7 +53,9 @@ process GetCDS {
 
         # Groovy interpolates \${sample_dir} and \${sample_id}, Python interpolates {seg}
         seg_fasta = f"${sample_dir}/segments/{seg}/${sample_id}_{seg}.fasta"
-        if not os.path.isfile(seg_fasta):
+        if not os.path.isfile(seg_fasta) or os.path.getsize(seg_fasta) == 0:
+            with open(f"${logDir}/errors.log", 'a') as log_file:
+                log_file.write(f"No valid FASTA found for sample ${sample_id} segment {seg}, skipping CDS extraction for this segment.\\n")
             continue
         # For each protein associated with the segment, extract the reference, align, and trim to get the CDS    
         for prot in prots:

@@ -12,12 +12,13 @@ process SubtypeDetection {
     tuple val(sample_id), path("inferred_subtypes_${sample_id}.csv")
     
     script:
+    def logDir = file(params.outDir).toAbsolutePath()
     """
     input_fasta="${sample_id}_HA_NA.fasta"
-    cat ${ha_fasta} ${na_fasta} > "\${input_fasta}"
+    cat ${ha_fasta} ${na_fasta} > "\${input_fasta}" # Combine HA and NA fastas for subtyping
 
     if [[ "${params.protocol}" == "AVIAN" ]]; then
-        minimizer_index="${params.protocols.AVIAN.resources}/Avian_minimizers.json"
+        minimizer_index="${params.protocols.AVIAN.resources}/Avian_minimizers.json" 
     elif [[ "${params.protocol}" == "SWINE" ]]; then
         minimizer_index="${params.protocols.SWINE.resources}/Swine_minimizers.json"
     else
@@ -29,7 +30,7 @@ process SubtypeDetection {
 
     nextclade sort -m "\${minimizer_index}" -r minimizers_results.tsv "\${input_fasta}"
 
-    
+    # Extract H and N tags from minimizer results, determine pathotype for H5/H7/H9
     h_tag=\$(grep -E '^0\t' minimizers_results.tsv | head -n 1 | cut -f3 | grep -oE 'H[0-9]+' | head -n 1 || true)
     n_tag=\$(grep -E '^1\t' minimizers_results.tsv | head -n 1 | cut -f3 | grep -oE 'N[0-9]+' | head -n 1 || true)
     pathotype="" # Default pathotype for non-H5/H7, will be updated later if needed
@@ -41,9 +42,11 @@ process SubtypeDetection {
     fi
     if [[ -n "\${h_tag}" && -n "\${n_tag}" ]]; then
         subtype="\${h_tag}\${n_tag}"
-    elif [[ -n "\${h_tag}" ]]; then
+    elif [[ -n "\${h_tag}" ]]; then # If only H is detected, assign N as "Nx" to indicate unknown N subtype
+        echo "N subtype not detected for sample ${sample_id}, assigning as Nx." >> "${logDir}/errors.log"
         subtype="\${h_tag}Nx"
-    elif [[ -n "\${n_tag}" ]]; then
+    elif [[ -n "\${n_tag}" ]]; then # Same for H if only N is detected
+        echo "H subtype not detected for sample ${sample_id}, assigning as Hx." >> "${logDir}/errors.log"
         subtype="Hx\${n_tag}"
     else
         subtype="Incomplete"
