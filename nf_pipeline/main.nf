@@ -129,7 +129,14 @@ workflow {
         }
 
     GetCDS(CDSInput_ch)
-    //TranslateToProtein(GetCDS.out)
+    TranslateToProtein_ch = GetCDS.out
+        .join(OrganizeBySample.out)
+        .map { sample_id, cds_files, sample_dir ->
+            return tuple(sample_id, cds_files, sample_dir)
+        }
+
+    
+    TranslateToProtein(TranslateToProtein_ch)
 
     // Mutacions opcional: només si es passa --mutationsSubtype
     //def mut_out = channel.empty()
@@ -147,7 +154,7 @@ workflow {
     genotyping = GenotypingMerged_ch
     results = GenotypingFinal_ch
     CDS = GetCDS.out
-    //prot = TranslateToProtein.out
+    prot = TranslateToProtein.out
     //mut = mut_out
 }
 // Bloc final de publicació de resultats
@@ -174,6 +181,10 @@ output {
         mode "copy"
     }
     CDS {
+        path { "${launchDir}/${params.outDir}" }
+        mode "copy"
+    }
+    prot {
         path { "${launchDir}/${params.outDir}" }
         mode "copy"
     }

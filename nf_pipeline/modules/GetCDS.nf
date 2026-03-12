@@ -8,7 +8,7 @@ process GetCDS {
     tuple val(h_tag), val(n_tag), val(sample_id), val(pathotype), path(sample_dir)
 
     output:
-    tuple val(sample_id), path("samples/${sample_id}/segments/CDS/*_CDS.fasta")
+    tuple val(sample_id), path("samples/${sample_id}/CDS/*_CDS.fasta")
 
     script:
     """
@@ -18,7 +18,7 @@ process GetCDS {
     references_fasta = "${params.protocols[params.protocol].resources}/CDS_references.fasta"
     
     # Create output directory for CDS if it doesn't exist
-    cds_dir = "samples/${sample_id}/segments/CDS"
+    cds_dir = "samples/${sample_id}/CDS"
     os.makedirs(cds_dir, exist_ok=True)
 
     # Define the map here, I wanted to keep it in params but it was too complex for Groovy interpolation
