@@ -40,15 +40,15 @@ workflow {
     SubtypeMerged_ch = SubtypeDetection.out
         .map { arr -> arr[1] }
         .collectFile(
-            name: 'inferred_subtypes.tsv',
-            seed: 'seqName\tinferred_subtype\tpathotype\n',
+            name: 'inferred_subtypes.csv',
+            seed: 'seqName,inferred_subtype,pathotype\n',
             storeDir: "${launchDir}/${params.outDir}",
         )
 
     // Parse subtyping results immediately for use in downstream filtering
-    GenotypingInfo_ch = SubtypeDetection.out.map { sample_id, tsv_file ->
-        def line = tsv_file.readLines()[0]
-        def parts = line.split('\t')
+    GenotypingInfo_ch = SubtypeDetection.out.map { sample_id, csv_file ->
+        def line = csv_file.readLines()[0]
+        def parts = line.split(',')
         def full_subtype = parts[1] 
         def pathotype = parts.size() > 2 ? parts[2] : ""
 
