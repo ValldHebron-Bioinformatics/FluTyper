@@ -13,6 +13,7 @@ process OrganizeBySample {
 
     script:
     // Convert to absolute path so the worker can find it regardless of the work directory
+    // Another option is to put it as output... ASK ALEJANDRA
     def logDir = file(params.outDir).toAbsolutePath()
     """
     mkdir -p "samples/${sample_id}"
@@ -32,12 +33,7 @@ process OrganizeBySample {
         
         # Check if the generated file is empty (size 0)
         if [ ! -s "\${SEG_FILE}" ]; then
-            if [ "\${seg}" = "HA" ]; then
-                echo "No HA segment for sample ${sample_id}. Cannot determine subtype or clade. Stopping processing for this sample." >> "${logDir}/errors.log"
-                exit 1
-            else
-                echo "No records found for sample ${sample_id} segment \${seg}, skipping." >> "${logDir}/errors.log"
-            fi
+            echo "No records found for sample ${sample_id} segment \${seg}, skipping." >> "${logDir}/errors.log"
         fi
     done
     """
