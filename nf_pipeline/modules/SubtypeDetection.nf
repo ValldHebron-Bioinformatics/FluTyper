@@ -22,10 +22,9 @@ process SubtypeDetection {
     elif [[ "${params.protocol}" == "SWINE" ]]; then
         minimizer_index="${params.protocols.SWINE.resources}/Swine_minimizers.json"
     else
-        echo "No valid protocol specified for subtype detection: ${params.protocol}"
-        : > minimizers_results.tsv
+        echo "No valid protocol specified for subtype detection: ${params.protocol}" >> "${logDir}/errors.log"
         printf '%s,%s,%s\n' "${sample_id}" "Incomplete" "" > inferred_subtypes_${sample_id}.csv
-        exit 0
+        exit 1 ## If no valid protocol, program cannot proceed with subtyping, so genotyping also cannot proceed.
     fi
 
     nextclade sort -m "\${minimizer_index}" -r minimizers_results.tsv "\${input_fasta}"
