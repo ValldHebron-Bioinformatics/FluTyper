@@ -18,45 +18,39 @@ workflow {
     SampleInput_ch = channel
         .fromPath(params.inputFasta, checkIfExists: true)
         .splitFasta(record: [id: true])
-        .map { rec -> tuple(rec.id.tokenize('[|_]')[0], file(params.inputFasta)) }
+        .map { rec -> tuple(rec.id.tokenize('[|_]')[0], file(params.inputFasta)) } // ASK ALEJANDRA: IS THIS THE MOST EFFICIENT WAY?
         .unique { record -> record[0] }
     
     OrganizeBySample(SampleInput_ch)
 
     // SUBTYPE DETECTION
     SubtypeInput_ch = OrganizeBySample.out.map { sample_id, sample_dir ->
-        tuple(
-            sample_id,
-            file("${sample_dir}/segments/HA/${sample_id}_HA.fasta"), // Use HA and NA only for subtyping
-            file("${sample_dir}/segments/NA/${sample_id}_NA.fasta")
-        )
+        def ha_fasta = file("${sample_dir}/segments/HA/${sample_id}_HA.fasta")
+        def na_fasta = file("${sample_dir}/segments/NA/${sample_id}_NA.fasta")
+        tuple(sample_id, ha_fasta, na_fasta)
     }
 
     SubtypeDetection(SubtypeInput_ch)
 
     // Merge individual subtype files into a global report
     SubtypeMerged_ch = SubtypeDetection.out
-        .map { arr -> arr[1] }
+        .map { tup -> tup[1] }
         .collectFile(
             name: 'inferred_subtypes.csv',
-            seed: 'seqName,inferred_subtype,pathotype\n',
+            seed: 'seqName,inferred_subtype,pathotype\n', // Add header to the merged CSV
             storeDir: "${launchDir}/${params.outDir}",
         )
 
     // Parse subtyping results immediately for use in downstream filtering
-    GenotypingInfo_ch = SubtypeDetection.out.map { sample_id, csv_file ->
-        def line = csv_file.readLines()[0]
-        def parts = line.split(',')
-        def full_subtype = parts[1] 
-        def pathotype = parts.size() > 2 ? parts[2] : ""
+    GenotypingInfo_ch = SubtypeDetection.out
+        .splitCsv()
+        .map { sample_id, row ->
+            def h_tag = (row[1] =~ /H\d+/) ? (row[1] =~ /H\d+/)[0] : "Hx"
+            def n_tag = (row[1] =~ /N\d+/) ? (row[1] =~ /N\d+/)[0] : "Nx"
+            def pathotype = row.size() > 2 ? row[2] : ""
 
-        def h_match = (full_subtype =~ /H\d+/)
-        def n_match = (full_subtype =~ /N\d+/)
-        def h_tag = h_match ? h_match[0] : "Hx"
-        def n_tag = n_match ? n_match[0] : "Nx"
-
-        return tuple(sample_id, h_tag, n_tag, pathotype)
-    }
+            tuple(sample_id, h_tag, n_tag, pathotype)
+        }
 
     // DATASET PREPARATION
     // GetDatasets depends on the merged list to know which H-types to download, 
@@ -64,9 +58,9 @@ workflow {
     GetDatasets(SubtypeMerged_ch)
 
     // GENOTYPING ANALYSIS (NEXTCLADE)
-    GenotypingHfile_ch = OrganizeBySample.out.map { sample_id, sample_dir -> 
-        tuple(sample_id, file("${sample_dir}/segments/HA/${sample_id}_HA.fasta")) // Use HA segment for genotyping
-    }
+    GenotypingHfile_ch = SubtypeInput_ch.map { sample_id, ha_fasta, _na_fasta -> 
+        tuple(sample_id, ha_fasta) 
+        }
     // Join with subtyping info to filter datasets based on H-type
     GenotypingNextcladeInput_ch = GenotypingHfile_ch
         .join(GenotypingInfo_ch)
@@ -76,7 +70,7 @@ workflow {
         }
 
     GenotypingNextclade(GenotypingNextcladeInput_ch)
-    // I think this is not needed, ask Alejandra.
+    // I think this is not needed, ASK ALEJANDRA
     // Merge individual genotyping results into a global report
     //GenotypingMerged_ch = GenotypingNextclade.out 
     //    .collectFile(
@@ -93,21 +87,12 @@ workflow {
         }
     // Join genotyping info with Nextclade results to prepare the final report
     GenotypingResultsInput_ch = GenotypingInfo_ch
-        .join(NextcladeTuple_ch, remainder: true) 
-        // Join on sample_id, keep all columns from GenotypingInfo and add the Nextclade CSV file
-        .map { row -> 
-            // row structure: [sample_id, h_tag, n_tag, pathotype, csv_file]
-            def sample_id = row[0] 
-            def h_tag     = row[1] 
-            def n_tag     = row[2] 
-            def pathotype = row[3] 
-            // csv_path is the fifth element if it exists, otherwise an empty list.
-            // This handles cases where the join might not find a dataset for the inferred H subtype, so there is no Nextclade result for that sample.
-            def csv_path  = (row.size() > 4 && row[4] != null) ? row[4] : [] 
-            return tuple(sample_id, h_tag, n_tag, pathotype, csv_path)
+        .join(NextcladeTuple_ch, remainder: true) // remainder: true to keep samples without Nextclade results (e.g. due to missing datasets) for reporting as well
+        .map { sample_id, h_tag, n_tag, pathotype, csv_file -> 
+            tuple(sample_id, h_tag, n_tag, pathotype, csv_file ?: [])
         }
     // GenotypingResults will need to handle cases where csv_path is empty (no Nextclade result) and report accordingly
-    GenotypingResults(GenotypingResultsInput_ch, GetDatasets.out.collect()) // Collect datasets to pass as reference
+    GenotypingResults(GenotypingResultsInput_ch, GetDatasets.out.collect()) // .collect() is key to pass the full list of datasets to each sample so no error when trying to access the dataset dir for a sample with no valid H subtype
     // Merge final genotyping results 
     GenotypingFinal_ch = GenotypingResults.out
         .collectFile(
@@ -119,14 +104,14 @@ workflow {
     CDSInput_ch = GenotypingInfo_ch
         .join(OrganizeBySample.out)
         .map { sample_id, h_tag, n_tag, pathotype, sample_dir ->
-            return tuple(h_tag, n_tag, sample_id, pathotype, sample_dir)
+            tuple(h_tag, n_tag, sample_id, pathotype, sample_dir)
         }
 
     GetCDS(CDSInput_ch)
     TranslateToProtein_ch = GetCDS.out
         .join(OrganizeBySample.out)
         .map { sample_id, cds_files, sample_dir ->
-            return tuple(sample_id, cds_files, sample_dir)
+            tuple(sample_id, cds_files, sample_dir)
         }
 
     
