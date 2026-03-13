@@ -25,8 +25,8 @@ process SubtypeDetection {
         echo "No valid protocol specified for subtype detection: ${params.protocol}" >> "${logDir}/errors.log"
         printf '%s,%s,%s\n' "${sample_id}" "Incomplete" "" > inferred_subtypes_${sample_id}.csv
         exit 1 ## If no valid protocol, program cannot proceed with subtyping, so genotyping also cannot proceed.
-    fi
-
+    fi         ## ASK ALEJANDRA if we want to exit with error or just create an empty results file and exit with 0
+    
     nextclade sort -m "\${minimizer_index}" -r minimizers_results.tsv "\${input_fasta}"
 
     # Extract H and N tags from minimizer results, determine pathotype for H5/H7/H9

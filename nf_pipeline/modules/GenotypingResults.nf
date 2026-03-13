@@ -35,10 +35,9 @@ process GenotypingResults {
         changelog_file = f"{d_path}/CHANGELOG.md"
         if os.path.isfile(changelog_file):
             with open(changelog_file, 'r') as f:
-                for line in f:
-                    if line.startswith('##'):
-                        data["Version"] = line.replace('##', '').strip() 
-                        break
+                first_line = f.readline()
+                if first_line.startswith('##'):
+                    data["Version"] = first_line.replace('##', '').strip()
 
         if os.path.isfile("${csv_path}"):
             best_row = None
