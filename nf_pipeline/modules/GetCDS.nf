@@ -14,49 +14,37 @@ process GetCDS {
     def logDir = file(params.outDir).toAbsolutePath()
     """
     #!/usr/bin/env python3
-    import os, subprocess, re
+    import os
 
-    references_fasta = "${params.protocols[params.protocol].resources}/CDS_references.fasta"
-    
+    ref_fasta = "${params.protocols[params.protocol].resources}/CDS_references.fasta"
     # Create output directory for CDS if it doesn't exist
     cds_dir = "samples/${sample_id}/CDS"
     os.makedirs(cds_dir, exist_ok=True)
 
     # Define the map here, I wanted to keep it in params but it was too complex for Groovy to python dict
     prot_dict = {
-        "HA":  ["HA", "HA-SP", "HA1-SP", "HA2"],
-        "NA":  ["NA"],
-        "PB2": ["PB2"],
-        "PB1": ["PB1", "PB1-F2"],
-        "PA":  ["PA", "PA-X"],
-        "NP":  ["NP"],
-        "MP":  ["M1", "M2"],
-        "NS":  ["NS1", "NEP"]
+        "HA":  ["HA", "HA-SP", "HA1-SP", "HA2"], "NA":  ["NA"], "PB2": ["PB2"],
+        "PB1": ["PB1", "PB1-F2"], "PA":  ["PA", "PA-X"], "NP":  ["NP"],
+        "MP":  ["M1", "M2"], "NS":  ["NS1", "NEP"]
     }
-
     # Iterate over segments and their associated proteins
     for seg, prots in prot_dict.items():
         if seg == "NA":
-            ref_tag = "${n_tag}"
-            ref_patho = ""
+            ref_tag, ref_patho = "${n_tag}", ""
         elif seg == "HA":
-            ref_tag = "${h_tag}"
-            ref_patho = "${pathotype}"
-        else:
-            # Internal segments
+            ref_tag, ref_patho = "${h_tag}", "${pathotype}"
+        else: # Internal segments
             if "${h_tag}" not in ["H5", "H7", "H9"]:
-                ref_tag = "H5"
-                ref_patho = "HPAI"
+                ref_tag, ref_patho = "H5", "HPAI"
             else:
-                ref_tag = "${h_tag}"
-                ref_patho = "${pathotype}"
+                ref_tag, ref_patho = "${h_tag}", "${pathotype}"
 
-        # Groovy interpolates \${sample_dir} and \${sample_id}, Python interpolates {seg}
         seg_fasta = f"${sample_dir}/segments/{seg}/${sample_id}_{seg}.fasta"
-        if not os.path.isfile(seg_fasta) or os.path.getsize(seg_fasta) == 0:
-            with open(f"${logDir}/errors.log", 'a') as log_file:
-                log_file.write(f"No valid FASTA found for sample ${sample_id} segment {seg}, skipping CDS extraction for this segment.\\n")
-            continue
+        
+        if not (os.path.isfile(seg_fasta) and os.path.getsize(seg_fasta) > 0):
+            with open(f"${logDir}/errors.log", 'a') as f:
+                f.write(f"No valid FASTA found for sample ${sample_id} segment {seg}, skipping CDS extraction for this segment.\\n")
+            continue 
         # For each protein associated with the segment, extract the reference, align, and trim to get the CDS    
         for prot in prots:
             pattern = f"^{ref_tag}_{prot}_.*_{ref_patho}" if (ref_patho and seg != "NA") else f"^{ref_tag}_{prot}_"
@@ -64,17 +52,15 @@ process GetCDS {
             mafft_in = f"{cds_dir}/${sample_id}_{prot}_mafft_in.fasta"
             mafft_out = f"{cds_dir}/${sample_id}_{prot}_aligned.fasta"
             # Use seqkit to extract the reference sequence based on the pattern
-            subprocess.run(f"seqkit grep -r -p '{pattern}' {references_fasta} > {ref_out}", shell=True)
+            os.system(f"seqkit grep -r -p '{pattern}' {ref_fasta} > {ref_out}")
             
             # If we got a reference sequence, proceed with alignment
             if os.path.isfile(ref_out) and os.path.getsize(ref_out) > 0:
                 os.system(f'cat "{ref_out}" "{seg_fasta}" > "{mafft_in}"')
                 os.system(f'mafft --auto --quiet "{mafft_in}" > "{mafft_out}"')
-                
                 # If the alignment was successful, extract the CDS sequence by removing gaps
                 # from the reference sequence and applying the same trimming to the aligned sequence
                 if os.path.isfile(mafft_out):
-                    
                     with open(mafft_out, 'r') as f: 
                         sequences = []
                         for parts in f.read().split('>'): # Split the FASTA file into entries

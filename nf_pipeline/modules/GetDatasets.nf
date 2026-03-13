@@ -15,7 +15,7 @@ process GetDatasets {
 
     script:
     """
-    # Extract unique H tags from the inferred subtypes CSV, 
+    # Extract unique H tags from the inferred subtypes CSV, the merged doc 
     # This way to have only 1 process instead of 1 per sample giving the sample id and h_tag tuple
     h_tags=\$(grep -oE 'H[0-9]+' "${inferred_subtypes}") 
     echo "\$h_tags" | sort -u | while read -r tag; do
