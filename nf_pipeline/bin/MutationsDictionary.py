@@ -43,7 +43,6 @@ def main():
 
     # Save the entirely edited sheet back to Excel
     df.to_excel(args.output, index=False, header=False)
-    print(f"Modifications saved successfully to {args.output}")
 
 if __name__ == "__main__":
     main()
