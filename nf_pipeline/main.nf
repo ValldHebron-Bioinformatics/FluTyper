@@ -117,15 +117,13 @@ workflow {
     
     TranslateToProtein(TranslateToProtein_ch)
 
-    // Mutacions opcional: només si es passa --mutationsSubtype
-    //def mut_out = channel.empty()
-    //if (params.mutationsSubtype) {
-    //    MutationsFinder(SampleId_ch)
-    //    mut_out = MutationsFinder.out
-    //} else {
-    //    log.info "MutationsFinder omès: passa --mutationsSubtype per activar-lo."
-    //}
-
+    Mutations_ch = TranslateToProtein.out
+        .join(GenotypingInfo_ch)
+        .map { sample_id, prot_files, h_tag, _n_tag, _pathotype ->
+            tuple(sample_id, prot_files, h_tag)
+        }
+    MutationsFinder(Mutations_ch)
+    
     publish:
     folder = OrganizeBySample.out
     subtype = SubtypeMerged_ch
@@ -134,7 +132,7 @@ workflow {
     results = GenotypingFinal_ch
     CDS = GetCDS.out
     prot = TranslateToProtein.out
-    //mut = mut_out
+    mut = MutationsFinder.out
 }
 // Bloc final de publicació de resultats
 output {
@@ -167,8 +165,8 @@ output {
         path { "${launchDir}/${params.outDir}" }
         mode "copy"
     }
-    //mut {
-    //    path { "${params.outDir}" }
-    //    mode "copy"
-    //}
+    mut {
+        path { "${launchDir}/${params.outDir}" }
+        mode "copy"
+    }
 }
