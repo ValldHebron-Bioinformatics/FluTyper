@@ -54,6 +54,7 @@ process MutationsFinder {
                     echo -e "\${aa}\\t\$((i+1))" >> "\$output_file"
                 done
             fi
+            
         done
     """
 }
