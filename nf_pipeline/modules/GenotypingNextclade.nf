@@ -9,7 +9,7 @@ process GenotypingNextclade {
     output:
     path("nextclade_results_${sample_id}.csv")
     script:
-    def logDir = file(params.outDir).toAbsolutePath()
+    def logDir = file(params.outDir)
     """
     # Check if dataset_dir is valid and contains the expected subdirectory for the H tag, if not create an empty results file and exit
     if [ ! -d "${dataset_dir}" ]; then

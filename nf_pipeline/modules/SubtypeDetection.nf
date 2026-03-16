@@ -12,7 +12,7 @@ process SubtypeDetection {
     tuple val(sample_id), path("inferred_subtypes_${sample_id}.csv")
     
     script:
-    def logDir = file(params.outDir).toAbsolutePath()
+    def logDir = file(params.outDir)
     """
     input_fasta="${sample_id}_HA_NA.fasta"
     cat ${ha_fasta} ${na_fasta} > "\${input_fasta}" # Combine HA and NA fastas for subtyping

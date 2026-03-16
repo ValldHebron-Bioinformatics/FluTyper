@@ -13,7 +13,7 @@ process TranslateToProtein {
 
 
     script:
-    def logDir = file(params.outDir).toAbsolutePath()
+    def logDir = file(params.outDir)
     """
     mkdir -p "samples/${sample_dir}/proteins"
     for cds_fasta in *_CDS.fasta; do

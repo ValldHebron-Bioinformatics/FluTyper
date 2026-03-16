@@ -12,9 +12,8 @@ process OrganizeBySample {
     tuple val(sample_id), path("samples/${sample_id}")
 
     script:
-    // Convert to absolute path so the worker can find it regardless of the work directory
     // Another option is to put it as output... ASK ALEJANDRA
-    def logDir = file(params.outDir).toAbsolutePath()
+    def logDir = file(params.outDir)
     """
     mkdir -p "samples/${sample_id}"
 

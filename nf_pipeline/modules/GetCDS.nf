@@ -11,7 +11,7 @@ process GetCDS {
     tuple val(sample_id), path("samples/${sample_id}/CDS/*_CDS.fasta")
 
     script:
-    def logDir = file(params.outDir).toAbsolutePath()
+    def logDir = file(params.outDir)
     """
     #!/usr/bin/env python3
     import os
