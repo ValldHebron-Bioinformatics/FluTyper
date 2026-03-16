@@ -15,46 +15,38 @@ process MutationsFinder {
     def logDir = file(params.outDir)
     
     """
-        DICTIONARY="${params.protocols[params.protocol].resources}/AA_dictionary_proposal/AA_Sites.csv"
-        MARKERS="${params.protocols[params.protocol].resources}/AA_dictionary_proposal/MARKERS.xlsx"
+    DICTIONARY="${params.protocols[params.protocol].resources}/AA_Sites.csv"
+    MARKERS_dir="${params.protocols[params.protocol].resources}/MARKERS"
 
-        if [[ "${h_tag}" =~ ^(H1|H3|H5|H7|H9)\$ ]]; then
-            TARGET_H="${h_tag}"
-        else
-            TARGET_H="H5"
-            echo "Subtype ${h_tag} not found in dictionary for sample ${sample_id}. Defaulting to H5 numbering." >> "${logDir}/errors.log"
-        fi
+    if [[ "${h_tag}" == "H1" || "${h_tag}" == "H3" || "${h_tag}" == "H5" || "${h_tag}" == "H7" || "${h_tag}" == "H9" ]]; then
+        TARGET_H="${h_tag}"
+    else
+        TARGET_H="H5"
+        echo "Subtype ${h_tag} not found in dictionary for sample ${sample_id}. Defaulting to H5 numbering." >> "${logDir}/errors.log"
+    fi
 
-        FINAL_MARKERS="translated_markers_\${TARGET_H}.xlsx"
+    FINAL_MARKERS="translated_markers_\${TARGET_H}.xlsx"
 
-        python3 "${params.programs.MutationsDictionary}" \\
-            --subtype \${TARGET_H} \\
-            --markers "\$MARKERS" \\
-            --dictionary "\$DICTIONARY" \\
-            --output \$FINAL_MARKERS
+    python3 "${params.programs.MutationsDictionary}" \\
+        --subtype \${TARGET_H} \\
+        --markers "\$MARKERS_dir/HA.csv" \\
+        --dictionary "\$DICTIONARY" \\
+        --output \$FINAL_MARKERS
 
-        mkdir -p "samples/${sample_id}/NUMERATION"
+    mkdir -p "samples/${sample_id}/NUMERATION"
 
-        for file in *.fasta; do
-            if [ ! -e "\$file" ]; then
-                echo "No protein FASTA files found for sample ${sample_id}, skipping mutation finding." >> "${logDir}/errors.log"
-                break
-            fi
-
-            protein=\$(basename "\$file" | sed 's/${sample_id}_//' | sed 's/_PROT\\.fasta//')
-            output_file="samples/${sample_id}/NUMERATION/${sample_id}_\${protein}_numeration.csv"
-
-            sequence="\$(grep -v '^>' "\$file" | tr -d '\\n')"
-
-            if [[ -n "\$sequence" ]]; then
-                echo -e "AminoAcid\\tPosition" > "\$output_file"
-
-                for ((i=0; i<\${#sequence}; i++)); do
-                    aa="\${sequence:\$i:1}"
-                    echo -e "\${aa}\\t\$((i+1))" >> "\$output_file"
-                done
-            fi
-            
-        done
+    for prot_file in ${prot_files}; do
+        prot_name=\$(basename "\$prot_file" .fasta)
+        temp_csv="samples/${sample_id}/NUMERATION/\${prot_name}_numeration.csv"
+            sequence=\$(cat "\$prot_file" | grep -v ">" | tr -d '\n')
+            echo "position,aa" > "\$temp_csv"
+            num=1
+            for ((i=0; i<\${#sequence}; i++)); do
+                aa=\${sequence:\$i:1}
+                echo "\$num,\$aa" >> "\$temp_csv"
+                num=\$((\$num + 1))
+            done
+        
+    done
     """
 }

@@ -11,38 +11,29 @@ COL = {
 }
 
 def main():
-    parser = argparse.ArgumentParser(description="Translate HA markers and save an edited Excel file")
+    parser = argparse.ArgumentParser(description="Translate HA markers and save an edited CSV file")
     parser.add_argument("--subtype", required=True, choices=COL.keys())
     parser.add_argument("--markers", required=True)
     parser.add_argument("--dictionary", required=True)
     parser.add_argument("--base", default="H5", choices=COL.keys())
-    parser.add_argument("--output", default="EDITED_MARKERS.xlsx")
+    parser.add_argument("--output", default="EDITED_MARKERS.csv")
     args = parser.parse_args()
 
     # Load dictionary and create a fast mapping dictionary
     sites = pd.read_csv(args.dictionary, dtype=str).dropna(subset=[COL[args.base], COL[args.subtype]])
     mapping = dict(zip(sites[COL[args.base]].str.strip(), sites[COL[args.subtype]].str.strip()))
 
-    # Load the Excel file
-    df = pd.read_excel(args.markers, sheet_name="Markers", header=None)
-    rx = re.compile(r"^\s*(-?\d+[A-Za-z]?)\s*([A-Za-z])\s*$")
+    # Load the CSV file
+    df = pd.read_csv(args.markers, dtype=str)
 
-    # Translation function applied to each cell
-    def translate_cell(val):
-        match = rx.match(str(val))
-        if match:
-            pos, aa = match.groups()
-            target_pos = mapping.get(pos, "")
-            return f"{target_pos}{aa.upper()}" if target_pos and target_pos != "-" else "-"
-        return val
+    # Translate POSITION column using mapping
+    df['TRANSLATED_POSITION'] = df['POSITION'].apply(lambda pos: mapping.get(pos.strip(), '-'))
 
-    # Find HA columns and modify them in place starting from row 2
-    for col in df.columns:
-        if str(df.iat[1, col]).strip().upper() == "HA":
-            df.iloc[2:, col] = df.iloc[2:, col].apply(translate_cell)
+    # Optionally, combine TRANSLATED_POSITION and AA if needed
+    df['TRANSLATED_MARKER'] = df.apply(lambda row: f"{row['TRANSLATED_POSITION']}{row['AA']}" if row['TRANSLATED_POSITION'] != '-' else '-', axis=1)
 
-    # Save the entirely edited sheet back to Excel
-    df.to_excel(args.output, index=False, header=False)
+    # Save the edited DataFrame to CSV
+    df.to_csv(args.output, index=False)
 
 if __name__ == "__main__":
     main()
