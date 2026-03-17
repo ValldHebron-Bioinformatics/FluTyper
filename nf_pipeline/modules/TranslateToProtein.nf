@@ -6,22 +6,22 @@ process TranslateToProtein {
     errorStrategy 'ignore'
 
     input:
-    tuple val(sample_id), path(cds_files), path(sample_dir)
+    tuple val(sample_id), path(cds_files)
 
     output:
-    tuple val(sample_id), path("samples/${sample_dir}/proteins/*_PROT.fasta")
+    tuple val(sample_id), path("samples/${sample_id}/proteins/*_PROT.fasta")
 
 
     script:
     def logDir = file(params.outDir)
     """
-    mkdir -p "samples/${sample_dir}/proteins"
+    mkdir -p "samples/${sample_id}/proteins"
     for cds_fasta in *_CDS.fasta; do
         prot_fasta="\$(basename "\${cds_fasta}" _CDS.fasta)_PROT.fasta"
         
         if [[ -f "\${cds_fasta}" ]]; then
             # Use seqkit translate to convert the CDS fasta to protein fasta
-            seqkit translate "\${cds_fasta}" > "samples/${sample_dir}/proteins/\${prot_fasta}"
+            seqkit translate "\${cds_fasta}" > "samples/${sample_id}/proteins/\${prot_fasta}"
         else
             echo "CDS FASTA file \${cds_fasta} not found for sample ${sample_id}, skipping translation for this file." >> "${logDir}/errors.log"
         fi

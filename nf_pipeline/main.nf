@@ -11,7 +11,6 @@ include { GetCDS              } from './modules/GetCDS'
 include { TranslateToProtein  } from './modules/TranslateToProtein'
 include { MutationsFinder     } from './modules/MutationsFinder'
 
-// Flux de treball principal
 workflow {
     main:
     // INPUT & INITIAL FOLDER ORGANIZATION
@@ -19,7 +18,7 @@ workflow {
         .fromPath(params.inputFasta, checkIfExists: true)
         .splitFasta(record: [id: true])
         .map { rec -> tuple(rec.id.tokenize('[|_]')[0], file(params.inputFasta)) } // ASK ALEJANDRA: IS THIS THE MOST EFFICIENT WAY?
-        .unique { record -> record[0] }
+        .unique {  rec -> rec[0]  }
     
     OrganizeBySample(SampleInput_ch)
 
@@ -43,14 +42,14 @@ workflow {
 
     // Parse subtyping results immediately for use in downstream filtering
     GenotypingInfo_ch = SubtypeDetection.out
-        .splitCsv()
-        .map { sample_id, row ->
-            def h_tag = (row[1] =~ /H\d+/) ? (row[1] =~ /H\d+/)[0] : "Hx"
-            def n_tag = (row[1] =~ /N\d+/) ? (row[1] =~ /N\d+/)[0] : "Nx"
-            def pathotype = row.size() > 2 ? row[2] : ""
-
-            tuple(sample_id, h_tag, n_tag, pathotype)
-        }
+    .splitCsv()
+    .map { sample_id, row ->
+        def subtype = row[1]
+        def pathotype = row[2]
+        def h_tag = subtype.find(/H\d+/) ?: "Hx" // .find() is a groovy method similar to grep -oE
+        def n_tag = subtype.find(/N\d+/) ?: "Nx"
+        tuple(sample_id, h_tag, n_tag, pathotype)
+    }
 
     // DATASET PREPARATION
     // GetDatasets depends on the merged list to know which H-types to download, 
@@ -64,9 +63,9 @@ workflow {
     // Join with subtyping info to filter datasets based on H-type
     GenotypingNextcladeInput_ch = GenotypingHfile_ch
         .join(GenotypingInfo_ch)
-        .combine(GetDatasets.out.flatten())
+        .combine(GetDatasets.out.flatMap { datasets -> datasets }) // Spills the single list into individual items for one-on-one filtering. flatMap is best practice according to Nextflow docs
         .filter { _sample_id, _input_fasta, h_tag, _n_tag, _pathotype, dataset_dir -> 
-            dataset_dir.name.contains(h_tag) // Only keep datasets that match the H-type of the sample
+            dataset_dir.name.contains(h_tag) 
         }
 
     GenotypingNextclade(GenotypingNextcladeInput_ch)
@@ -100,23 +99,19 @@ workflow {
             keepHeader: true,
         )
 
+    // CDS EXTRACTION & TRANSLATION
     // Prepare inputs for sequence extraction
     CDSInput_ch = GenotypingInfo_ch
         .join(OrganizeBySample.out)
         .map { sample_id, h_tag, n_tag, pathotype, sample_dir ->
             tuple(h_tag, n_tag, sample_id, pathotype, sample_dir)
         }
-
-    GetCDS(CDSInput_ch)
-    TranslateToProtein_ch = GetCDS.out
-        .join(OrganizeBySample.out)
-        .map { sample_id, cds_files, sample_dir ->
-            tuple(sample_id, cds_files, sample_dir)
-        }
-
     
-    TranslateToProtein(TranslateToProtein_ch)
+    GetCDS(CDSInput_ch)
+    TranslateToProtein(GetCDS.out)
 
+    // MUTATION IDENTIFICATION
+    // Join translated protein files with genotyping info to prepare for mutation finding
     Mutations_ch = TranslateToProtein.out
         .join(GenotypingInfo_ch)
         .map { sample_id, prot_files, h_tag, _n_tag, _pathotype ->
