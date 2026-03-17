@@ -7,9 +7,10 @@ process GenotypingNextclade {
     input:
     tuple val(sample_id), path(ha_fasta), val(h_tag), val(n_tag), val(pathotype), val(dataset_dir)
     output:
-    path("nextclade_results_${sample_id}.csv")
+    tuple val(sample_id), path("nextclade_results_${sample_id}.csv"), emit: results
+    tuple val(sample_id), path("GNerrors.log"), optional: true, emit: errors
+    
     script:
-    def logDir = file(params.outDir)
     """
     # Genotyping using Nextclade with the appropriate dataset based on the H subtype
     if [[ ${h_tag} == "H5" ]]; then
@@ -23,7 +24,7 @@ process GenotypingNextclade {
         touch nextclade_results_${sample_id}.csv
         exit 0
     else
-        echo "No valid H subtype found for genotyping: ${h_tag}" >> "${logDir}/errors.log"
+        echo "No valid H subtype found for genotyping: ${h_tag}" >> "GNerrors.log"
         touch nextclade_results_${sample_id}.csv
         exit 0 ## Theoretically, this should not happen because we only get the H tags from the inferred subtypes, but we add this check just in case.
     fi

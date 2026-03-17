@@ -9,10 +9,10 @@ process SubtypeDetection {
     tuple val(sample_id), path(ha_fasta), path(na_fasta)
 
     output:
-    tuple val(sample_id), path("inferred_subtypes_${sample_id}.csv")
+    tuple val(sample_id), path("inferred_subtypes_${sample_id}.csv"), emit: results
+    tuple val(sample_id), path("SDerrors.log"), optional: true, emit: errors
     
     script:
-    def logDir = file(params.outDir)
     """
     input_fasta="${sample_id}_HA_NA.fasta"
     cat ${ha_fasta} ${na_fasta} > "\${input_fasta}" # Combine HA and NA fastas for subtyping
@@ -22,7 +22,7 @@ process SubtypeDetection {
     elif [[ "${params.protocol}" == "SWINE" ]]; then
         minimizer_index="${params.protocols.SWINE.resources}/Swine_minimizers.json"
     else
-        echo "No valid protocol specified for subtype detection: ${params.protocol}" >> "${logDir}/errors.log"
+        echo "No valid protocol specified for subtype detection: ${params.protocol}" > "samples/${sample_id}/SDerrors.log"
         printf '%s,%s,%s\n' "${sample_id}" "Incomplete" "" > inferred_subtypes_${sample_id}.csv
         exit 1 ## If no valid protocol, program cannot proceed with subtyping, so genotyping also cannot proceed.
     fi         ## ASK ALEJANDRA if we want to exit with error or just create an empty results file and exit with 0
@@ -42,10 +42,10 @@ process SubtypeDetection {
     if [[ -n "\${h_tag}" && -n "\${n_tag}" ]]; then
         subtype="\${h_tag}\${n_tag}"
     elif [[ -n "\${h_tag}" && -z "\${n_tag}" ]]; then # If only H is detected, assign N as "Nx" to indicate unknown N subtype
-        echo "N subtype not detected for sample ${sample_id}, assigning as Nx." >> "${logDir}/errors.log"
+        echo "SubtypeDetection: N subtype not detected for sample ${sample_id}, assigning as Nx." > "SDerrors.log"
         subtype="\${h_tag}Nx"
     elif [[ -n "\${n_tag}" && -z "\${h_tag}" ]]; then # Same for H if only N is detected
-        echo "H subtype not detected for sample ${sample_id}, assigning as Hx. Cannot proceed with clade inference." >> "${logDir}/errors.log"
+        echo "SubtypeDetection: H subtype not detected for sample ${sample_id}, assigning as Hx. Cannot proceed with clade inference." >> "SDerrors.log"
         subtype="Hx\${n_tag}"
     else
         subtype="Incomplete"

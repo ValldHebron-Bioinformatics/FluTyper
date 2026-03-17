@@ -10,6 +10,7 @@ include { GenotypingResults   } from './modules/GenotypingResults'
 include { GetCDS              } from './modules/GetCDS'
 include { TranslateToProtein  } from './modules/TranslateToProtein'
 include { MutationsFinder     } from './modules/MutationsFinder'
+include { CompileErrors       } from './modules/CompileErrors'
 
 workflow {
     main:
@@ -17,13 +18,13 @@ workflow {
     SampleInput_ch = channel
         .fromPath(params.inputFasta, checkIfExists: true)
         .splitFasta(record: [id: true])
-        .map { rec -> tuple(rec.id.tokenize('[|_]')[0], file(params.inputFasta)) } // ASK ALEJANDRA: IS THIS THE MOST EFFICIENT WAY?
-        .unique {  rec -> rec[0]  }
-    
+        .map { rec -> rec.id.tokenize('[|_]')[0] } 
+        .unique()
+ 
     OrganizeBySample(SampleInput_ch)
 
     // SUBTYPE DETECTION
-    SubtypeInput_ch = OrganizeBySample.out.map { sample_id, sample_dir ->
+    SubtypeInput_ch = OrganizeBySample.out.results.map { sample_id, sample_dir ->
         def ha_fasta = file("${sample_dir}/segments/HA/${sample_id}_HA.fasta")
         def na_fasta = file("${sample_dir}/segments/NA/${sample_id}_NA.fasta")
         tuple(sample_id, ha_fasta, na_fasta)
@@ -32,7 +33,7 @@ workflow {
     SubtypeDetection(SubtypeInput_ch)
 
     // Merge individual subtype files into a global report
-    SubtypeMerged_ch = SubtypeDetection.out
+    SubtypeMerged_ch = SubtypeDetection.out.results
         .map { tup -> tup[1] }
         .collectFile(
             name: 'inferred_subtypes.csv',
@@ -40,8 +41,14 @@ workflow {
             storeDir: "${launchDir}/${params.outDir}",
         )
 
+    // DATASET PREPARATION
+    // GetDatasets depends on the merged list to know which H-types to download, 
+    // this way it is only run once and not per sample
+    GetDatasets(SubtypeMerged_ch)
+  
+    // GENOTYPING ANALYSIS (NEXTCLADE)
     // Parse subtyping results immediately for use in downstream filtering
-    GenotypingInfo_ch = SubtypeDetection.out
+    GenotypingInfo_ch = SubtypeDetection.out.results
     .splitCsv()
     .map { sample_id, row ->
         def subtype = row[1]
@@ -50,13 +57,6 @@ workflow {
         def n_tag = subtype.find(/N\d+/) ?: "Nx"
         tuple(sample_id, h_tag, n_tag, pathotype)
     }
-
-    // DATASET PREPARATION
-    // GetDatasets depends on the merged list to know which H-types to download, 
-    // this way it is only run once and not per sample
-    GetDatasets(SubtypeMerged_ch)
-
-    // GENOTYPING ANALYSIS (NEXTCLADE)
     GenotypingHfile_ch = SubtypeInput_ch.map { sample_id, ha_fasta, _na_fasta -> 
         tuple(sample_id, ha_fasta) 
         }
@@ -69,31 +69,18 @@ workflow {
         }
 
     GenotypingNextclade(GenotypingNextcladeInput_ch)
-    // I think this is not needed, ASK ALEJANDRA
-    // Merge individual genotyping results into a global report
-    //GenotypingMerged_ch = GenotypingNextclade.out 
-    //    .collectFile(
-    //        name: 'genotyping_results.csv',
-    //        keepHeader: true,
-    //    )
-
+    
     // RESULTS REPORTING & CDS EXTRACTION
-    // Re-associate Nextclade files with their IDs for the final join
-    NextcladeTuple_ch = GenotypingNextclade.out
-        .map { csv_file ->
-            def id = csv_file.name.replace('nextclade_results_', '').replace('.csv', '') // Extract sample ID from filename
-            return tuple(id, csv_file)
-        }
     // Join genotyping info with Nextclade results to prepare the final report
     GenotypingResultsInput_ch = GenotypingInfo_ch
-        .join(NextcladeTuple_ch, remainder: true) // remainder: true to keep samples without Nextclade results (e.g. due to missing datasets) for reporting as well
+        .join(GenotypingNextclade.out.results, remainder: true) // remainder: true to keep samples without Nextclade results (e.g. due to missing datasets) for reporting as well
         .map { sample_id, h_tag, n_tag, pathotype, csv_file -> 
             tuple(sample_id, h_tag, n_tag, pathotype, csv_file ?: [])
         }
     // GenotypingResults will need to handle cases where csv_path is empty (no Nextclade result) and report accordingly
     GenotypingResults(GenotypingResultsInput_ch, GetDatasets.out.collect()) // .collect() is key to pass the full list of datasets to each sample so no error when trying to access the dataset dir for a sample with no valid H subtype
     // Merge final genotyping results 
-    GenotypingFinal_ch = GenotypingResults.out
+    GenotypingFinal_ch = GenotypingResults.out.results.map { tup -> tup[1] }
         .collectFile(
             name: 'final_genotyping_results.csv',
             keepHeader: true,
@@ -102,32 +89,63 @@ workflow {
     // CDS EXTRACTION & TRANSLATION
     // Prepare inputs for sequence extraction
     CDSInput_ch = GenotypingInfo_ch
-        .join(OrganizeBySample.out)
+        .join(OrganizeBySample.out.results)
         .map { sample_id, h_tag, n_tag, pathotype, sample_dir ->
             tuple(h_tag, n_tag, sample_id, pathotype, sample_dir)
         }
     
     GetCDS(CDSInput_ch)
-    TranslateToProtein(GetCDS.out)
+    TranslateToProtein(GetCDS.out.results)
 
     // MUTATION IDENTIFICATION
     // Join translated protein files with genotyping info to prepare for mutation finding
-    Mutations_ch = TranslateToProtein.out
+    Mutations_ch = TranslateToProtein.out.results
         .join(GenotypingInfo_ch)
         .map { sample_id, prot_files, h_tag, _n_tag, _pathotype ->
             tuple(sample_id, prot_files, h_tag)
         }
     MutationsFinder(Mutations_ch)
     
+    // Funnel all optional error channels together, then group by sample_id
+    Errors_ch = OrganizeBySample.out.errors
+        .mix(
+            SubtypeDetection.out.errors,
+            GenotypingNextclade.out.errors,
+            GenotypingResults.out.errors,
+            GetCDS.out.errors,
+            TranslateToProtein.out.errors,
+            MutationsFinder.out.errors
+        )
+        .groupTuple()
+
+    // Pass the grouped bundles to a final concatenation process
+    CompileErrors(Errors_ch)
+    ErrorsMerged_ch = CompileErrors.out
+        .map { sample_id, log_file ->
+            // Read the raw text from the individual log file
+            def content = log_file.text
+            
+            // Return a formatted string with the sample ID header
+            return "========================================\n" +
+                   "Errors for Sample: ${sample_id}\n" +
+                   "========================================\n" +
+                   "${content}\n"
+        }
+        .collectFile(
+            name: 'pipeline_errors.log',
+            storeDir: "${launchDir}/${params.outDir}"
+        )   
+           
     publish:
-    folder = OrganizeBySample.out
+    folder = OrganizeBySample.out.results
     subtype = SubtypeMerged_ch
     datasets = GetDatasets.out
-    //genotyping = GenotypingMerged_ch
     results = GenotypingFinal_ch
-    CDS = GetCDS.out
-    prot = TranslateToProtein.out
-    mut = MutationsFinder.out
+    CDS = GetCDS.out.results
+    prot = TranslateToProtein.out.results
+    mut = MutationsFinder.out.results
+    errors = CompileErrors.out
+    errors_merged = ErrorsMerged_ch
 }
 // Bloc final de publicació de resultats
 output {
@@ -161,6 +179,14 @@ output {
         mode "copy"
     }
     mut {
+        path { "${launchDir}/${params.outDir}" }
+        mode "copy"
+    }
+    errors {
+        path { "${launchDir}/${params.outDir}" }
+        mode "copy"
+    }
+    errors_merged {
         path { "${launchDir}/${params.outDir}" }
         mode "copy"
     }
