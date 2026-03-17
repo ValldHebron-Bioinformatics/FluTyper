@@ -119,7 +119,22 @@ workflow {
         .groupTuple()
 
     // Pass the grouped bundles to a final concatenation process
-    CompileErrors(Errors_ch)     
+    CompileErrors(Errors_ch)
+    ErrorsMerged_ch = CompileErrors.out
+        .map { sample_id, log_file ->
+            // Read the raw text from the individual log file
+            def content = log_file.text
+            
+            // Return a formatted string with the sample ID header
+            return "========================================\n" +
+                   "Errors for Sample: ${sample_id}\n" +
+                   "========================================\n" +
+                   "${content}\n"
+        }
+        .collectFile(
+            name: 'pipeline_errors.log',
+            storeDir: "${launchDir}/${params.outDir}"
+        )   
            
     publish:
     folder = OrganizeBySample.out.results
@@ -130,6 +145,7 @@ workflow {
     prot = TranslateToProtein.out.results
     mut = MutationsFinder.out.results
     errors = CompileErrors.out
+    errors_merged = ErrorsMerged_ch
 }
 // Bloc final de publicació de resultats
 output {
@@ -167,6 +183,10 @@ output {
         mode "copy"
     }
     errors {
+        path { "${launchDir}/${params.outDir}" }
+        mode "copy"
+    }
+    errors_merged {
         path { "${launchDir}/${params.outDir}" }
         mode "copy"
     }
