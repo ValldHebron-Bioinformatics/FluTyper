@@ -8,7 +8,8 @@ process OrganizeBySample {
     input:
     val(sample_id)
     output:
-    tuple val(sample_id), path("samples/${sample_id}")
+    tuple val(sample_id), path("samples/${sample_id}"), emit: results
+    tuple val(sample_id), path("OSerrors.log"), optional: true, emit: errors
 
     script:
     // Another option is to put it as output... ASK ALEJANDRA
@@ -32,7 +33,7 @@ process OrganizeBySample {
         
         # Check if the generated file is empty (size 0)
         if [ ! -s "\${SEG_FILE}" ]; then
-            echo "OrganizeBySample: No records found for sample ${sample_id} segment \${seg}, skipping." >> "samples/${sample_id}/errors.log"
+            echo "OrganizeBySample: No records found for sample ${sample_id} segment \${seg}, skipping." >> "OSerrors.log"
         fi
     done
     """

@@ -8,10 +8,11 @@ process GetCDS {
     tuple val(h_tag), val(n_tag), val(sample_id), val(pathotype), path(sample_dir)
 
     output:
-    tuple val(sample_id), path("samples/${sample_id}/CDS/*_CDS.fasta")
+    tuple val(sample_id), path("samples/${sample_id}/CDS/*_CDS.fasta"), emit: results
+    tuple val(sample_id), path("CDSerrors.log"), optional: true, emit: errors
 
     script:
-    def logDir = file(params.outDir)
+    
     """
     #!/usr/bin/env python3
     import os
@@ -22,7 +23,7 @@ process GetCDS {
     ref_fasta = "${params.protocols[params.protocol].resources}/CDS_references.fasta"
     cds_dir = "samples/${sample_id}/CDS"
     os.makedirs(cds_dir, exist_ok=True)
-    log_file = "${logDir}/errors.log"
+    log_file = "CDSerrors.log"
 
     prot_dict = {
         "HA":  ["HA", "HA-SP", "HA1-SP", "HA2"], "NA":  ["NA"], "PB2": ["PB2"],
@@ -66,7 +67,7 @@ process GetCDS {
         
         if not (os.path.isfile(seg_fasta) and os.path.getsize(seg_fasta) > 0):
             with open(log_file, 'a') as f:
-                f.write(f"No valid FASTA found for sample ${sample_id} segment {seg}, skipping.\\n")
+                f.write(f"GetCDS: No valid FASTA found for sample ${sample_id} segment {seg}, skipping.\\n")
             continue 
             
         for prot in prots:
@@ -93,6 +94,6 @@ process GetCDS {
                                 
             except subprocess.CalledProcessError as e:
                 with open(log_file, 'a') as f:
-                    f.write(f"Alignment failed for sample ${sample_id} protein {prot}: {e}\\n")
+                    f.write(f"GetCDS: Alignment failed for sample ${sample_id} protein {prot}: {e}\\n")
     """
 }

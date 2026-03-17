@@ -14,7 +14,6 @@ process GetDatasets {
     
 
     script:
-    def logDir = file(params.outDir)
     """
     # Extract unique H tags from the inferred subtypes CSV, the merged doc 
     # This way to have only 1 process instead of 1 per sample giving the sample id and h_tag tuple
@@ -37,7 +36,7 @@ process GetDatasets {
                 #nextclade dataset get --name "\${DATASET_NAME}" --output-dir H9/nextclade_H9_dataset
                 ;;
             *)
-                echo "No valid dataset found for subtype: \$tag, skipping Genotyping" >> "${logDir}/errors.log"
+                echo "No valid H tag found for dataset retrieval: \$tag" 
                 ;;
         esac
     done

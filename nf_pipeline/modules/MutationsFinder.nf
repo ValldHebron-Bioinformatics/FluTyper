@@ -5,11 +5,10 @@ process MutationsFinder {
     tuple val(sample_id), path(prot_files), val(h_tag)
 
     output:
-    tuple val(sample_id), path("samples/${sample_id}/mutations/${sample_id}_*_mutations.csv")
+    tuple val(sample_id), path("samples/${sample_id}/mutations/${sample_id}_*_mutations.csv"), emit: results
+    tuple val(sample_id), path("MFerrors.log"), optional: true, emit: errors
 
     script:
-    def logDir = file(params.outDir)
-    
     """
     DICTIONARY="${params.protocols[params.protocol].resources}/AA_Sites.csv"
     MARKERS_dir="${params.protocols[params.protocol].resources}/MARKERS"
@@ -18,7 +17,7 @@ process MutationsFinder {
         TARGET_H="${h_tag}"
     else
         TARGET_H="H5"
-        echo "Subtype ${h_tag} not found in dictionary for sample ${sample_id}. Defaulting to H5 numbering." >> "${logDir}/errors.log"
+        echo "MutationsFinder: Subtype ${h_tag} not found in dictionary for sample ${sample_id}. Defaulting to H5 numbering." >> "MFerrors.log"
     fi
 
     FINAL_MARKERS="HA-SP_\${TARGET_H}.csv"
@@ -68,7 +67,7 @@ process MutationsFinder {
                 fi
             done
         else
-            echo "Reference file for \${prot_name} not found at \$ref_file." >> "${logDir}/errors.log"
+            echo "MutationsFinder: Reference file for \${prot_name} not found at \$ref_file." >> "MFerrors.log"
             # Ensure the file exists to satisfy the output pattern
             touch "\$output_csv"
         fi
