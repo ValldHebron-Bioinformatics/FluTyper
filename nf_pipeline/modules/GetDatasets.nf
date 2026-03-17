@@ -37,7 +37,7 @@ process GetDatasets {
                 #nextclade dataset get --name "\${DATASET_NAME}" --output-dir H9/nextclade_H9_dataset
                 ;;
             *)
-                echo "Skipping undefined subtype: \$tag" >> "${logDir}/errors.log"
+                echo "No valid dataset found for subtype: \$tag, skipping Genotyping" >> "${logDir}/errors.log"
                 ;;
         esac
     done
