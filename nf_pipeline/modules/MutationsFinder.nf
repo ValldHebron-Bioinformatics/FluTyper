@@ -21,7 +21,7 @@ process MutationsFinder {
         echo "Subtype ${h_tag} not found in dictionary for sample ${sample_id}. Defaulting to H5 numbering." >> "${logDir}/errors.log"
     fi
 
-    FINAL_MARKERS="HA-SP.csv"
+    FINAL_MARKERS="HA-SP_\${TARGET_H}.csv"
     if [[ ${h_tag} != "H5" ]]; then
       python3 "${params.programs.MutationsDictionary}" \\
         --subtype \${TARGET_H} \\

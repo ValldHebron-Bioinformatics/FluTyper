@@ -17,9 +17,9 @@ workflow {
     SampleInput_ch = channel
         .fromPath(params.inputFasta, checkIfExists: true)
         .splitFasta(record: [id: true])
-        .map { rec -> tuple(rec.id.tokenize('[|_]')[0], file(params.inputFasta)) } // ASK ALEJANDRA: IS THIS THE MOST EFFICIENT WAY?
-        .unique {  rec -> rec[0]  }
-    
+        .map { rec -> rec.id.tokenize('[|_]')[0] } 
+        .unique()
+ 
     OrganizeBySample(SampleInput_ch)
 
     // SUBTYPE DETECTION
@@ -69,14 +69,7 @@ workflow {
         }
 
     GenotypingNextclade(GenotypingNextcladeInput_ch)
-    // I think this is not needed, ASK ALEJANDRA
-    // Merge individual genotyping results into a global report
-    //GenotypingMerged_ch = GenotypingNextclade.out 
-    //    .collectFile(
-    //        name: 'genotyping_results.csv',
-    //        keepHeader: true,
-    //    )
-
+    
     // RESULTS REPORTING & CDS EXTRACTION
     // Re-associate Nextclade files with their IDs for the final join
     NextcladeTuple_ch = GenotypingNextclade.out
