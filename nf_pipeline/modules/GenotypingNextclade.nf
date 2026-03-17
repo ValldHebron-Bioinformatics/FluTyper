@@ -11,12 +11,7 @@ process GenotypingNextclade {
     script:
     def logDir = file(params.outDir)
     """
-    # Check if dataset_dir is valid and contains the expected subdirectory for the H tag, if not create an empty results file and exit
-    if [ ! -d "${dataset_dir}" ]; then
-        echo "[WARNING] No valid dataset_dir for ${sample_id}, skipping." >> "${logDir}/errors.log"
-        touch nextclade_results_${sample_id}.csv ## ASK ALEJANDRA: if there's no classification, we want to have an empty results file or exit with an error? For now, we create an empty file to keep the pipeline running and avoid missing data in the final report. We can always check the errors.log for details on which samples had issues.
-        exit 0
-    fi
+    # Genotyping using Nextclade with the appropriate dataset based on the H subtype
     if [[ ${h_tag} == "H5" ]]; then
         dataset_dir="${dataset_dir}/H5/nextclade_H5_dataset"
     elif [[ ${h_tag} == "H7" ]]; then
@@ -36,7 +31,5 @@ process GenotypingNextclade {
         --input-dataset "${dataset_dir}" \
         --output-csv nextclade_results_${sample_id}.csv \
         "${ha_fasta}"
-
-
     """
 }
