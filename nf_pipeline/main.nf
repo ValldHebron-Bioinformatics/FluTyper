@@ -14,6 +14,13 @@ include { CompileErrors       } from './modules/CompileErrors'
 
 workflow {
     main:
+    // PRE-RUN PROTOCOL VALIDATION
+    if (params.protocol == "SWINE") {
+        exit 1, "PROTOCOL ERROR: The SWINE protocol is currently under development and cannot be used."
+    } else if (params.protocol != "AVIAN") {
+        def available = params.protocols.keySet().join(', ') // List available protocols from the config for the error message, just in case we add more later.
+        exit 1, "PROTOCOL ERROR: Invalid protocol specified ('${params.protocol}'). Available protocols are: ${available}."
+    }
     // INPUT & INITIAL FOLDER ORGANIZATION
     SampleInput_ch = channel
         .fromPath(params.inputFasta, checkIfExists: true)
