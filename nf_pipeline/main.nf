@@ -108,8 +108,8 @@ workflow {
     // Join translated protein files with genotyping info to prepare for mutation finding
     Mutations_ch = TranslateToProtein.out.results
         .join(GenotypingInfo_ch)
-        .map { sample_id, prot_files, h_tag, _n_tag, _pathotype ->
-            tuple(sample_id, prot_files, h_tag)
+        .map { sample_id, prot_files, h_tag, n_tag, pathotype ->
+            tuple(sample_id, prot_files, h_tag, n_tag, pathotype)
         }
     MutationsFinder(Mutations_ch)
     
