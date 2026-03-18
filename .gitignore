@@ -7,5 +7,4 @@ docs/
 results/
 protocols/AVIAN/v1/config.yaml
 prova/
-.gitignore
-
+nf_pipeline/modules/MutationsCompiler.nf

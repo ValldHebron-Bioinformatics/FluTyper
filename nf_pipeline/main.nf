@@ -113,6 +113,8 @@ workflow {
         }
     MutationsFinder(Mutations_ch)
     
+    
+    
     // Funnel all optional error channels together, then group by sample_id
     Errors_ch = OrganizeBySample.out.errors
         .mix(
@@ -156,10 +158,6 @@ workflow {
 }
 // Bloc final de publicació de resultats
 output {
-    //genotyping {
-    //    path { "${launchDir}/${params.outDir}" }
-    //    mode "copy"
-    //}
     datasets {
         path { "${launchDir}/protocols/${params.protocol}/v1/resources" }
         mode "copy"
