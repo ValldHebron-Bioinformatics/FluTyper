@@ -4,6 +4,7 @@ nextflow.enable.dsl=2
 
 process GetDatasets {
     errorStrategy 'ignore'
+    debug true
 
     input:
     path(inferred_subtypes)
@@ -28,15 +29,17 @@ process GetDatasets {
             H7)
                 DATASET_NAME='TO_BE_DECIDED_H7' # No H7 dataset yet
                 mkdir -p H7/nextclade_H7_dataset
+                echo "GetDatasets: H7 dataset retrieval is currently under development."
                 #nextclade dataset get --name "\${DATASET_NAME}" --output-dir H7/nextclade_H7_dataset
                 ;;
             H9)
                 DATASET_NAME='TO_BE_DECIDED_H9' # No H9 dataset yet
                 mkdir -p H9/nextclade_H9_dataset
+                echo "GetDatasets: H9 dataset retrieval is currently under development."
                 #nextclade dataset get --name "\${DATASET_NAME}" --output-dir H9/nextclade_H9_dataset
                 ;;
             *)
-                echo "No valid H tag found for dataset retrieval: \$tag" 
+                echo "GetDatasets: No valid H tag found for dataset retrieval: \$tag" 
                 ;;
         esac
     done
