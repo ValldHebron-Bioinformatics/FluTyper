@@ -15,7 +15,7 @@ def main():
     # Set up the instructions for anyone running the script from the command line
     parser = argparse.ArgumentParser(description="Translate HA marker positions and save them to a new CSV.")
     parser.add_argument("--subtype", required=True, choices=SUBTYPE_COLUMNS.keys(), help="The target subtype you want to translate to.")
-    parser.add_argument("--markers", required=True, help="Your input CSV file containing a 'POSITION' column.")
+    parser.add_argument("--input", required=True, help="Your input CSV file containing a 'POSITION' column.")
     parser.add_argument("--dictionary", required=True, help="The master CSV file that maps all the subtypes together.")
     parser.add_argument("--base", default="H5", choices=SUBTYPE_COLUMNS.keys(), help="The starting subtype of your markers (defaults to H5).")
     parser.add_argument("--output", default="EDITED_MARKERS.csv", help="What to name the final saved file.")
@@ -38,7 +38,7 @@ def main():
         translation_lookup[start_position] = target_position
 
     # Load the user's marker data
-    marker_data = pd.read_csv(args.markers, dtype=str)
+    input_data = pd.read_csv(args.input, dtype=str)
 
     # Define a quick helper function to translate a single position
     def translate_position(current_position):
@@ -46,10 +46,10 @@ def main():
         return translation_lookup.get(clean_position, "-")
 
     # Apply the translation to the entire POSITION column
-    marker_data['POSITION'] = marker_data['POSITION'].apply(translate_position)
+    input_data['POSITION'] = input_data['POSITION'].apply(translate_position)
 
     # Save the newly translated data
-    marker_data.to_csv(args.output, index=False)
+    input_data.to_csv(args.output, index=False)
 
 if __name__ == "__main__":
     main()

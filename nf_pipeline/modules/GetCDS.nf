@@ -15,9 +15,7 @@ process GetCDS {
     
     """
     #!/usr/bin/env python3
-    import os
-    import subprocess
-    import io
+    import os, subprocess, io
     from Bio import SeqIO
 
     ref_fasta = "${params.protocols[params.protocol].resources}/CDS_references.fasta"
@@ -31,10 +29,7 @@ process GetCDS {
         "MP":  ["M1", "M2"], "NS":  ["NS1", "NEP"]
     }
 
-    PATHO_SUBTYPES = {"H5", "H7", "H9"}
-    h_tag_val = "${h_tag}"
-
-    def trim_to_cds(ref_seq, aligned_seq, gap_threshold=50):
+    def TrimCDS(ref_seq, aligned_seq, gap_threshold):
         start = len(ref_seq) - len(ref_seq.lstrip('-'))
         end   = len(ref_seq.rstrip('-'))
         final_seq, tmp_chunk, gap_len = [], [], 0
@@ -53,15 +48,17 @@ process GetCDS {
             final_seq.extend(tmp_chunk)
             
         return "".join(final_seq)
+    
+    PATHO_SUBTYPES = {"H5", "H7", "H9"}
 
     for seg, prots in prot_dict.items():
         if seg == "NA":
             ref_tag, ref_patho = "${n_tag}", ""
         elif seg == "HA":
-            ref_tag, ref_patho = h_tag_val, "${pathotype}"
+            ref_tag, ref_patho = "${h_tag}", "${pathotype}"
         else:
-            ref_tag = h_tag_val if h_tag_val in PATHO_SUBTYPES else "H5"
-            ref_patho = "${pathotype}" if h_tag_val in PATHO_SUBTYPES else "HPAI"
+            ref_tag = "${h_tag}" if "${h_tag}" in PATHO_SUBTYPES else "H5"
+            ref_patho = "${pathotype}" if "${h_tag}" in PATHO_SUBTYPES else "HPAI"
 
         seg_fasta = f"${sample_dir}/segments/{seg}/${sample_id}_{seg}.fasta"
         
@@ -71,7 +68,7 @@ process GetCDS {
             continue 
             
         for prot in prots:
-            pattern = f"^{ref_tag}_{prot}_.*_{ref_patho}" if ref_patho else f"^{ref_tag}_{prot}_"
+            pattern = f"^{ref_tag}_{prot}_.*{ref_patho}"
             
             cmd = f"seqkit grep -r -p '{pattern}' {ref_fasta} | cat - '{seg_fasta}' | mafft --auto --quiet -"
             try:
@@ -85,7 +82,14 @@ process GetCDS {
                         aligned_header = sequences[1].id
                         aligned_seq = str(sequences[1].seq)
                         
-                        clean_seq = trim_to_cds(ref_seq, aligned_seq)
+                        if prot == "NEP":
+                            current_threshold = 400
+                        elif prot == "M2":
+                            current_threshold = 600
+                        else:
+                            current_threshold = float('inf')
+                            
+                        clean_seq = TrimCDS(ref_seq, aligned_seq, current_threshold)
                         
                         with open(f"{cds_dir}/${sample_id}_{prot}_CDS.fasta", 'w') as f_out:
                             f_out.write(f">{aligned_header}\\n")

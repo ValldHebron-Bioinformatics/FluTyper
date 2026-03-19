@@ -10,10 +10,18 @@ include { GenotypingResults   } from './modules/GenotypingResults'
 include { GetCDS              } from './modules/GetCDS'
 include { TranslateToProtein  } from './modules/TranslateToProtein'
 include { MutationsFinder     } from './modules/MutationsFinder'
+include { MutationsCompiler   } from './modules/MutationsCompiler'
 include { CompileErrors       } from './modules/CompileErrors'
 
 workflow {
     main:
+    // PRE-RUN PROTOCOL VALIDATION
+    if (params.protocol == "SWINE") {
+        exit 1, "PROTOCOL ERROR: The SWINE protocol is currently under development and cannot be used."
+    } else if (params.protocol != "AVIAN") {
+        def available = params.protocols.keySet() // List available protocols from the config for the error message, just in case we add more later.
+        exit 1, "PROTOCOL ERROR: Invalid protocol specified ('${params.protocol}'). Available protocols are: ${available}."
+    }
     // INPUT & INITIAL FOLDER ORGANIZATION
     SampleInput_ch = channel
         .fromPath(params.inputFasta, checkIfExists: true)
@@ -37,8 +45,7 @@ workflow {
         .map { tup -> tup[1] }
         .collectFile(
             name: 'inferred_subtypes.csv',
-            seed: 'seqName,inferred_subtype,pathotype\n', // Add header to the merged CSV
-            storeDir: "${launchDir}/${params.outDir}",
+            seed: 'seqName,inferred_subtype,pathotype\n' // Add header to the merged CSV
         )
 
     // DATASET PREPARATION
@@ -101,10 +108,14 @@ workflow {
     // Join translated protein files with genotyping info to prepare for mutation finding
     Mutations_ch = TranslateToProtein.out.results
         .join(GenotypingInfo_ch)
-        .map { sample_id, prot_files, h_tag, _n_tag, _pathotype ->
-            tuple(sample_id, prot_files, h_tag)
+        .map { sample_id, prot_files, h_tag, n_tag, pathotype ->
+            tuple(sample_id, prot_files, h_tag, n_tag, pathotype)
         }
     MutationsFinder(Mutations_ch)
+    MutationsCompiler_ch = MutationsFinder.out.results
+        .map { _sample_id, _mut_files, combined_csv -> combined_csv }
+        .collect()
+    MutationsCompiler(MutationsCompiler_ch)
     
     // Funnel all optional error channels together, then group by sample_id
     Errors_ch = OrganizeBySample.out.errors
@@ -133,7 +144,6 @@ workflow {
         }
         .collectFile(
             name: 'pipeline_errors.log',
-            storeDir: "${launchDir}/${params.outDir}"
         )   
            
     publish:
@@ -144,50 +154,51 @@ workflow {
     CDS = GetCDS.out.results
     prot = TranslateToProtein.out.results
     mut = MutationsFinder.out.results
+    mutations_report = MutationsCompiler.out.results
     errors = CompileErrors.out
     errors_merged = ErrorsMerged_ch
 }
 // Bloc final de publicació de resultats
 output {
-    //genotyping {
-    //    path { "${launchDir}/${params.outDir}" }
-    //    mode "copy"
-    //}
     datasets {
-        path { "${launchDir}/protocols/${params.protocol}/v1/resources" }
+        path { "${projectDir}/../protocols/${params.protocol}/v1/resources" }
         mode "copy"
     }
     folder {
-        path { "${launchDir}/${params.outDir}" }
+        path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
     
     subtype {
-        path { "${launchDir}/${params.outDir}" }
+        path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
     results {
-        path { "${launchDir}/${params.outDir}" }
+        path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
     CDS {
-        path { "${launchDir}/${params.outDir}" }
+        path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
     prot {
-        path { "${launchDir}/${params.outDir}" }
+        path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
     mut {
-        path { "${launchDir}/${params.outDir}" }
+        path { "${projectDir}/../${params.outDir}" }
+        mode "copy"
+    }
+    mutations_report {
+        path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
     errors {
-        path { "${launchDir}/${params.outDir}" }
+        path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
     errors_merged {
-        path { "${launchDir}/${params.outDir}" }
+        path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
 }
