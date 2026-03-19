@@ -116,9 +116,6 @@ workflow {
         .map { _sample_id, _mut_files, combined_csv -> combined_csv }
         .collect()
     MutationsCompiler(MutationsCompiler_ch)
-        
-    
-    
     
     // Funnel all optional error channels together, then group by sample_id
     Errors_ch = OrganizeBySample.out.errors
