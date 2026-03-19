@@ -16,7 +16,7 @@ process MutationsFinder {
     target_H=\$(echo "${h_tag}" | grep -E '^H[13579]\$' || echo "H5")
     FINAL_MARKERS="HA-SP_\${target_H}.csv"
     if [[ "\${target_H}" != "H5" ]]; then
-        python3 "${params.programs.MutationsDictionary}" --subtype \${target_H} --markers "\$MARKERS_DIR/HA-SP.csv" --dictionary "\$DICTIONARY" --output \$FINAL_MARKERS
+        python3 "${params.programs.MutationsDictionary}" --subtype \${target_H} --input "\$MARKERS_DIR/HA-SP.csv" --dictionary "\$DICTIONARY" --output \$FINAL_MARKERS
     fi
     
     mkdir -p samples/${sample_id}/mutations 
@@ -107,7 +107,7 @@ process MutationsFinder {
             python3 "${params.programs.MutationsDictionary}" \
                 --base "\${target_H}" \
                 --subtype "H5" \
-                --markers "\${output_csv}" \
+                --input "\${output_csv}" \
                 --dictionary "\$DICTIONARY" \
                 --output "\$output_csv"
         fi
