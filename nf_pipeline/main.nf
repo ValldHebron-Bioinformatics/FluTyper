@@ -45,8 +45,7 @@ workflow {
         .map { tup -> tup[1] }
         .collectFile(
             name: 'inferred_subtypes.csv',
-            seed: 'seqName,inferred_subtype,pathotype\n', // Add header to the merged CSV
-            storeDir: "${launchDir}/${params.outDir}",
+            seed: 'seqName,inferred_subtype,pathotype\n' // Add header to the merged CSV
         )
 
     // DATASET PREPARATION
@@ -148,7 +147,6 @@ workflow {
         }
         .collectFile(
             name: 'pipeline_errors.log',
-            storeDir: "${launchDir}/${params.outDir}"
         )   
            
     publish:
@@ -166,44 +164,44 @@ workflow {
 // Bloc final de publicació de resultats
 output {
     datasets {
-        path { "${launchDir}/protocols/${params.protocol}/v1/resources" }
+        path { "${projectDir}/../protocols/${params.protocol}/v1/resources" }
         mode "copy"
     }
     folder {
-        path { "${launchDir}/${params.outDir}" }
+        path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
     
     subtype {
-        path { "${launchDir}/${params.outDir}" }
+        path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
     results {
-        path { "${launchDir}/${params.outDir}" }
+        path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
     CDS {
-        path { "${launchDir}/${params.outDir}" }
+        path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
     prot {
-        path { "${launchDir}/${params.outDir}" }
+        path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
     mut {
-        path { "${launchDir}/${params.outDir}" }
+        path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
     mutations_report {
-        path { "${launchDir}/${params.outDir}" }
+        path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
     errors {
-        path { "${launchDir}/${params.outDir}" }
+        path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
     errors_merged {
-        path { "${launchDir}/${params.outDir}" }
+        path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
 }

@@ -1,3 +1,6 @@
+#!/usr/bin/env nextflow
+nextflow.enable.dsl=2
+
 process MutationsFinder {
     errorStrategy 'ignore'
 
@@ -55,7 +58,11 @@ process MutationsFinder {
         else
             subtype_val="${h_tag}${n_tag}"
         fi
-        ref_pattern="\${ref_tag}\${ref_patho:+(\$ref_patho)}"
+        if [[ -n "\$ref_patho" ]]; then
+          ref_pattern="\${ref_tag}(\${ref_patho})"
+        else
+          ref_pattern="\${ref_tag}"
+        fi
         
         output_csv="samples/${sample_id}/mutations/${sample_id}_\${prot_name}_mutations.csv"
         # HEADER
@@ -69,7 +76,7 @@ process MutationsFinder {
         
         # FIND MUTATIONS
         pos=1
-        paste <(echo "\$ref_seq" | fold -w1) <(echo "\$query_seq" | fold -w1) | while read -r ref_aa query_aa; do
+        while read -r ref_aa query_aa; do
             if [[ -n "\$ref_aa" && -n "\$query_aa" && "\$ref_aa" != "\$query_aa" ]]; then
                 marker_found=false
                 if [[ -f "\$ref_file" ]]; then
@@ -79,7 +86,7 @@ process MutationsFinder {
                             marker_found=true
                             break
                         fi
-                    done < <(tail -n +2 "\$ref_file" | tr -d '\\r') # Skip header and sanitize line endings
+                    done < <(tail -n +2 "\$ref_file" | tr -d '\r') # Skip header and sanitize line endings
                 fi
                 
                 if [[ "\$marker_found" == "false" ]]; then
@@ -87,7 +94,7 @@ process MutationsFinder {
                 fi
             fi
             ((pos++))
-        done
+        done < <(paste <(echo "\$ref_seq" | fold -w1) <(echo "\$query_seq" | fold -w1)) 
         
         # CHECK NON-MUTATION MARKERS
         if [[ -f "\$ref_file" ]]; then
@@ -104,12 +111,7 @@ process MutationsFinder {
         fi
         # CONVERT HA TO H5 NUMBERING
         if [[ "\$prot_name" == HA* && "\${target_H}" != "H5" ]]; then            
-            python3 "${params.programs.MutationsDictionary}" \
-                --base "\${target_H}" \
-                --subtype "H5" \
-                --input "\${output_csv}" \
-                --dictionary "\$DICTIONARY" \
-                --output "\$output_csv"
+            python3 "${params.programs.MutationsDictionary}" --base "\${target_H}" --subtype "H5" --input "\${output_csv}" --dictionary "\$DICTIONARY" --output "\$output_csv"
         fi
     done
     # COMPILE ALL PROTEIN MUTATION FILES INTO ONE MASTER CSV
