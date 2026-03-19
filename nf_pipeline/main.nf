@@ -10,6 +10,7 @@ include { GenotypingResults   } from './modules/GenotypingResults'
 include { GetCDS              } from './modules/GetCDS'
 include { TranslateToProtein  } from './modules/TranslateToProtein'
 include { MutationsFinder     } from './modules/MutationsFinder'
+include { MutationsCompiler   } from './modules/MutationsCompiler'
 include { CompileErrors       } from './modules/CompileErrors'
 
 workflow {
@@ -112,6 +113,11 @@ workflow {
             tuple(sample_id, prot_files, h_tag, n_tag, pathotype)
         }
     MutationsFinder(Mutations_ch)
+    MutationsCompiler_ch = MutationsFinder.out.results
+        .map { _sample_id, _mut_files, combined_csv -> combined_csv }
+        .collect()
+    MutationsCompiler(MutationsCompiler_ch)
+        
     
     
     
@@ -153,6 +159,7 @@ workflow {
     CDS = GetCDS.out.results
     prot = TranslateToProtein.out.results
     mut = MutationsFinder.out.results
+    mutations_report = MutationsCompiler.out.results
     errors = CompileErrors.out
     errors_merged = ErrorsMerged_ch
 }
@@ -184,6 +191,10 @@ output {
         mode "copy"
     }
     mut {
+        path { "${launchDir}/${params.outDir}" }
+        mode "copy"
+    }
+    mutations_report {
         path { "${launchDir}/${params.outDir}" }
         mode "copy"
     }
