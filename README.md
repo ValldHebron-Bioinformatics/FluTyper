@@ -108,6 +108,6 @@ nextflow run nf_pipeline/main.nf --inputFasta <your_fasta_file> --protocol AVIAN
 - [seqkit](https://bioinf.shenwei.me/seqkit/)
 - [Nextclade](https://clades.nextstrain.org/)
 - [MAFFT](https://mafft.cbrc.jp/alignment/software/)
-- [Python 3](https://www.python.org/) (with pandas, biopython, openpyxl)
+- [Python 3](https://www.python.org/) (with [pandas](https://pandas.pydata.org/docs/index.html), [biopython](https://biopython.org/wiki/Documentation) [openpyxl](https://openpyxl.readthedocs.io/en/stable/))
 
 ---
