@@ -8,7 +8,8 @@ process MutationsCompiler {
     path csv_files
 
     output:
-    path "final_mutations_report.xlsx", emit: results
+    tuple path("final_mutations_report.xlsx"), path("relevant_mutations.xlsx") , emit: results
+    
 
    script:
     """#!/usr/bin/env python3
@@ -40,5 +41,30 @@ with pd.ExcelWriter("final_mutations_report.xlsx", engine='openpyxl') as writer:
             protein_df = protein_df.sort_values(by=['SAMPLE_ID', 'POSITION'])
             
         protein_df.to_excel(writer, sheet_name=str(protein), index=False)
+# Additionally, create a separate Excel file for relevant mutations
+# Open an ExcelWriter object to handle creating multiple sheets properly
+with pd.ExcelWriter("relevant_mutations.xlsx") as writer:
+    
+    for protein in unique_proteins:
+        # Read the specific sheet into a DataFrame directly
+        df = pd.read_excel("final_mutations_report.xlsx", sheet_name=str(protein))
+        
+        # Calculate unique samples correctly from the isolated Series
+        n = len(df['SAMPLE_ID'].dropna().unique())
+        
+        # If a certain position has mutations in more than 10% of the samples, consider it relevant
+        threshold = n * 0.1
+        relevant_mutations = df['POSITION'].value_counts()[df['POSITION'].value_counts() > threshold].index.tolist()
+        relevant_df = df[df['POSITION'].isin(relevant_mutations)]
+        
+        # Also include all MARKERS=TRUE in the relevant mutations file
+        markers_df = df[df['MARKER'] == True]
+        
+        # Combine both dataframes and drop duplicates to prevent overlapping rows
+        combined_df = pd.concat([relevant_df, markers_df]).drop_duplicates()
+        
+        # Write the combined data to its specific sheet if it is not empty
+        if not combined_df.empty:
+            combined_df.to_excel(writer, sheet_name=str(protein), index=False)
 """
 }
