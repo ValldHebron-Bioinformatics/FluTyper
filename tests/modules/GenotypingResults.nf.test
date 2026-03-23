@@ -1,0 +1,46 @@
+nextflow_process {
+
+    name "Test Process GenotypingResults"
+    script "nf_pipeline/modules/GenotypingResults.nf"
+    process "GenotypingResults"
+
+    test("Should successfully aggregate results and extract real version from CHANGELOG") {
+
+        when {
+            process {
+                """
+                def sampleId = "19135815"
+                def hTag = "H5"
+                def nTag = "N1"
+                def pathotype = "HPAI"
+                
+                // Point to the Nextclade CSV results
+                def csvPath = file("${projectDir}/tests/data/19135815/nextclade_results_19135815.csv")
+                
+                // Point to the real dataset folder containing your CHANGELOG.md
+                def dsDir = file("${projectDir}/tests/data/resources/H5/nextclade_H5_dataset")
+
+                input[0] = [ sampleId, hTag, nTag, pathotype, csvPath ]
+                
+                // Pass the dataset directory inside an array for proper staging
+                input[1] = [ dsDir ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            
+            assert process.out.results != null
+            def reportFile = path(process.out.results[0][1])
+            assert reportFile.exists()
+
+            // Verify the Python script processed the data correctly
+            def csvText = reportFile.text
+            assert csvText.contains("19135815")
+            assert csvText.contains("H5N1(HPAI)")
+            assert csvText.contains("2025-09-09T12:13:13Z") 
+            assert csvText.contains("2.3.4.4b")
+        }
+    }
+}

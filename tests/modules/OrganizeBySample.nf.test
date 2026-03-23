@@ -1,0 +1,42 @@
+nextflow_process {
+
+    name "Test Process OrganizeBySample"
+    script "nf_pipeline/modules/OrganizeBySample.nf"
+    process "OrganizeBySample"
+
+    test("Should successfully split FASTA by sample and segment") {
+
+        when {
+            params {
+                segments = ['HA', 'NA', 'PB2', 'MP', 'NP', 'PA', 'PB1', 'NS']
+                inputFasta = "${projectDir}/tests/data/19135815/19135815.fasta"
+            }
+            process {
+                """
+                input[0] = "19135815"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            assert process.out.results != null
+            assert process.out.results.size() > 0
+
+            def sample_id = process.out.results[0][0]
+            def out_dir = path(process.out.results[0][1])
+
+            assert sample_id == "19135815"
+            assert out_dir.resolve("19135815.fasta").exists()
+            assert out_dir.resolve("segments/HA/19135815_HA.fasta").exists()
+            assert out_dir.resolve("segments/NA/19135815_NA.fasta").exists()
+            assert out_dir.resolve("segments/PB2/19135815_PB2.fasta").exists()
+            assert out_dir.resolve("segments/MP/19135815_MP.fasta").exists()
+            assert out_dir.resolve("segments/NP/19135815_NP.fasta").exists()
+            assert out_dir.resolve("segments/PA/19135815_PA.fasta").exists()
+            assert out_dir.resolve("segments/PB1/19135815_PB1.fasta").exists()
+            assert out_dir.resolve("segments/NS/19135815_NS.fasta").exists()
+        }
+    }
+}

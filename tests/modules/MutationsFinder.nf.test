@@ -1,0 +1,56 @@
+nextflow_process {
+
+    name "Test Process MutationsFinder"
+    script "nf_pipeline/modules/MutationsFinder.nf"
+    process "MutationsFinder"
+
+    test("Should successfully identify mutations against marker database") {
+
+        when {
+            params {
+                protocol = "AVIAN"
+                protocols = [
+                    AVIAN: [
+                        // Points to the folder containing AA_Sites.csv and the MARKERS directory
+                        resources : "${projectDir}/protocols/AVIAN/v1"
+                    ]
+                ]
+                programs = [
+                    // Ensure this path is correct if your script calls this python tool
+                    MutationsDictionary : "${projectDir}/bin/MutationsDictionary.py"
+                ]
+            }
+            process {
+                """
+                def sampleId = "19135815"
+                def hTag = "H5"
+                def nTag = "N1"
+                def pathotype = "HPAI"
+                
+                // Get the list of protein FASTA files generated in the previous step
+                def protDir = file("${projectDir}/tests/data/19135815/proteins")
+                def protFiles = protDir.listFiles().findAll { it.name.endsWith(".fasta") }
+
+                input[0] = [ sampleId, protFiles, hTag, nTag, pathotype ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            
+            // Validate the master mutation CSV exists
+            assert process.out.results != null
+            def masterCsv = path(process.out.results[0][2])
+            assert masterCsv.exists()
+
+            // Verify the content
+            def csvText = masterCsv.text
+            assert csvText.contains("19135815")
+            assert csvText.contains("H5N1(HPAI)")
+            
+            // Check if it successfully identified at least the header or a mutation
+            assert csvText.contains("SAMPLE_ID,SUBTYPE,PROTEIN")
+        }
+    }
+}

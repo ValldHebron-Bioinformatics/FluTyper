@@ -1,0 +1,37 @@
+nextflow_process {
+
+    name "Test Process GetDatasets"
+    script "nf_pipeline/modules/GetDatasets.nf"
+    process "GetDatasets"
+
+    test("Should successfully retrieve datasets for H5N1") {
+
+        when {
+            params {
+                protocol = "AVIAN"
+                protocols = [
+                    AVIAN: [
+                        resources : "${projectDir}/protocols/AVIAN/v1"
+                    ]
+                ]
+            }
+            process {
+                """
+                // Point directly to the new file in your tests/data folder
+                input[0] = file("${projectDir}/tests/data/19135815/inferred_subtypes.csv")
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            
+            assert process.out[0] != null
+            assert process.out[0].size() > 0
+            
+            def datasetDir = path(process.out[0][0])
+            assert datasetDir.exists()
+            assert datasetDir.getFileName().toString() == "nextclade_H5_dataset"
+        }
+    }
+}

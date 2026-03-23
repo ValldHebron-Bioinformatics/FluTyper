@@ -1,0 +1,46 @@
+nextflow_process {
+
+    name "Test Process CompileErrors"
+    script "nf_pipeline/modules/CompileErrors.nf"
+    process "CompileErrors"
+
+    test("Should successfully consolidate multiple log files into one") {
+
+        when {
+            process {
+                """
+                def sampleId = "19135815"
+                
+                // Create two quick dummy logs to test the 'cat' command
+                def log1 = file("OSerrors.log")
+                log1.text = "Error in Organization phase in sample 19135815\\n"
+                
+                def log2 = file("GNerrors.log")
+                log2.text = "Error in Genotyping phase in sample 19135815\\n"
+
+                // Pass the ID and the list of log files
+                input[0] = [ sampleId, [log1, log2] ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            
+            // Since no 'emit' name is used in the module, we access the first output channel
+            assert process.out[0] != null
+            
+            // process.out[0] contains a list of results (one per process execution)
+            // Each result is the tuple: [sample_id, log_path]
+            def finalLog = path(process.out[0][0][1])
+            
+            assert finalLog.exists()
+            
+            // Verify that both errors were successfully merged
+            def content = finalLog.text
+            assert content.contains("19135815")
+            assert content.contains("Organization")
+            assert content.contains("Genotyping")
+        }
+    } 
+}

@@ -1,0 +1,51 @@
+nextflow_process {
+
+    name "Test Process GenotypingNextclade"
+    script "nf_pipeline/modules/GenotypingNextclade.nf"
+    process "GenotypingNextclade"
+
+    test("Should successfully genotype H5N1 sample using local resources") {
+
+        when {
+            params {
+                protocol = "AVIAN"
+                protocols = [
+                    AVIAN: [
+                        resources : "${projectDir}/protocols/AVIAN/v1"
+                    ]
+                ]
+            }
+            process {
+                """
+                def sampleId = "19135815"
+                // This must be the actual HA fasta file for Nextclade to work
+                def haFasta = file("${projectDir}/tests/data/19135815/segments/HA/19135815_HA.fasta")
+                
+                // The script appends '/H5/nextclade_H5_dataset' to this path
+                // So we point to the parent folder: tests/data/resources
+                def baseDatasetDir = file("${projectDir}/tests/data/resources/H5/nextclade_H5_dataset")
+                
+                def hTag = "H5"
+                def nTag = "N1"
+                def pathotype = "HPAI"
+
+                input[0] = [ sampleId, haFasta, hTag, nTag, pathotype, baseDatasetDir ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            
+            assert process.out.results != null
+            assert process.out.results.size() > 0
+            
+            def nextclade_csv = path(process.out.results[0][1])
+            assert nextclade_csv.exists()
+
+            // Verify the scientific accuracy: check for the specific clade
+            def csvContent = nextclade_csv.text
+            assert csvContent.contains("2.3.4.4b")
+        }
+    }
+}

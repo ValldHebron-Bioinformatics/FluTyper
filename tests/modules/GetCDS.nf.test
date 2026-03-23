@@ -1,0 +1,53 @@
+nextflow_process {
+
+    name "Test Process GetCDS"
+    script "nf_pipeline/modules/GetCDS.nf"
+    process "GetCDS"
+
+    test("Should successfully extract and trim CDS from sample") {
+
+        when {
+                params {
+                    protocol = "AVIAN"
+                    protocols = [
+                        AVIAN: [
+                            resources : "${projectDir}/protocols/AVIAN/v1"
+                        ]
+                    ]
+                }
+            process {
+                """
+                def hTag = "H5"
+                def nTag = "N1"
+                def sampleId = "19135815"
+                def pathotype = "HPAI"
+                
+                // We pass the tests/data directory. 
+                // Nextflow will stage this as a folder named 'data' in the work directory.
+                def sampleDir = file("${projectDir}/tests/data/19135815")
+
+                input[0] = [ hTag, nTag, sampleId, pathotype, sampleDir ]
+                """
+            }
+        }
+
+        then {
+            // If the output is missing, we need to know why
+            if (!process.success || process.out.results.size() == 0) {
+                // We look for the log inside the process work directory
+                def errorLog = path("${process.path}/CDSerrors.log")
+                if (errorLog.exists()) {
+                    println "--- INTERNAL PYTHON LOG ---"
+                    println errorLog.text
+                } else {
+                    println "--- NO LOG CREATED ---"
+                    // List files to see what Nextflow actually staged
+                    process.path.eachFile { println it }
+                }
+            }
+
+            assert process.success
+            assert process.out.results.size() > 0
+        }
+    }
+}

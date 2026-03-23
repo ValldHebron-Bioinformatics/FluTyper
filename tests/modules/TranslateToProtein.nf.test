@@ -1,0 +1,42 @@
+nextflow_process {
+
+    name "Test Process TranslateToProtein"
+    script "nf_pipeline/modules/TranslateToProtein.nf"
+    process "TranslateToProtein"
+
+    test("Should successfully translate CDS to protein sequences") {
+
+        when {
+            process {
+                """
+                def sampleId = "19135815"
+                
+                // Use .listFiles() to pass the actual files, not the folder itself
+                def cdsDir = file("${projectDir}/tests/data/19135815/CDS")
+                def cdsFiles = cdsDir.listFiles().findAll { it.name.endsWith(".fasta") }
+
+                input[0] = [ sampleId, cdsFiles ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            
+            // 1. Check that results are emitted
+            assert process.out.results != null
+            assert process.out.results.size() > 0
+            
+            // 2. Validate the protein files
+            def proteinFiles = process.out.results[0][1]
+            assert proteinFiles.size() > 0
+            
+            // Check the first file in the list using standard String methods
+            def firstFile = proteinFiles[0].toString()
+            assert firstFile.endsWith("_PROT.fasta")
+            
+            // Optional: confirm the file physically exists in the work directory
+            assert path(firstFile).exists()
+        }
+    }
+}
