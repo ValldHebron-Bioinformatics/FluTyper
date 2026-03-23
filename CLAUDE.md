@@ -24,7 +24,31 @@ Default parameters (from `nf_pipeline/nextflow.config`):
 - `--protocol`: `AVIAN`
 - `--outDir`: `prova/1/`
 
-There is no formal test suite. The test data is `docs/fastas/prova.fasta`.
+The full test dataset is `docs/fastas/prova.fasta` (gitignored). A minimal 2-sample FASTA for CI lives at `tests/test_mini.fasta`.
+
+## Running Tests
+
+Three test layers, fastest to slowest:
+
+```bash
+# 1. Python unit tests — no bioinformatics tools required (~5 s)
+pytest tests/ -v
+
+# 2. Nextflow process tests — requires nextflow, nextclade, seqkit, mafft (~2-5 min)
+nf-test test --config tests/nf-test.config
+
+# 3. Full pipeline integration test (~20-30 min)
+cd nf_pipeline && nextflow run main.nf \
+  --inputFasta ../tests/test_mini.fasta \
+  --protocol AVIAN \
+  --outDir ../ci_output \
+  -profile ci
+```
+
+Test files:
+- `tests/pytest/` — pytest unit tests for Python utilities
+- `tests/nf/` — nf-test process-level tests
+- `tests/fixtures/` — synthetic CSVs and FASTA files used by the tests
 
 ## Input/Output Format
 

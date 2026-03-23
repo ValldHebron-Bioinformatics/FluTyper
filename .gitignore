@@ -1,6 +1,8 @@
 __pycache__/
 .nextflow.log*
 .nextflow
+.nf-test.log*
+.nf-test/
 work
 docs/ 
 .venv/

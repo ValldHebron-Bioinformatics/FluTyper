@@ -1,0 +1,35 @@
+nextflow_process {
+    name "Test SubtypeDetection"
+    script "nf_pipeline/modules/SubtypeDetection.nf"
+    process "SubtypeDetection"
+
+    options "-profile ci"
+
+    test("H5N1 HPAI sample is typed correctly") {
+        when {
+            params {
+                protocol = "AVIAN"
+                protocols = [
+                    AVIAN: [
+                        resources: "${projectDir}/protocols/AVIAN/v1"
+                    ]
+                ]
+            }
+            process {
+                """
+                input[0] = [
+                    "19135815",
+                    file("${projectDir}/tests/fixtures/segments/19135815_HA.fasta"),
+                    file("${projectDir}/tests/fixtures/segments/19135815_NA.fasta")
+                ]
+                """
+            }
+        }
+        then {
+            assert process.success
+            def csv = path(process.out.results[0][1]).text
+            assert csv.contains("H5N1")
+            assert csv.contains("HPAI")
+        }
+    }
+}
