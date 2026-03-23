@@ -67,10 +67,12 @@ jobs:
 
       - name: Run Pipeline (CI Profile)
         run: |
-          cd nf_pipeline
-          # We use the 'ci' profile defined in your config to limit resources
-          nextflow run main.nf \
-            --inputFasta "../tests/data/test.fasta" \
+          # Use realpath to ensure Nextflow gets the absolute path to the data
+          INPUT_FASTA_ABS=$(realpath tests/data/test.fasta)
+          
+          # Run Nextflow from the root, pointing to the main.nf inside the subfolder
+          nextflow run nf_pipeline/main.nf \
+            --inputFasta "$INPUT_FASTA_ABS" \
             --protocol AVIAN \
             --outDir ci_output \
             -profile ci
