@@ -19,7 +19,7 @@ nextflow_process {
                 """
                 def sampleId = "19135815"
                 // This must be the actual HA fasta file for Nextclade to work
-                def haFasta = file("${projectDir}/tests/data/19135815_HA.fasta")
+                def haFasta = file("${projectDir}/tests/data/19135815/segments/HA/19135815_HA.fasta")
                 
                 // The script appends '/H5/nextclade_H5_dataset' to this path
                 // So we point to the parent folder: tests/data/resources
