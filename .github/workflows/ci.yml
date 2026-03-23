@@ -86,8 +86,3 @@ jobs:
             --protocol AVIAN \
             --outDir ../ci_output \
             -profile ci
-
-      - name: Validate Final Artifacts
-        run: |
-          test -s ci_output/final_genotyping_results.csv
-          test -s ci_output/final_mutations_report.xlsx

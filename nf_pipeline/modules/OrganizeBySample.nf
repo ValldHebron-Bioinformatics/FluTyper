@@ -15,7 +15,6 @@ process OrganizeBySample {
     script:
     // Casting the parameter to a file() object forces Nextflow to stage it into the work directory
     def staged_fasta = file(params.inputFasta)
-    
     """
     mkdir -p "samples/${sample_id}"
 
