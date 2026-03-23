@@ -84,7 +84,7 @@ process MutationsFinder {
                         if [[ "\$m_pos" == "\$pos" && "\$m_aa" == "\$query_aa" ]]; then
                             echo "${sample_id},\${subtype_val},\${prot_name},\${ref_pattern},\${pos},\${ref_aa},\${query_aa},TRUE,\${m_origin},\${m_effect},\${m_ref}" >> "\$output_csv"
                             marker_found=true
-                            break
+                            break # Avoid unnecessary iterations once a marker is found for this position
                         fi
                     done < <(tail -n +2 "\$ref_file" | tr -d '\r') # Skip header and sanitize line endings
                 fi
