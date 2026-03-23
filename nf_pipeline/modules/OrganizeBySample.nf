@@ -11,9 +11,7 @@ process OrganizeBySample {
     tuple val(sample_id), path("samples/${sample_id}"), emit: results
     tuple val(sample_id), path("OSerrors.log"), optional: true, emit: errors
 
-    script:
-    // Another option is to put it as output... ASK ALEJANDRA
-    
+    script:    
     """
     mkdir -p "samples/${sample_id}"
     input_fasta="${params.inputFasta}"
