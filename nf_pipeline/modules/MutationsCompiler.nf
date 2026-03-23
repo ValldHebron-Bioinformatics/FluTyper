@@ -8,10 +8,9 @@ process MutationsCompiler {
     path csv_files
 
     output:
-    tuple path("final_mutations_report.xlsx"), path("relevant_mutations.xlsx") , emit: results
+    tuple path("final_mutations_report.xlsx"), path("relevant_mutations.xlsx"), emit: results
     
-
-   script:
+    script:
     """#!/usr/bin/env python3
 import pandas as pd
 import sys
@@ -22,49 +21,37 @@ dataframes = [pd.read_csv(f) for f in csv_list if f.endswith('.csv')]
 if not dataframes:
     print("ERROR: No CSV files found to compile.")
     sys.exit(1)
-# Concatenate all dataframes into one master dataframe ignoring the index to avoid duplicate indices from individual files 
+
+# Concatenate all dataframes into one master dataframe ignoring the index
 master_df = pd.concat(dataframes, ignore_index=True)
 
 if 'PROTEIN' not in master_df.columns:
     print("ERROR: 'PROTEIN' column not found in the data. Cannot compile report.")
     sys.exit(1)
 
-# Write the master dataframe to an Excel file with separate sheets for each unique protein
-with pd.ExcelWriter("final_mutations_report.xlsx", engine='openpyxl') as writer:
-    unique_proteins = master_df['PROTEIN'].dropna().unique()
+# Open both Excel files simultaneously to avoid reading data back from the disk
+with pd.ExcelWriter("final_mutations_report.xlsx", engine='openpyxl') as writer_all, \\
+     pd.ExcelWriter("relevant_mutations.xlsx", engine='openpyxl') as writer_rel:
     
-    for protein in unique_proteins:
-        protein_df = master_df[master_df['PROTEIN'] == protein]
+    # Group the dataframe by the 'PROTEIN' column, automatically dropping NA proteins
+    for protein, protein_df in master_df.dropna(subset=['PROTEIN']).groupby('PROTEIN'):
         
-        # Sort the data for better readability
+        # Write to the final mutations report
         if 'SAMPLE_ID' in protein_df.columns and 'POSITION' in protein_df.columns:
             protein_df = protein_df.sort_values(by=['SAMPLE_ID', 'POSITION'])
             
-        protein_df.to_excel(writer, sheet_name=str(protein), index=False)
-# Additionally, create a separate Excel file for relevant mutations
-# Open an ExcelWriter object to handle creating multiple sheets properly
-with pd.ExcelWriter("relevant_mutations.xlsx") as writer:
-    
-    for protein in unique_proteins:
-        # Read the specific sheet into a DataFrame directly
-        df = pd.read_excel("final_mutations_report.xlsx", sheet_name=str(protein))
+        protein_df.to_excel(writer_all, sheet_name=str(protein), index=False)
         
-        # Calculate unique samples correctly from the isolated Series
-        n = len(df['SAMPLE_ID'].dropna().unique())
+        # Filter and write to the relevant mutations report, nunique() returns the number of unique sample IDs
+        threshold = protein_df['SAMPLE_ID'].nunique() * 0.1
         
-        # If a certain position has mutations in more than 10% of the samples, consider it relevant
-        threshold = n * 0.1
-        relevant_mutations = df['POSITION'].value_counts()[df['POSITION'].value_counts() > threshold].index.tolist()
-        relevant_df = df[df['POSITION'].isin(relevant_mutations)]
+        counts = protein_df['POSITION'].value_counts()
+        relevant_positions = counts[counts > threshold].index
+        # A mutation is considered relevant if it occurs in more than 10% of the samples for that protein, or if it is marked as a marker mutation
+        relevants = protein_df['POSITION'].isin(relevant_positions) | (protein_df['MARKER'] == True)
+        combined_df = protein_df[relevants]
         
-        # Also include all MARKERS=TRUE in the relevant mutations file
-        markers_df = df[df['MARKER'] == True]
-        
-        # Combine both dataframes and drop duplicates to prevent overlapping rows
-        combined_df = pd.concat([relevant_df, markers_df]).drop_duplicates()
-        
-        # Write the combined data to its specific sheet if it is not empty
         if not combined_df.empty:
-            combined_df.to_excel(writer, sheet_name=str(protein), index=False)
+            combined_df.to_excel(writer_rel, sheet_name=str(protein), index=False)
 """
 }
