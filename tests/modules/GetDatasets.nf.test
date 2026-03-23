@@ -17,10 +17,8 @@ nextflow_process {
             }
             process {
                 """
-                def mockCsv = file("mock_inferred_subtypes.csv")
-                mockCsv.text = 'seqName,inferred_subtype,pathotype\\n19135815,H5N1,HPAI\\n'
-                
-                input[0] = mockCsv
+                // Point directly to the new file in your tests/data folder
+                input[0] = file("${projectDir}/tests/data/inferred_subtypes.csv")
                 """
             }
         }
@@ -35,6 +33,5 @@ nextflow_process {
             assert datasetDir.exists()
             assert datasetDir.getFileName().toString() == "nextclade_H5_dataset"
         }
-
     }
 }
