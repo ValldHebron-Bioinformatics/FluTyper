@@ -70,7 +70,7 @@ jobs:
           cd nf_pipeline
           # We use the 'ci' profile defined in your config to limit resources
           nextflow run main.nf \
-            --inputFasta "tests/data/test.fasta" \
+            --inputFasta "../tests/data/test.fasta" \
             --protocol AVIAN \
             --outDir ci_output \
             -profile ci
