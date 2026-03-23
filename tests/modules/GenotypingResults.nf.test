@@ -15,7 +15,7 @@ nextflow_process {
                 def pathotype = "HPAI"
                 
                 // Point to the Nextclade CSV results
-                def csvPath = file("${projectDir}/tests/data/nextclade_results_19135815.csv")
+                def csvPath = file("${projectDir}/tests/data/19135815/nextclade_results_19135815.csv")
                 
                 // Point to the real dataset folder containing your CHANGELOG.md
                 def dsDir = file("${projectDir}/tests/data/resources/H5/nextclade_H5_dataset")
