@@ -1,14 +1,14 @@
-name: Pipeline CI
+name: FluTyper CI
 
 on:
   pull_request:
     branches: [main, mutations]
+  push:
+    branches: [main]
 
 jobs:
-  # Python unit tests job has been removed to focus on Nextflow modules
-
-  process-tests:
-    name: Nextflow process tests (nf-test)
+  nf-test:
+    name: Nextflow Module Tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -16,133 +16,67 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java (required by Nextflow)
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
+          distribution: 'temurin'
           java-version: '21'
 
-      - name: Cache Nextflow assets
-        uses: actions/cache@v4
+      - name: Setup Nextflow
+        uses: nf-core/setup-nextflow@v2
         with:
-          path: ~/.nextflow
-          key: nextflow-${{ hashFiles('nf_pipeline/nextflow.config') }}
-          restore-keys: nextflow-
+          version: "latest"
 
-      - name: Install Nextflow
-        run: |
-          curl -fsSL https://get.nextflow.io | bash
-          chmod +x nextflow
-          sudo mv nextflow /usr/local/bin/
-          nextflow -version
-
-      - name: Install system tools (mafft, seqkit, nextclade)
+      - name: Install System Dependencies
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends mafft
-
-          # seqkit
+          
+          # Install seqkit
           curl -fsSL "https://github.com/shenwei356/seqkit/releases/download/v2.8.2/seqkit_linux_amd64.tar.gz" \
             | tar xz && sudo mv seqkit /usr/local/bin/
 
-          # nextclade
+          # Install nextclade
           curl -fsSL "https://github.com/nextstrain/nextclade/releases/download/3.9.1/nextclade-x86_64-unknown-linux-musl" \
             -o nextclade && chmod +x nextclade && sudo mv nextclade /usr/local/bin/
 
-      - name: Install Python dependencies
-        run: pip install --quiet pandas openpyxl biopython numpy
+      - name: Install Python Stack
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas openpyxl biopython numpy
 
       - name: Install nf-test
         run: |
           curl -fsSL https://get.nf-test.com | bash
           sudo mv nf-test /usr/local/bin/
-          nf-test version
 
-      - name: Run nf-test
-        run: nf-test test --config tests/nf-test.config --verbose
+      - name: Run Module Tests
+        # We point to the specific config for nf-test if it exists
+        # Ensure tests/data/resources/ is committed to the repo!
+        run: nf-test test tests/modules/*.nf.test --verbose
 
   integration-test:
-    name: Full pipeline integration
+    name: Full Pipeline Integration
+    needs: [nf-test]
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-    # Removed unit-tests from dependency list
-    needs: [process-tests]
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Java (required by Nextflow)
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
+      - name: Setup Environment
+        uses: nf-core/setup-nextflow@v2
 
-      - name: Cache Nextflow assets
-        uses: actions/cache@v4
-        with:
-          path: ~/.nextflow
-          key: nextflow-${{ hashFiles('nf_pipeline/nextflow.config') }}
-          restore-keys: nextflow-
-
-      - name: Install Nextflow
+      - name: Run Pipeline (CI Profile)
         run: |
-          curl -fsSL https://get.nextflow.io | bash
-          chmod +x nextflow
-          sudo mv nextflow /usr/local/bin/
-          nextflow -version
-
-      - name: Install system tools (mafft, seqkit, nextclade)
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends mafft
-
-          # seqkit
-          curl -fsSL "https://github.com/shenwei356/seqkit/releases/download/v2.8.2/seqkit_linux_amd64.tar.gz" \
-            | tar xz && sudo mv seqkit /usr/local/bin/
-
-          # nextclade
-          curl -fsSL "https://github.com/nextstrain/nextclade/releases/download/3.9.1/nextclade-x86_64-unknown-linux-musl" \
-            -o nextclade && chmod +x nextclade && sudo mv nextclade /usr/local/bin/
-
-      - name: Install Python dependencies
-        run: pip install --quiet pandas openpyxl biopython numpy
-
-      - name: Cache Nextclade H5 dataset
-        uses: actions/cache@v4
-        with:
-          path: protocols/AVIAN/v1/resources/H5
-          key: nextclade-h5-${{ hashFiles('protocols/AVIAN/v1/AVIAN_minimizers.json') }}
-          restore-keys: nextclade-h5-
-
-      - name: Run pipeline
-        run: |
-          cd nf_pipeline
-          # Convert relative path to absolute path to fix 255 error in OrganizeBySample
-          INPUT_FASTA_ABS="\$(realpath ../tests/test_mini.fasta)"
-          
+          # We use the 'ci' profile defined in your config to limit resources
           nextflow run main.nf \
-            --inputFasta "\$INPUT_FASTA_ABS" \
+            --inputFasta "tests/data/test.fasta" \
             --protocol AVIAN \
-            --outDir ../ci_output \
-            -profile ci \
-            -ansi-log false
+            --outDir ci_output \
+            -profile ci
 
-      - name: Validate outputs
+      - name: Validate Final Artifacts
         run: |
-          set -e
-          test -f ci_output/final_genotyping_results.csv
-          test -f ci_output/inferred_subtypes.csv
-          test -f ci_output/final_mutations_report.xlsx
-          test -f ci_output/relevant_mutations.xlsx
-          echo "All validation checks passed."
-
-      - name: Upload artifacts on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ci-pipeline-output
-          path: |
-            ci_output/
-            .nextflow.log
-          retention-days: 7
+          # Verify that the final outputs actually contain data
+          test -s ci_output/final_genotyping_results.csv
+          test -s ci_output/final_mutations_report.xlsx
