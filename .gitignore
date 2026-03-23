@@ -1,6 +1,9 @@
 __pycache__/
+.pytest_cache/
 .nextflow.log*
 .nextflow
+.nf-test.log*
+.nf-test/
 work
 docs/ 
 .venv/

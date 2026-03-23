@@ -1,0 +1,168 @@
+name: Pipeline CI
+
+on:
+  pull_request:
+    branches: [main, mutations]
+
+jobs:
+  unit-tests:
+    name: Python unit tests (pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Python dependencies
+        run: pip install --quiet pandas pytest
+
+      - name: Run pytest
+        run: pytest tests/ -v
+
+  process-tests:
+    name: Nextflow process tests (nf-test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java (required by Nextflow)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Cache Nextflow assets
+        uses: actions/cache@v4
+        with:
+          path: ~/.nextflow
+          key: nextflow-${{ hashFiles('nf_pipeline/nextflow.config') }}
+          restore-keys: nextflow-
+
+      - name: Install Nextflow
+        run: |
+          curl -fsSL https://get.nextflow.io | bash
+          chmod +x nextflow
+          sudo mv nextflow /usr/local/bin/
+          nextflow -version
+
+      - name: Install system tools (mafft, seqkit, nextclade)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends mafft
+
+          # seqkit
+          curl -fsSL "https://github.com/shenwei356/seqkit/releases/download/v2.8.2/seqkit_linux_amd64.tar.gz" \
+            | tar xz && sudo mv seqkit /usr/local/bin/
+
+          # nextclade
+          curl -fsSL "https://github.com/nextstrain/nextclade/releases/download/3.9.1/nextclade-x86_64-unknown-linux-musl" \
+            -o nextclade && chmod +x nextclade && sudo mv nextclade /usr/local/bin/
+
+      - name: Install Python dependencies
+        run: pip install --quiet pandas openpyxl biopython numpy
+
+      - name: Install nf-test
+        run: |
+          curl -fsSL https://get.nf-test.com | bash
+          sudo mv nf-test /usr/local/bin/
+          nf-test version
+
+      - name: Run nf-test
+        run: nf-test test --config tests/nf-test.config --verbose
+
+  integration-test:
+    name: Full pipeline integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: [unit-tests, process-tests]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java (required by Nextflow)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Cache Nextflow assets
+        uses: actions/cache@v4
+        with:
+          path: ~/.nextflow
+          key: nextflow-${{ hashFiles('nf_pipeline/nextflow.config') }}
+          restore-keys: nextflow-
+
+      - name: Install Nextflow
+        run: |
+          curl -fsSL https://get.nextflow.io | bash
+          chmod +x nextflow
+          sudo mv nextflow /usr/local/bin/
+          nextflow -version
+
+      - name: Install system tools (mafft, seqkit, nextclade)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends mafft
+
+          # seqkit
+          curl -fsSL "https://github.com/shenwei356/seqkit/releases/download/v2.8.2/seqkit_linux_amd64.tar.gz" \
+            | tar xz && sudo mv seqkit /usr/local/bin/
+
+          # nextclade
+          curl -fsSL "https://github.com/nextstrain/nextclade/releases/download/3.9.1/nextclade-x86_64-unknown-linux-musl" \
+            -o nextclade && chmod +x nextclade && sudo mv nextclade /usr/local/bin/
+
+      - name: Install Python dependencies
+        run: pip install --quiet pandas openpyxl biopython numpy
+
+      - name: Cache Nextclade H5 dataset
+        uses: actions/cache@v4
+        with:
+          path: protocols/AVIAN/v1/resources/H5
+          key: nextclade-h5-${{ hashFiles('protocols/AVIAN/v1/AVIAN_minimizers.json') }}
+          restore-keys: nextclade-h5-
+
+      - name: Run pipeline
+        run: |
+          cd nf_pipeline
+          nextflow run main.nf \
+            --inputFasta ../tests/test_mini.fasta \
+            --protocol AVIAN \
+            --outDir ../ci_output \
+            -profile ci \
+            -ansi-log false
+
+      - name: Validate outputs
+        run: |
+          set -e
+
+          # Required output files must exist
+          test -f ci_output/final_genotyping_results.csv || { echo "MISSING: final_genotyping_results.csv"; exit 1; }
+          test -f ci_output/inferred_subtypes.csv        || { echo "MISSING: inferred_subtypes.csv"; exit 1; }
+          test -f ci_output/final_mutations_report.xlsx  || { echo "MISSING: final_mutations_report.xlsx"; exit 1; }
+          test -f ci_output/relevant_mutations.xlsx      || { echo "MISSING: relevant_mutations.xlsx"; exit 1; }
+
+          # Subtype detection: both samples must be identified as H5N1 HPAI
+          grep -q "H5N1" ci_output/inferred_subtypes.csv || { echo "FAIL: H5N1 not found in inferred_subtypes.csv"; exit 1; }
+          grep -q "HPAI" ci_output/inferred_subtypes.csv || { echo "FAIL: HPAI not found in inferred_subtypes.csv"; exit 1; }
+
+          # Genotyping results: expect H5N1(HPAI) with clade 2.3.4.4b
+          grep -q "H5N1(HPAI)"  ci_output/final_genotyping_results.csv || { echo "FAIL: H5N1(HPAI) not found in genotyping results"; exit 1; }
+          grep -q "2\.3\.4\.4b" ci_output/final_genotyping_results.csv || { echo "FAIL: clade 2.3.4.4b not found in genotyping results"; exit 1; }
+
+          echo "All validation checks passed."
+
+      - name: Upload artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-pipeline-output
+          path: |
+            ci_output/
+            .nextflow.log
+          retention-days: 7
