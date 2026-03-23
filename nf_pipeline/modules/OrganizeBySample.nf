@@ -3,7 +3,7 @@
 nextflow.enable.dsl=2
 
 process OrganizeBySample {
-    // errorStrategy 'ignore' // Ignora errors i continua
+    errorStrategy 'ignore' // Ignora errors i continua
     
     input:
     val(sample_id)

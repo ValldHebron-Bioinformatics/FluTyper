@@ -52,7 +52,6 @@ jobs:
 
       - name: Run Module Tests
         # We point to the specific config for nf-test if it exists
-        # Ensure tests/data/resources/ is committed to the repo!
         run: nf-test test tests/modules/*.nf.test --verbose
 
   integration-test:
@@ -68,6 +67,7 @@ jobs:
 
       - name: Run Pipeline (CI Profile)
         run: |
+          cd nf_pipeline
           # We use the 'ci' profile defined in your config to limit resources
           nextflow run main.nf \
             --inputFasta "tests/data/test.fasta" \
