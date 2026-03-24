@@ -33,8 +33,8 @@ workflow {
 
     // SUBTYPE DETECTION
     SubtypeInput_ch = OrganizeBySample.out.results.map { sample_id, sample_dir ->
-        def ha_fasta = file("${sample_dir}/segments/HA/${sample_id}_HA.fasta")
-        def na_fasta = file("${sample_dir}/segments/NA/${sample_id}_NA.fasta")
+        def ha_fasta = file("${sample_dir}/segments/${sample_id}_HA.fasta")
+        def na_fasta = file("${sample_dir}/segments/${sample_id}_NA.fasta")
         tuple(sample_id, ha_fasta, na_fasta)
     }
 

@@ -60,7 +60,7 @@ process GetCDS {
             ref_tag = "${h_tag}" if "${h_tag}" in PATHO_SUBTYPES else "H5"
             ref_patho = "${pathotype}" if "${h_tag}" in PATHO_SUBTYPES else "HPAI"
 
-        seg_fasta = f"${sample_dir}/segments/{seg}/${sample_id}_{seg}.fasta"
+        seg_fasta = f"${sample_dir}/segments/${sample_id}_{seg}.fasta"
         
         if not (os.path.isfile(seg_fasta) and os.path.getsize(seg_fasta) > 0):
             with open(log_file, 'a') as f:
