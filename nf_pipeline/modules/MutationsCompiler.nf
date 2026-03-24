@@ -22,7 +22,7 @@ if not dataframes:
     print("ERROR: No CSV files found to compile.")
     sys.exit(1)
 
-# Concatenate all dataframes into one master dataframe ignoring the index
+# Concatenate all dataframes into one master dataframe
 master_df = pd.concat(dataframes, ignore_index=True)
 
 if 'PROTEIN' not in master_df.columns:
@@ -33,7 +33,11 @@ if 'PROTEIN' not in master_df.columns:
 with pd.ExcelWriter("final_mutations_report.xlsx", engine='openpyxl') as writer_all, \\
      pd.ExcelWriter("relevant_mutations.xlsx", engine='openpyxl') as writer_rel:
     
-    # Group the dataframe by the 'PROTEIN' column, automatically dropping NA proteins
+    # Group the dataframe by the 'PROTEIN' column
+    # When you call .groupby('PROTEIN'), you aren't just looking at a list,
+    # but rather you are creating a DataFrameGroupBy object. 
+    # This object acts like a dictionary where the "keys" are the protein names and the "values" 
+    # are the actual rows of data belonging to those names.
     for protein, protein_df in master_df.dropna(subset=['PROTEIN']).groupby('PROTEIN'):
         
         # Write to the final mutations report
@@ -43,7 +47,7 @@ with pd.ExcelWriter("final_mutations_report.xlsx", engine='openpyxl') as writer_
         protein_df.to_excel(writer_all, sheet_name=str(protein), index=False)
         
         # Filter and write to the relevant mutations report, nunique() returns the number of unique sample IDs
-        threshold = protein_df['SAMPLE_ID'].nunique() * 0.1
+        threshold = protein_df['SAMPLE_ID'].nunique() * 0.1 # 10% of the samples have the mutations, subject to change ASK ALEJANDRA
         
         counts = protein_df['POSITION'].value_counts()
         relevant_positions = counts[counts > threshold].index

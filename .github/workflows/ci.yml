@@ -7,6 +7,7 @@ on:
     branches: [main]
 
 jobs:
+  # Job 1: Unit Testing for individual modules
   nf-test:
     name: Nextflow Module Tests
     runs-on: ubuntu-latest
@@ -27,33 +28,38 @@ jobs:
         with:
           version: "latest"
 
+      - name: Cache Python Packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
       - name: Install System Dependencies
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends mafft
           
-          # Install seqkit
-          curl -fsSL "https://github.com/shenwei356/seqkit/releases/download/v2.8.2/seqkit_linux_amd64.tar.gz" \
-            | tar xz && sudo mv seqkit /usr/local/bin/
+          # Unified tool installation
+          curl -fsSL "https://github.com/shenwei356/seqkit/releases/download/v2.8.2/seqkit_linux_amd64.tar.gz" | tar xz
+          sudo mv seqkit /usr/local/bin/
 
-          # Install nextclade
-          curl -fsSL "https://github.com/nextstrain/nextclade/releases/download/3.9.1/nextclade-x86_64-unknown-linux-musl" \
-            -o nextclade && chmod +x nextclade && sudo mv nextclade /usr/local/bin/
+          curl -fsSL "https://github.com/nextstrain/nextclade/releases/download/3.9.1/nextclade-x86_64-unknown-linux-musl" -o nextclade
+          chmod +x nextclade && sudo mv nextclade /usr/local/bin/
 
-      - name: Install Python Stack
-        run: |
-          python -m pip install --upgrade pip
+          python3 -m pip install --upgrade pip
           pip install pandas openpyxl biopython numpy
 
-      - name: Install nf-test
-        run: |
-          curl -fsSL https://get.nf-test.com | bash
-          sudo mv nf-test /usr/local/bin/
+      - name: Setup nf-test
+        uses: nf-core/setup-nf-test@v1
+        with:
+          install-pdiff: true
 
       - name: Run Module Tests
-        # We point to the specific config for nf-test if it exists
         run: nf-test test tests/modules/*.nf.test --verbose
 
+  # Job 2: Full pipeline testing (only runs if unit tests pass)
   integration-test:
     name: Full Pipeline Integration
     needs: [nf-test]
@@ -62,24 +68,34 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Environment
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Setup Nextflow
         uses: nf-core/setup-nextflow@v2
+        with:
+          version: "latest"
 
       - name: Install System Tools & Dependencies
         run: |
           sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends mafft
-          wget https://github.com/shenwei356/seqkit/releases/download/v2.8.2/seqkit_linux_amd64.tar.gz
-          tar -xvf seqkit_linux_amd64.tar.gz
-          sudo find . -name "seqkit" -type f -exec mv {} /usr/local/bin/ \;
-          sudo chmod +x /usr/local/bin/seqkit
+          
+          curl -fsSL "https://github.com/shenwei356/seqkit/releases/download/v2.8.2/seqkit_linux_amd64.tar.gz" | tar xz
+          sudo mv seqkit /usr/local/bin/
+          
           curl -fsSL "https://github.com/nextstrain/nextclade/releases/download/3.9.1/nextclade-x86_64-unknown-linux-musl" -o nextclade
           chmod +x nextclade && sudo mv nextclade /usr/local/bin/
-          python -m pip install pandas openpyxl biopython numpy
+          
+          python3 -m pip install --upgrade pip
+          pip install pandas openpyxl biopython numpy
 
-      - name: Install nf-test
-        run: |
-          curl -fsSL https://get.nf-test.com | bash
-          sudo mv nf-test /usr/local/bin/
+      - name: Setup nf-test
+        uses: nf-core/setup-nf-test@v1
+        with:
+          install-pdiff: true
 
       - name: Run Pipeline (nf-test)
         run: nf-test test tests/main.nf.test --verbose

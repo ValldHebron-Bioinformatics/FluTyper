@@ -69,24 +69,24 @@ process MutationsFinder {
         echo "SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,REFERENCE_AA,QUERY_AA,MARKER,ORIGIN,EFFECT,REFERENCE" > "\$output_csv"
         
         if [[ "\$prot_name" == "HA-SP" && -f "\$FINAL_MARKERS" ]]; then
-            ref_file="\$FINAL_MARKERS"
+            markers_file="\$FINAL_MARKERS"
         else
-            ref_file="\$MARKERS_DIR/\${prot_name}.csv"
+            markers_file="\$MARKERS_DIR/\${prot_name}.csv"
         fi
         
-        # FIND MUTATIONS
+        # FIND MUTATIONS, I think python would be more efficient for this ASK ALEJANDRA
         pos=1
         while read -r ref_aa query_aa; do
             if [[ -n "\$ref_aa" && -n "\$query_aa" && "\$ref_aa" != "\$query_aa" ]]; then
                 marker_found=false
-                if [[ -f "\$ref_file" ]]; then
+                if [[ -f "\$markers_file" ]]; then
                     while IFS=, read -r m_pos m_aa m_origin m_effect m_ref; do
                         if [[ "\$m_pos" == "\$pos" && "\$m_aa" == "\$query_aa" ]]; then
                             echo "${sample_id},\${subtype_val},\${prot_name},\${ref_pattern},\${pos},\${ref_aa},\${query_aa},TRUE,\${m_origin},\${m_effect},\${m_ref}" >> "\$output_csv"
                             marker_found=true
-                            break # Avoid unnecessary iterations once a marker is found for this position
+                            break # Avoid iterations once a marker is found for this position
                         fi
-                    done < <(tail -n +2 "\$ref_file" | tr -d '\r') # Skip header and sanitize line endings
+                    done < <(tail -n +2 "\$markers_file" | tr -d '\r') # Skip header and sanitize line endings
                 fi
                 
                 if [[ "\$marker_found" == "false" ]]; then
@@ -97,7 +97,7 @@ process MutationsFinder {
         done < <(paste <(echo "\$ref_seq" | fold -w1) <(echo "\$query_seq" | fold -w1)) 
         
         # CHECK NON-MUTATION MARKERS
-        if [[ -f "\$ref_file" ]]; then
+        if [[ -f "\$markers_file" ]]; then
             while IFS=, read -r m_pos m_aa m_origin m_effect m_ref; do
                 if [[ "\$m_pos" =~ ^[0-9]+\$ ]]; then
                     q_aa="\${query_seq:m_pos-1:1}"
@@ -107,7 +107,7 @@ process MutationsFinder {
                         echo "${sample_id},\${subtype_val},\${prot_name},\${ref_pattern},\$m_pos,\$r_aa,\$q_aa,TRUE,\$m_origin,\$m_effect,\$m_ref" >> "\$output_csv"
                     fi
                 fi
-            done < <(tail -n +2 "\$ref_file" | tr -d '\\r')
+            done < <(tail -n +2 "\$markers_file" | tr -d '\\r')
         fi
         # CONVERT HA TO H5 NUMBERING
         if [[ "\$prot_name" == HA* && "\${target_H}" != "H5" ]]; then            
