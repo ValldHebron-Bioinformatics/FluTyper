@@ -23,20 +23,21 @@ nextflow_process {
         then {
             assert process.success
             
-            // 1. Check that results are emitted
-            assert process.out.results != null
-            assert process.out.results.size() > 0
+            def outputFiles = [process.out.results[0][1]].flatten()
             
-            // 2. Validate the protein files
-            def proteinFiles = process.out.results[0][1]
-            assert proteinFiles.size() > 0
+            def targetFilePath = outputFiles.find { it.toString().endsWith("19135815_HA-SP_PROT.fasta") }
+            assert targetFilePath != null : "The expected file 19135815_HA-SP_PROT.fasta was not generated"
             
-            // Check the first file in the list using standard String methods
-            def firstFile = proteinFiles[0].toString()
-            assert firstFile.endsWith("_PROT.fasta")
+            def targetFile = path(targetFilePath)
+            assert targetFile.exists()
             
-            // Optional: confirm the file physically exists in the work directory
-            assert path(firstFile).exists()
+            assert targetFile.getParent().getFileName().toString() == "proteins" : "The file was not placed in a folder explicitly named 'proteins'"
+            
+            def lines = targetFile.readLines()
+            def sequenceLine = lines.find { !it.startsWith(">") }
+            
+            assert sequenceLine != null : "No protein sequence data found below the FASTA header"
+            assert sequenceLine.toUpperCase().startsWith("DQICIGYHANN") : "Biological accuracy failure: Sequence does not start with 'DQICIGYHANN'"
         }
     }
 }

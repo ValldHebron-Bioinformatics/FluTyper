@@ -11,12 +11,10 @@ nextflow_process {
                 protocol = "AVIAN"
                 protocols = [
                     AVIAN: [
-                        // Points to the folder containing AA_Sites.csv and the MARKERS directory
                         resources : "${projectDir}/protocols/AVIAN/v1"
                     ]
                 ]
                 programs = [
-                    // Ensure this path is correct if your script calls this python tool
                     MutationsDictionary : "${projectDir}/bin/MutationsDictionary.py"
                 ]
             }
@@ -27,7 +25,6 @@ nextflow_process {
                 def nTag = "N1"
                 def pathotype = "HPAI"
                 
-                // Get the list of protein FASTA files generated in the previous step
                 def protDir = file("${projectDir}/tests/data/19135815/proteins")
                 def protFiles = protDir.listFiles().findAll { it.name.endsWith(".fasta") }
 
@@ -39,18 +36,13 @@ nextflow_process {
         then {
             assert process.success
             
-            // Validate the master mutation CSV exists
-            assert process.out.results != null
             def masterCsv = path(process.out.results[0][2])
             assert masterCsv.exists()
 
-            // Verify the content
             def csvText = masterCsv.text
-            assert csvText.contains("19135815")
-            assert csvText.contains("H5N1(HPAI)")
             
-            // Check if it successfully identified at least the header or a mutation
-            assert csvText.contains("SAMPLE_ID,SUBTYPE,PROTEIN")
+            assert csvText.contains("SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,REFERENCE_AA,QUERY_AA,MARKER,ORIGIN,EFFECT,REFERENCE")
+            assert csvText.contains("19135815,H5N1(HPAI),HA1-SP,H5(HPAI),104,M,L,FALSE")
         }
     }
 }
