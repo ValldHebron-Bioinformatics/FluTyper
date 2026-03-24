@@ -7,14 +7,14 @@ nextflow_process {
     test("Should successfully extract and trim CDS from sample") {
 
         when {
-                params {
-                    protocol = "AVIAN"
-                    protocols = [
-                        AVIAN: [
-                            resources : "${projectDir}/protocols/AVIAN/v1"
-                        ]
+            params {
+                protocol = "AVIAN"
+                protocols = [
+                    AVIAN: [
+                        resources : "${projectDir}/protocols/AVIAN/v1"
                     ]
-                }
+                ]
+            }
             process {
                 """
                 def hTag = "H5"
@@ -32,22 +32,23 @@ nextflow_process {
         }
 
         then {
-            // If the output is missing, we need to know why
-            if (!process.success || process.out.results.size() == 0) {
-                // We look for the log inside the process work directory
-                def errorLog = path("${process.path}/CDSerrors.log")
-                if (errorLog.exists()) {
-                    println "--- INTERNAL PYTHON LOG ---"
-                    println errorLog.text
-                } else {
-                    println "--- NO LOG CREATED ---"
-                    // List files to see what Nextflow actually staged
-                    process.path.eachFile { println it }
-                }
-            }
-
             assert process.success
             assert process.out.results.size() > 0
+            
+            def outputFiles = [process.out.results[0][1]].flatten()
+            def targetFilePath = outputFiles.find { it.toString().endsWith("19135815_HA-SP_CDS.fasta") }
+            assert targetFilePath != null : "The expected file 19135815_HA-SP_CDS.fasta was not generated"
+            
+            def targetFile = path(targetFilePath)
+            
+            // Use Java NIO methods to correctly extract the parent folder name
+            assert targetFile.getParent().getFileName().toString() == "CDS" : "The file was not placed in a folder explicitly named 'CDS'"
+            
+            def lines = targetFile.readLines()
+            def sequenceLine = lines.find { !it.startsWith(">") }
+            
+            assert sequenceLine != null : "No sequence data found below the FASTA header"
+            assert sequenceLine.toLowerCase().startsWith("gatcagattt") : "Biological accuracy failure: Sequence does not start with 'gatcagattt'"
         }
     }
 }

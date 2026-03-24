@@ -17,7 +17,7 @@ nextflow_process {
                 // Point to the Nextclade CSV results
                 def csvPath = file("${projectDir}/tests/data/19135815/nextclade_results_19135815.csv")
                 
-                // Point to the real dataset folder containing your CHANGELOG.md
+                // Point to the real dataset folder containing CHANGELOG.md
                 def dsDir = file("${projectDir}/tests/data/resources/H5/nextclade_H5_dataset")
 
                 input[0] = [ sampleId, hTag, nTag, pathotype, csvPath ]
