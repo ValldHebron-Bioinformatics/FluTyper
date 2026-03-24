@@ -5,6 +5,7 @@ nextflow.enable.dsl = 2
 include { OrganizeBySample    } from './modules/OrganizeBySample'
 include { SubtypeDetection    } from './modules/SubtypeDetection'
 include { GetDatasets         } from './modules/GetDatasets'
+include { FluMutDB            } from './modules/FluMutDB'
 include { GenotypingNextclade } from './modules/GenotypingNextclade'
 include { GenotypingResults   } from './modules/GenotypingResults'
 include { GetCDS              } from './modules/GetCDS'
@@ -48,10 +49,11 @@ workflow {
             seed: 'seqName,inferred_subtype,pathotype\n' // Add header to the merged CSV
         )
 
-    // DATASET PREPARATION
+    // DATASET PREPARATION AND DATABASE DOWNLOAD
     // GetDatasets depends on the merged list to know which H-types to download, 
     // this way it is only run once and not per sample
     GetDatasets(SubtypeMerged_ch)
+    FluMutDB(SubtypeMerged_ch) 
   
     // GENOTYPING ANALYSIS (NEXTCLADE)
     // Parse subtyping results immediately for use in downstream filtering
@@ -150,6 +152,7 @@ workflow {
     folder = OrganizeBySample.out.results
     subtype = SubtypeMerged_ch
     datasets = GetDatasets.out
+    database = FluMutDB.out
     results = GenotypingFinal_ch
     CDS = GetCDS.out.results
     prot = TranslateToProtein.out.results
@@ -162,6 +165,10 @@ workflow {
 output {
     datasets {
         path { "${projectDir}/../protocols/${params.protocol}/v1/resources" }
+        mode "copy"
+    }
+    database {
+        path { "${projectDir}/../protocols/${params.protocol}/v1" }
         mode "copy"
     }
     folder {
