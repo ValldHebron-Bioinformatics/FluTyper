@@ -1,4 +1,3 @@
-
 # FluTyper 🧬🐔🐷
 [![nf-test](https://img.shields.io/badge/tested_with-nf--test-337ab7.svg)](https://code.askimed.com/nf-test)
 
@@ -8,16 +7,15 @@ FluTyper is a modular, reproducible Nextflow pipeline for genotyping zoonotic in
 
 ## ✨ Features
 
-- Automated organization of input samples and extraction of individual segments
-- Subtype detection (H/N typing and pathotype inference) from sequence data
-- Reference dataset selection and download based on detected subtypes
-- Genotyping using Nextclade with per-sample and merged reports
-- Extraction of coding sequences (CDS) and translation to protein sequences
-- Mutation detection and annotation (optional, configurable)
-- Comprehensive error reporting and logging
-- Outputs designed for genomic surveillance, research, and downstream analysis
-- Support for both avian and swine influenza viruses (SWINE protocol in development)
-- Modular, reproducible workflow built with Nextflow DSL2
+- Automated organization of input samples and extraction of individual segments.
+- Subtype detection (H/N typing and pathotype inference) from sequence data.
+- Reference dataset selection and download based on detected subtypes.
+- Genotyping using Nextclade with per-sample and merged reports.
+- Extraction of coding sequences (CDS) and translation to protein sequences.
+- Mutation detection and annotation (optional, configurable).
+- Comprehensive error reporting and logging.
+- Support for both avian and swine influenza viruses (SWINE protocol in development).
+- Modular, reproducible workflow built with Nextflow DSL2.
 
 ---
 
@@ -32,83 +30,95 @@ cd FluTyper
 
 ## 🏃 Usage
 
-**Input requirements:**  
-MultiFASTA headers must use either an underscore (_) or a pipe (|) as a separator.
+### Input Requirements
+MultiFASTA headers must use either an underscore (`_`) or a pipe (`|`) as a separator.
 
-Header Format:
+**Header Format:**
 - `{SequenceID}_{Protein}_{OptionalInformation}`
 - `{SequenceID}|{Protein}|{OptionalInformation}`
 
-Examples:
+**Examples:**
 - Underscore: `>Sample01_HA_2024_Spain`
 - Pipe: `>Sample01|NA|Hebei_SJ27`
 
-**Run the pipeline:**
+### Execution
+Run the pipeline with the following command:
 ```bash
-nextflow run nf_pipeline/main.nf --inputFasta <your_fasta_file> --protocol AVIAN --outDir <output_folder>
+nextflow run nf_pipeline/main.nf \
+  --inputFasta <input.fasta> \
+  --protocol <AVIAN|SWINE> \
+  --outDir <output_directory>
 ```
 - Default input: `docs/fastas/prova.fasta`
-- Default protocol: `AVIAN`
-- Output: `prova/1/`
+- Default protocol: `AVIAN` (SWINE is under development)
+
+### Testing
+The project uses `nf-test` for verification.
+- **All tests:** `nf-test test tests/main.nf.test`
+- **Module tests:** `nf-test test tests/modules/*.nf.test`
+- **Individual module test:** `nf-test test tests/modules/<module_name>.nf.test`
+
+### 🛠️ Continuous Integration
+FluTyper uses GitHub Actions for automated testing and quality assurance:
+- **Unit Testing:** Individual Nextflow modules are tested using `nf-test` on every pull request and push to the main branches.
+- **Integration Testing:** The complete pipeline is verified against test datasets to ensure end-to-end functionality.
 
 ---
 
 ## 🔄 Pipeline Overview
 
+The workflow consists of several key stages:
+
 1. **OrganizeBySample**  
 	Organizes input sequences by sample, extracts segments, and creates per-sample directories.
-
 2. **SubtypeDetection**  
-	Combines HA and NA segments, runs Nextclade minimizer-based subtyping, and infers H/N subtypes and pathotype (H5/H7/H9).
-
+	Uses Nextclade minimizer-based subtyping to infer H/N subtypes and pathotypes (H5/H7/H9).
 3. **GetDatasets**  
-	Determines which reference datasets to use based on detected subtypes.
-
+	Determines and downloads the appropriate reference datasets based on detected subtypes.
 4. **GenotypingNextclade**  
-	Runs Nextclade genotyping for each sample using the appropriate dataset.
-
+	Runs Nextclade genotyping for each sample using the selected datasets.
 5. **GenotypingResults**  
-	Merges genotyping results, extracts clade, QC status, and dataset version, and prepares a final CSV report.
-
-6. **GetCDS**  
-	Extracts coding sequences (CDS) for each segment using reference alignments.
-
-7. **TranslateToProtein**  
-	Translates CDS FASTA files to protein sequences.
-
-8. **MutationsFinder**  
+	Merges genotyping results into a summary report (clade, QC, dataset version).
+6. **GetCDS & TranslateToProtein**  
+	Extracts coding sequences (CDS) using reference alignments and translates them to proteins.
+7. **MutationsFinder**  
 	Compares sample proteins to references, annotates mutations, and checks for known markers.
-
-9. **MutationsCompiler**  
-	Compiles all mutation CSVs into a single Excel report with one sheet per protein.
-
-10. **CompileErrors**  
-	 Aggregates and formats error logs for each sample.
+8. **MutationsCompiler**  
+	Compiles all mutation data into a single Excel report with one sheet per protein.
+9. **CompileErrors**  
+	 Aggregates and formats error logs for each sample into a final report.
 
 ---
 
 ## 📂 Output
 
-- `final_genotyping_results.csv`: Summary of genotyping and QC for all samples
-- `final_mutations_report.xlsx`: All detected mutations, one sheet per protein
-- `samples/<sample_id>/`: Per-sample folders with all intermediate and final files
-- `pipeline_errors.log`: Aggregated error log for the run
+- `final_genotyping_results.csv`: Summary of genotyping and QC for all samples.
+- `final_mutations_report.xlsx`: All detected mutations, organized by protein.
+- `samples/<sample_id>/`: Per-sample folders with intermediate and final sequence files.
+- `pipeline_errors.log`: Aggregated error log for the entire run.
 
 ---
 
 ## ⚙️ Configuration
 
 - Edit `nf_pipeline/nextflow.config` to customize protocols, reference paths, and default parameters.
-- Only the AVIAN protocol is currently supported; SWINE is under development.
+- Protocol-specific resources are managed in the `protocols/` directory.
+
+---
+
+### Continuous Integration (CI)
+The project uses GitHub Actions (`.github/workflows/ci.yml`) to automate:
+- **Module Unit Tests:** Using `nf-test` for individual modules.
+- **Full Pipeline Integration Tests:** End-to-end validation of the workflow.
+CI runs on `ubuntu-latest` and handles the installation of all necessary bioinformatics tools (Nextclade, seqkit, MAFFT) and Python dependencies.
 
 ---
 
 ## 🧩 Dependencies
 
 - [Nextflow](https://www.nextflow.io/)
-- [seqkit](https://bioinf.shenwei.me/seqkit/)
 - [Nextclade](https://clades.nextstrain.org/)
+- [seqkit](https://bioinf.shenwei.me/seqkit/)
 - [MAFFT](https://mafft.cbrc.jp/alignment/software/)
 - [Python 3](https://www.python.org/) (with [pandas](https://pandas.pydata.org/docs/index.html), [biopython](https://biopython.org/wiki/Documentation) [openpyxl](https://openpyxl.readthedocs.io/en/stable/))
-
----
+- [nf-test](https://www.nf-test.com/)
