@@ -1,10 +1,8 @@
 name: FluTyper CI
 
 on:
-  pull_request:
-    branches: [main, mutations]
-  push:
-    branches: [main]
+  [pull_request, release]
+  
 
 jobs:
   # Job 1: Unit Testing for individual modules
