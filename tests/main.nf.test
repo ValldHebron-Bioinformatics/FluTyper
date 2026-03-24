@@ -1,0 +1,48 @@
+nextflow_pipeline {
+
+    name "Test Workflow main.nf"
+    script "nf_pipeline/main.nf"
+
+    test("Should generate expected output files with content") {
+
+        when {
+            params {
+                protocol = "AVIAN"
+                protocols = [
+                        AVIAN: [
+                            resources : "${projectDir}/protocols/AVIAN/v1"
+                        ]
+                    ]
+                inputFasta = "${projectDir}/tests/data/test.fasta" 
+                outDir = "tests/results"
+            }
+        }
+
+        then {
+            // It is still highly recommended to keep the success check 
+            // to ensure the pipeline didn't silently fail before outputting files
+            assert workflow.success
+
+            // Define the base output directory path
+            def outputDir = path("$baseDir/tests/results")
+
+            // Assert final_mutations_report.xlsx exists and is not empty
+            assert outputDir.resolve("final_mutations_report.xlsx").exists()
+            assert outputDir.resolve("final_mutations_report.xlsx").size() > 0
+
+            // Assert inferred_subtypes.csv exists and is not empty
+            assert outputDir.resolve("inferred_subtypes.csv").exists()
+            assert outputDir.resolve("inferred_subtypes.csv").size() > 0
+
+            // Assert relevant_mutations.xlsx exists and is not empty
+            assert outputDir.resolve("relevant_mutations.xlsx").exists()
+            assert outputDir.resolve("relevant_mutations.xlsx").size() > 0
+
+            // Assert pipeline_errors.log exists and is not empty
+            assert outputDir.resolve("pipeline_errors.log").exists()
+            assert outputDir.resolve("pipeline_errors.log").size() > 0
+        }
+
+    }
+
+}

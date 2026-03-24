@@ -76,13 +76,10 @@ jobs:
           chmod +x nextclade && sudo mv nextclade /usr/local/bin/
           python -m pip install pandas openpyxl biopython numpy
 
-      - name: Run Pipeline (CI Profile)
+      - name: Install nf-test
         run: |
-          INPUT_FASTA_ABS=$(realpath tests/data/test.fasta)
-          cd nf_pipeline
-          
-          nextflow run main.nf \
-            --inputFasta "$INPUT_FASTA_ABS" \
-            --protocol AVIAN \
-            --outDir ../ci_output \
-            -profile ci
+          curl -fsSL https://get.nf-test.com | bash
+          sudo mv nf-test /usr/local/bin/
+
+      - name: Run Pipeline (nf-test)
+        run: nf-test test tests/main.nf.test --verbose
