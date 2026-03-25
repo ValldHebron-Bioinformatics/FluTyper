@@ -24,7 +24,7 @@ process GetCDS {
     log_file = "CDSerrors.log"
 
     prot_dict = {
-        "HA":  ["HA-SP", "HA1-SP", "HA2"], "NA":  ["NA"], "PB2": ["PB2"],
+        "HA":  ["HA", "HA1", "HA2"], "NA":  ["NA"], "PB2": ["PB2"],
         "PB1": ["PB1", "PB1-F2"], "PA":  ["PA", "PA-X"], "NP":  ["NP"],
         "MP":  ["M1", "M2"], "NS":  ["NS1", "NS2"]
     }
