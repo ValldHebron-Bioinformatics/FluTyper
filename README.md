@@ -48,9 +48,34 @@ nextflow run nf_pipeline/main.nf \
   --inputFasta <input.fasta> \
   --protocol <AVIAN|SWINE> \
   --outDir <output_directory>
+	[--extraMarkers <folder_with_marker_csvs>]
 ```
 - Default input: `docs/fastas/prova.fasta`
 - Default protocol: `AVIAN` (SWINE is under development)
+
+#### Extra Markers
+
+
+You can provide additional mutation marker files using the `--extraMarkers` flag. This flag should point to a folder containing one or more CSV files, each named `{prot}.csv` (where `{prot}` is the protein name, e.g., `HA.csv`).
+
+**Valid protein names:**
+```list
+HA1 HA2 NA NP M1 M2 NS1 NS2 PA PB1 PB2
+```
+Use these names for your CSV files (e.g., `HA1.csv`, `NA.csv`).
+
+**CSV format:**
+
+- The file must have exactly four columns, with headers:
+	- `POSITION`, `AA`, `EFFECT`, `REFERENCE`
+- Example:
+	```csv
+	POSITION,AA,EFFECT,REFERENCE
+	155,K,Antigenic,Reference1
+	190,E,Resistance,Reference2
+	```
+
+Each CSV file should correspond to a specific protein and follow this format for the pipeline to recognize and use the extra markers.
 
 ### Testing
 The project uses `nf-test` for verification.
