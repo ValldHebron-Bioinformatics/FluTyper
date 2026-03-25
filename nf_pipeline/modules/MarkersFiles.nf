@@ -18,13 +18,13 @@ db_connection = sqlite3.connect('flumut_db.sqlite')
 
 mutations_query = '''
 SELECT 
-    m.protein_name, # Retrieve the protein name for grouping
-    m.name AS mutation_name, # Grabs the mutation name (e.g., "M1:N30D") 
-    me.effect_name AS EFFECT, # Pulls the effect description from the markers_effects table
-    me.paper_id AS REFERENCE # Pulls the reference paper ID for the mutation effect
-FROM mutations m # Set the mutations table as the primary source of mutation data
-JOIN markers_mutations mm ON m.name = mm.mutation_name # Join to link mutations to their associated markers
-JOIN markers_effects me ON mm.marker_id = me.marker_id # Join to get the effect details for each mutation
+    m.protein_name, -- Retrieve the protein name for grouping
+    m.name AS mutation_name, -- Grabs the mutation name (e.g., "M1:N30D") 
+    me.effect_name AS EFFECT, -- Pulls the effect description from the markers_effects table
+    me.paper_id AS REFERENCE -- Pulls the reference paper ID for the mutation effect
+FROM mutations m -- Set the mutations table as the primary source of mutation data
+JOIN markers_mutations mm ON m.name = mm.mutation_name -- Join to link mutations to their associated markers
+JOIN markers_effects me ON mm.marker_id = me.marker_id -- Join to get the effect details for each mutation
 '''
 mutations_dataframe = pd.read_sql_query(mutations_query, db_connection)
 db_connection.close()
