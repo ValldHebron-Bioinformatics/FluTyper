@@ -73,8 +73,10 @@ The workflow consists of several key stages:
 	Organizes input sequences by sample, extracts segments, and creates per-sample directories.
 2. **SubtypeDetection**  
 	Uses Nextclade minimizer-based subtyping to infer H/N subtypes and pathotypes (H5/H7/H9).
-3. **GetDatasets**  
-	Determines and downloads the appropriate reference datasets based on detected subtypes.
+3.  **Database & Dataset Management:**
+    - **FluMutDB:** Automatically fetches or updates the latest `flumut_db.sqlite` from the [izsvenezie-virology/FluMutDB](https://github.com/izsvenezie-virology/FluMutDB) repository.
+    - **MarkersFiles:** Queries the SQLite database to generate protein-specific marker CSVs for mutation annotation.
+    - **GetDatasets:** Downloads/selects Nextclade reference datasets based on detected subtypes.
 4. **GenotypingNextclade**  
 	Runs Nextclade genotyping for each sample using the selected datasets.
 5. **GenotypingResults**  
@@ -120,5 +122,5 @@ CI runs on `ubuntu-latest` and handles the installation of all necessary bioinfo
 - [Nextclade](https://clades.nextstrain.org/)
 - [seqkit](https://bioinf.shenwei.me/seqkit/)
 - [MAFFT](https://mafft.cbrc.jp/alignment/software/)
-- [Python 3](https://www.python.org/) (with [pandas](https://pandas.pydata.org/docs/index.html), [biopython](https://biopython.org/wiki/Documentation) [openpyxl](https://openpyxl.readthedocs.io/en/stable/))
+- [Python 3](https://www.python.org/) (with [pandas](https://pandas.pydata.org/docs/index.html), [biopython](https://biopython.org/wiki/Documentation), [openpyxl](https://openpyxl.readthedocs.io/en/stable/), [sqlite3](https://docs.python.org/3/library/sqlite3.html))
 - [nf-test](https://www.nf-test.com/)
