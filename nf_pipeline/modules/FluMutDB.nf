@@ -6,8 +6,8 @@ process FluMutDB {
     path(inferred_subtypes)
 
     output:
-    path "flumut_db.sqlite"
-
+    path "flumut_db.sqlite", emit: results
+   
     script:
     """
     public_repo="izsvenezie-virology/FluMutDB"
