@@ -1,0 +1,42 @@
+nextflow_process {
+
+    name "Test Process MarkersFiles"
+    script "nf_pipeline/modules/MarkersFiles.nf"
+    process "MarkersFiles"
+
+    test("Should run without failures") {
+
+        when {
+            params {
+                protocol = "AVIAN"
+                protocols = [
+                    AVIAN: [
+                        resources: "${projectDir}/protocols/AVIAN/v1"
+                    ]
+                ]
+            }
+            process {
+                """
+                input = [ file("${params.protocols[params.protocol].resources}/flumut_db.sqlite") ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            // Use flatten() to turn the [[file1, file2]] structure into [file1, file2]
+            def allFiles = process.out.results.flatten()
+            
+            // Search for the specific file in the flattened list
+            def ha1File = allFiles.find { it.toString().contains("HA1_markers.csv") }
+            
+            // Enhanced assertion message to help debug if the file is missing in the future
+            assert ha1File != null : "HA1_markers.csv not found. Generated files: ${allFiles.collect { it.name }}"
+
+            // Now that ha1File is a single Path object, path().text will work correctly
+            assert path(ha1File).text.contains("Increased virus binding to α2-6")
+        }
+
+    }
+}

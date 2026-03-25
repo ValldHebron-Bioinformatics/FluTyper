@@ -6,7 +6,7 @@ process MarkersFiles {
     path 'flumut_db.sqlite'
 
     output:
-    path "*_markers.csv"
+    path "*_markers.csv", emit: results
 
     script:
     """#!/usr/bin/env python3
