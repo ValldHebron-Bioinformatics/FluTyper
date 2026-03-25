@@ -29,14 +29,14 @@ nextflow_process {
 
             assert sample_id == "19135815"
             assert out_dir.resolve("19135815.fasta").exists()
-            assert out_dir.resolve("segments/HA/19135815_HA.fasta").exists()
-            assert out_dir.resolve("segments/NA/19135815_NA.fasta").exists()
-            assert out_dir.resolve("segments/PB2/19135815_PB2.fasta").exists()
-            assert out_dir.resolve("segments/MP/19135815_MP.fasta").exists()
-            assert out_dir.resolve("segments/NP/19135815_NP.fasta").exists()
-            assert out_dir.resolve("segments/PA/19135815_PA.fasta").exists()
-            assert out_dir.resolve("segments/PB1/19135815_PB1.fasta").exists()
-            assert out_dir.resolve("segments/NS/19135815_NS.fasta").exists()
+            assert out_dir.resolve("segments/19135815_HA.fasta").exists()
+            assert out_dir.resolve("segments/19135815_NA.fasta").exists()
+            assert out_dir.resolve("segments/19135815_PB2.fasta").exists()
+            assert out_dir.resolve("segments/19135815_MP.fasta").exists()
+            assert out_dir.resolve("segments/19135815_NP.fasta").exists()
+            assert out_dir.resolve("segments/19135815_PA.fasta").exists()
+            assert out_dir.resolve("segments/19135815_PB1.fasta").exists()
+            assert out_dir.resolve("segments/19135815_NS.fasta").exists()
         }
     }
 }

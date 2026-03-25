@@ -5,6 +5,8 @@ nextflow.enable.dsl = 2
 include { OrganizeBySample    } from './modules/OrganizeBySample'
 include { SubtypeDetection    } from './modules/SubtypeDetection'
 include { GetDatasets         } from './modules/GetDatasets'
+include { FluMutDB            } from './modules/FluMutDB'
+include { MarkersFiles        } from './modules/MarkersFiles'
 include { GenotypingNextclade } from './modules/GenotypingNextclade'
 include { GenotypingResults   } from './modules/GenotypingResults'
 include { GetCDS              } from './modules/GetCDS'
@@ -33,8 +35,8 @@ workflow {
 
     // SUBTYPE DETECTION
     SubtypeInput_ch = OrganizeBySample.out.results.map { sample_id, sample_dir ->
-        def ha_fasta = file("${sample_dir}/segments/HA/${sample_id}_HA.fasta")
-        def na_fasta = file("${sample_dir}/segments/NA/${sample_id}_NA.fasta")
+        def ha_fasta = file("${sample_dir}/segments/${sample_id}_HA.fasta")
+        def na_fasta = file("${sample_dir}/segments/${sample_id}_NA.fasta")
         tuple(sample_id, ha_fasta, na_fasta)
     }
 
@@ -48,10 +50,13 @@ workflow {
             seed: 'seqName,inferred_subtype,pathotype\n' // Add header to the merged CSV
         )
 
-    // DATASET PREPARATION
+    // DATASET PREPARATION AND DATABASE DOWNLOAD
     // GetDatasets depends on the merged list to know which H-types to download, 
     // this way it is only run once and not per sample
     GetDatasets(SubtypeMerged_ch)
+    FluMutDB(SubtypeMerged_ch)
+    // Generate marker files from the database for later use in mutation effect annotation
+    MarkersFiles(FluMutDB.out) 
   
     // GENOTYPING ANALYSIS (NEXTCLADE)
     // Parse subtyping results immediately for use in downstream filtering
@@ -150,6 +155,8 @@ workflow {
     folder = OrganizeBySample.out.results
     subtype = SubtypeMerged_ch
     datasets = GetDatasets.out
+    database = FluMutDB.out
+    markerfiles = MarkersFiles.out
     results = GenotypingFinal_ch
     CDS = GetCDS.out.results
     prot = TranslateToProtein.out.results
@@ -162,6 +169,14 @@ workflow {
 output {
     datasets {
         path { "${projectDir}/../protocols/${params.protocol}/v1/resources" }
+        mode "copy"
+    }
+    database {
+        path { "${projectDir}/../protocols/${params.protocol}/v1" }
+        mode "copy"
+    }
+    markerfiles {
+        path { "${projectDir}/../protocols/${params.protocol}/v1/markers" }
         mode "copy"
     }
     folder {

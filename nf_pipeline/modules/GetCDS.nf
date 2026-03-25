@@ -26,7 +26,7 @@ process GetCDS {
     prot_dict = {
         "HA":  ["HA-SP", "HA1-SP", "HA2"], "NA":  ["NA"], "PB2": ["PB2"],
         "PB1": ["PB1", "PB1-F2"], "PA":  ["PA", "PA-X"], "NP":  ["NP"],
-        "MP":  ["M1", "M2"], "NS":  ["NS1", "NEP"]
+        "MP":  ["M1", "M2"], "NS":  ["NS1", "NS2"]
     }
 
     def TrimCDS(ref_seq, aligned_seq, gap_threshold):
@@ -60,7 +60,7 @@ process GetCDS {
             ref_tag = "${h_tag}" if "${h_tag}" in PATHO_SUBTYPES else "H5"
             ref_patho = "${pathotype}" if "${h_tag}" in PATHO_SUBTYPES else "HPAI"
 
-        seg_fasta = f"${sample_dir}/segments/{seg}/${sample_id}_{seg}.fasta"
+        seg_fasta = f"${sample_dir}/segments/${sample_id}_{seg}.fasta"
         
         if not (os.path.isfile(seg_fasta) and os.path.getsize(seg_fasta) > 0):
             with open(log_file, 'a') as f:

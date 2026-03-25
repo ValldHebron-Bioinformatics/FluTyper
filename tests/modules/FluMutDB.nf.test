@@ -1,0 +1,93 @@
+nextflow_process {
+
+    name "Test Process FluMutDB"
+    script "nf_pipeline/modules/FluMutDB.nf"
+    process "FluMutDB"
+
+    test("Should successfully fetch, compile, and verify the SQLite database") {
+
+        when {
+            params {
+                protocol = "AVIAN"
+                protocols = [
+                    AVIAN: [
+                        resources: "${projectDir}/protocols/AVIAN/v1"
+                    ]
+                ]
+            }
+            process {
+                """
+                input = [ file("tests/data/19135815/inferred_subtypes.csv") ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            // Resolve to an absolute path so external .execute() calls can find the file
+            def dbFile = path(process.out.results[0]).toAbsolutePath()
+            assert dbFile.exists()
+
+            // Verification of mutation count in the database to ensure it was populated correctly
+            def mutationsCmd = ["python3", "-c",
+                "import sqlite3; conn=sqlite3.connect('${dbFile}'); cur=conn.cursor(); cur.execute('SELECT count(*) FROM mutations'); print(cur.fetchone()[0])"
+            ]
+            def mutationsCount = mutationsCmd.execute().text.trim()
+            assert mutationsCount != "" : "mutationsCount is empty! Check if the database was created and populated correctly."
+            assert mutationsCount.toInteger() > 0 : "The mutations table is empty!"
+
+            // Verification of schema (Critical Columns)
+            def schemaCmd = ["python3", "-c",
+                "import sqlite3; conn=sqlite3.connect('${dbFile}'); cur=conn.cursor(); cur.execute('PRAGMA table_info(mutations)'); print([row[1] for row in cur.fetchall()])"
+            ]
+            def schemaCheck = schemaCmd.execute().text.trim()
+            assert schemaCheck.contains("protein_name")
+            assert schemaCheck.contains("name")
+
+            // Verification of version
+            def versionCmd = ["python3", "-c",
+                "import sqlite3; conn=sqlite3.connect('${dbFile}'); cur=conn.cursor(); cur.execute('SELECT major, minor FROM db_version'); row=cur.fetchone(); print(str(row[0]) + '.' + str(row[1]))"
+            ]
+            def versionCheck = versionCmd.execute().text.trim()
+            assert versionCheck.matches("\\d+\\.\\d+")
+        }
+    }
+
+    test("Should handle initial setup when local resources are missing") {
+
+        when {
+            params {
+                protocol = "AVIAN"
+                protocols = [
+                    AVIAN: [
+                        resources: "${workDir}/empty_resources"
+                    ]
+                ]
+            }
+            process {
+                """
+                input = [ file("tests/data/19135815/inferred_subtypes.csv") ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            // Verification of the output log
+            assert process.stdout.any { it.contains("No version detected") }
+
+            // Resolve to an absolute path so external .execute() calls can find the file
+            def dbFile = path(process.out.results[0]).toAbsolutePath()
+            assert dbFile.exists()
+
+            def mutationsCmd = ["python3", "-c",
+                "import sqlite3; conn=sqlite3.connect('${dbFile}'); cur=conn.cursor(); cur.execute('SELECT count(*) FROM mutations'); print(cur.fetchone()[0])"
+            ]
+            def mutationsCount = mutationsCmd.execute().text.trim()
+            assert mutationsCount != "" : "mutationsCount is empty! Check if the database was created and populated correctly."
+            assert mutationsCount.toInteger() > 0 : "The mutations table is empty!"
+        }
+    }
+}

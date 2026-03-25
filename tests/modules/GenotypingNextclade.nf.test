@@ -18,7 +18,7 @@ nextflow_process {
             process {
                 """
                 def sampleId = "19135815"
-                def haFasta = file("${projectDir}/tests/data/19135815/segments/HA/19135815_HA.fasta")
+                def haFasta = file("${projectDir}/tests/data/19135815/segments/19135815_HA.fasta")
                 
                 // The script appends '/H5/nextclade_H5_dataset' to this path
                 def baseDatasetDir = file("${projectDir}/tests/data/resources/H5/nextclade_H5_dataset")
