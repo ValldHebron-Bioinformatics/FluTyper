@@ -6,6 +6,7 @@ include { OrganizeBySample    } from './modules/OrganizeBySample'
 include { SubtypeDetection    } from './modules/SubtypeDetection'
 include { GetDatasets         } from './modules/GetDatasets'
 include { FluMutDB            } from './modules/FluMutDB'
+include { MarkersFiles        } from './modules/MarkersFiles'
 include { GenotypingNextclade } from './modules/GenotypingNextclade'
 include { GenotypingResults   } from './modules/GenotypingResults'
 include { GetCDS              } from './modules/GetCDS'
@@ -53,7 +54,9 @@ workflow {
     // GetDatasets depends on the merged list to know which H-types to download, 
     // this way it is only run once and not per sample
     GetDatasets(SubtypeMerged_ch)
-    FluMutDB(SubtypeMerged_ch) 
+    FluMutDB(SubtypeMerged_ch)
+    // Generate marker files from the database for later use in mutation effect annotation
+    MarkersFiles(FluMutDB.out) 
   
     // GENOTYPING ANALYSIS (NEXTCLADE)
     // Parse subtyping results immediately for use in downstream filtering
@@ -153,6 +156,7 @@ workflow {
     subtype = SubtypeMerged_ch
     datasets = GetDatasets.out
     database = FluMutDB.out
+    markerfiles = MarkersFiles.out
     results = GenotypingFinal_ch
     CDS = GetCDS.out.results
     prot = TranslateToProtein.out.results
@@ -169,6 +173,10 @@ output {
     }
     database {
         path { "${projectDir}/../protocols/${params.protocol}/v1" }
+        mode "copy"
+    }
+    markerfiles {
+        path { "${projectDir}/../protocols/${params.protocol}/v1/markers" }
         mode "copy"
     }
     folder {

@@ -1,7 +1,3 @@
-#!/usr/bin/env nextflow
-nextflow.enable.dsl=2
-
-
 process FluMutDB {
     errorStrategy 'ignore'
     debug true
@@ -10,7 +6,7 @@ process FluMutDB {
     path(inferred_subtypes)
 
     output:
-    path "flumut_db.sql"
+    path "flumut_db.sqlite"
 
     script:
     """
@@ -39,5 +35,8 @@ process FluMutDB {
     else
         echo "Local database is up to date (v\${cur_clean})."
     fi
+
+    python3 -c "import sqlite3; conn = sqlite3.connect('flumut_db.sqlite'); conn.executescript(open('flumut_db.sql').read()); conn.close()"
+    rm flumut_db.sql
     """
 }
