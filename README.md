@@ -56,26 +56,24 @@ nextflow run nf_pipeline/main.nf \
 #### Extra Markers
 
 
-You can provide additional mutation marker files using the `--extraMarkers` flag. This flag should point to a folder containing one or more CSV files, each named `{prot}.csv` (where `{prot}` is the protein name, e.g., `HA.csv`).
-
-**Valid protein names:**
-```list
-HA1 HA2 NA NP M1 M2 NS1 NS2 PA PB1 PB2
-```
-Use these names for your CSV files (e.g., `HA1.csv`, `NA.csv`).
+You can provide additional mutation marker data using the `--extraMarkers` flag. This flag should point to a single CSV file containing all extra markers.
 
 **CSV format:**
 
-- The file must have exactly four columns, with headers:
-	- `POSITION`, `AA`, `EFFECT`, `REFERENCE`
+- The file must have exactly five columns, with headers:
+	- `POSITION`, `AA`, `PROTEIN`, `EFFECT`, `REFERENCE`
 - Example:
 	```csv
-	POSITION,AA,EFFECT,REFERENCE
-	155,K,Antigenic,Reference1
-	190,E,Resistance,Reference2
+	POSITION,AA,PROTEIN,EFFECT,REFERENCE
+	155,K,HA1,Antigenic,Reference1
+	24,R,M1,CANCER,PMID: 12345678
+	190,E,NA,Resistance,Reference2
 	```
 
-Each CSV file should correspond to a specific protein and follow this format for the pipeline to recognize and use the extra markers.
+**Valid protein names:**
+HA1, HA2, NA, NP, M1, M2, NS1, NS2, PA, PB1, PB2
+
+Each row should specify the protein in the `PROTEIN` column. The pipeline will automatically detect and use all valid markers from this file.
 
 ### Testing
 The project uses `nf-test` for verification.

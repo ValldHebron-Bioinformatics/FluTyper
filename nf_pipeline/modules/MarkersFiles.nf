@@ -9,7 +9,7 @@ process MarkersFiles {
 
     script:
     // Resolve the absolute path outside the script block for reliability
-    def extra_path_abs = params.extraMarkers ? file(params.extraMarkers).toAbsolutePath().toString() : ""
+    def extra_markers_abs = params.extraMarkers ? file(params.extraMarkers).toAbsolutePath().toString() : ""
 
     """#!/usr/bin/env python3
 import sqlite3
@@ -25,9 +25,9 @@ SELECT
     m.name AS mutation_name, -- Grabs the mutation name (e.g., "M1:N30D") 
     me.effect_name AS EFFECT, -- Pulls the effect description from the markers_effects table
     me.paper_id AS REFERENCE -- Pulls the reference paper ID for the mutation effect
-FROM mutations m -- Set the mutations table as the primary source of mutation data
-JOIN markers_mutations mm ON m.name = mm.mutation_name -- Join to link mutations to their associated markers
-JOIN markers_effects me ON mm.marker_id = me.marker_id -- Join to get the effect details for each mutation
+FROM mutations m
+JOIN markers_mutations mm ON m.name = mm.mutation_name
+JOIN markers_effects me ON mm.marker_id = me.marker_id
 '''
 mutations_dataframe = pd.read_sql_query(mutations_query, db_connection)
 db_connection.close()
@@ -38,20 +38,21 @@ mutations_dataframe = mutations_dataframe.dropna(subset=['POSITION', 'AA'])
 
 # Extra Markers Integration
 target_prots = ["HA1", "HA2", "M1", "M2", "NA", "NP", "NS-1", "NS-2", "PA", "PB1", "PB1-F2", "PB2"]
-extra_path = "${extra_path_abs}"
+extra_file_path = "${extra_markers_abs}"
 
-if extra_path and os.path.isdir(extra_path):
-    extra_frames = []
-    for prot in target_prots:
-        csv_file = os.path.join(extra_path, f"{prot}.csv")
-        if os.path.isfile(csv_file):
-            temp_df = pd.read_csv(csv_file)
-            temp_df.columns = [c.upper() for c in temp_df.columns]
-            temp_df['protein_name'] = prot
-            extra_frames.append(temp_df)
+# Check if the path points to a file
+if extra_file_path and os.path.isfile(extra_file_path):
+    extra_df = pd.read_csv(extra_file_path)
     
-    if extra_frames:
-        mutations_dataframe = pd.concat([mutations_dataframe] + extra_frames, ignore_index=True)
+    # Standardize column names to uppercase
+    extra_df.columns = [c.upper() for c in extra_df.columns]
+    
+    # Align the PROTEIN column name with the database query output
+    if 'PROTEIN' in extra_df.columns:
+        extra_df = extra_df.rename(columns={'PROTEIN': 'protein_name'})
+        
+    # Combine the extra markers with the database mutations
+    mutations_dataframe = pd.concat([mutations_dataframe, extra_df], ignore_index=True)
 
 # Final cleanup: ensure POSITION is numeric, deduplicate, and sort
 mutations_dataframe['POSITION'] = pd.to_numeric(mutations_dataframe['POSITION'], errors='coerce')
