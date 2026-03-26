@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 import argparse
+import os
 import pandas as pd
 
-# These are the exact column names expected in the master dictionary file
 SUBTYPE_COLUMNS = {
     "H3": "reference_site(H3_numbering)",
     "H1": "reference_H1_site(H1_numbering)",
@@ -12,44 +12,35 @@ SUBTYPE_COLUMNS = {
 }
 
 def main():
-    # Set up the instructions for anyone running the script from the command line
-    parser = argparse.ArgumentParser(description="Translate HA marker positions and save them to a new CSV.")
-    parser.add_argument("--subtype", required=True, choices=SUBTYPE_COLUMNS.keys(), help="The target subtype you want to translate to.")
-    parser.add_argument("--input", required=True, help="Your input CSV file containing a 'POSITION' column.")
-    parser.add_argument("--dictionary", required=True, help="The master CSV file that maps all the subtypes together.")
-    parser.add_argument("--base", default="H5", choices=SUBTYPE_COLUMNS.keys(), help="The starting subtype of your markers (defaults to H5).")
-    parser.add_argument("--output", default="EDITED_MARKERS.csv", help="What to name the final saved file.")
-    
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--subtype", required=True)
+    parser.add_argument("--input", required=True)
+    parser.add_argument("--dictionary", required=True)
+    parser.add_argument("--base", default="H5")
+    parser.add_argument("--output", required=True)
     args = parser.parse_args()
 
-    # Find the exact column names for the starting and target subtypes
-    starting_column = SUBTYPE_COLUMNS[args.base]
-    target_column = SUBTYPE_COLUMNS[args.subtype]
+    # Determine protein context from filename if column is missing
+    filename = os.path.basename(args.input).upper()
+    file_prot = "HA2" if filename.startswith("HA2") else "HA1"
 
-    # Load the master dictionary, ignoring any rows that are missing the required numbers
-    master_dictionary = pd.read_csv(args.dictionary, dtype=str) # dtype=str ensures we read everything as text, so no NaNs from empty cells
-    valid_rows = master_dictionary.dropna(subset=[starting_column, target_column])
+    # Load dictionary and create the lookup map
+    master_dict = pd.read_csv(args.dictionary, dtype=str)
+    start_col = SUBTYPE_COLUMNS.get(args.base)
+    target_col = SUBTYPE_COLUMNS.get(args.subtype)
+    
+    master_dict['region'] = master_dict['region'].fillna("HA1").str.strip().str.upper()
+    lookup = master_dict.set_index(['region', start_col])[target_col].to_dict()
 
-    # Create a dictionary for the translation lookup
-    translation_lookup = {}
-    for index, row in valid_rows.iterrows():
-        start_position = row[starting_column].strip()
-        target_position = row[target_column].strip()
-        translation_lookup[start_position] = target_position
-
-    # Load the user's marker data
-    input_data = pd.read_csv(args.input, dtype=str)
-
-    # Define a quick helper function to translate a single position
-    def translate_position(current_position):
-        clean_position = current_position.strip()
-        return translation_lookup.get(clean_position, "-")
-
-    # Apply the translation to the entire POSITION column
-    input_data['POSITION'] = input_data['POSITION'].apply(translate_position)
-
-    # Save the newly translated data
-    input_data.to_csv(args.output, index=False)
+    # Load input and preserve original data
+    df = pd.read_csv(args.input, dtype=str)
+    prots = df['PROTEIN'].str.strip().str.upper() if 'PROTEIN' in df.columns else [file_prot] * len(df)
+    
+    # Create the new column while keeping the original POSITION
+    new_col_name = f"POSITION_{args.subtype}"
+    df[new_col_name] = [lookup.get((p, pos), "-") for p, pos in zip(prots, df['POSITION'])]
+    
+    df.to_csv(args.output, index=False)
 
 if __name__ == "__main__":
     main()

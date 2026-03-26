@@ -36,8 +36,8 @@ nextflow_process {
             assert process.out.results.size() > 0
             
             def outputFiles = [process.out.results[0][1]].flatten()
-            def targetFilePath = outputFiles.find { it.toString().endsWith("19135815_HA-SP_CDS.fasta") }
-            assert targetFilePath != null : "The expected file 19135815_HA-SP_CDS.fasta was not generated"
+            def targetFilePath = outputFiles.find { it.toString().endsWith("19135815_HA_CDS.fasta") }
+            assert targetFilePath != null : "The expected file 19135815_HA_CDS.fasta was not generated"
             
             def targetFile = path(targetFilePath)
             

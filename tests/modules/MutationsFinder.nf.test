@@ -42,7 +42,7 @@ nextflow_process {
             def csvText = masterCsv.text
             
             assert csvText.contains("SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,REFERENCE_AA,QUERY_AA,MARKER,ORIGIN,EFFECT,REFERENCE")
-            assert csvText.contains("19135815,H5N1(HPAI),HA1-SP,H5(HPAI),104,M,L,FALSE")
+            assert csvText.contains('19135815,H5N1,HA1,H5,107,R,R,TRUE,,Increased virulence in chickens,"Suttie A. et al., 2019"')
         }
     }
 }
