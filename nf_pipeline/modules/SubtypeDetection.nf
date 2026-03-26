@@ -1,5 +1,4 @@
 #!/usr/bin/env nextflow
-
 nextflow.enable.dsl=2
 
 process SubtypeDetection {
@@ -15,34 +14,34 @@ process SubtypeDetection {
     script:
     """
     input_fasta="${sample_id}_HA_NA.fasta"
-    cat ${ha_fasta} ${na_fasta} > "\${input_fasta}" # Combine HA and NA fastas for subtyping
+    
+    # Combine existing files and ignore missing ones
+    cat ${ha_fasta} ${na_fasta} 2>/dev/null > "\${input_fasta}" || true
 
+    if [[ ! -s "\${input_fasta}" ]]; then
+        echo "${sample_id},Missing," > inferred_subtypes_${sample_id}.csv
+        echo "Missing sequences for ${sample_id}" > SDerrors.log
+        exit 0
+    fi
          
     minimizer_index="${params.protocols[params.protocol].resources}/${params.protocol}_minimizers.json"
+    nextclade sort -m "\${minimizer_index}" -r min.tsv "\${input_fasta}"
 
-    nextclade sort -m "\${minimizer_index}" -r minimizers_results.tsv "\${input_fasta}"
-
-    # Extract H and N tags from minimizer results, determine pathotype for H5/H7/H9
-    h_tag=\$(grep -E '^[0-9]\t${sample_id}[_|]HA' minimizers_results.tsv | head -n 1 | cut -f3 | grep -oE 'H[0-9]+' | head -n 1 || true)
-    n_tag=\$(grep -E '^[0-9]\t${sample_id}[_|]NA' minimizers_results.tsv | head -n 1 | cut -f3 | grep -oE 'N[0-9]+' | head -n 1 || true)
-    pathotype="" # Default pathotype for non-H5/H7, will be updated later if needed
-    if [[ "\$h_tag" == "H5" || "\$h_tag" == "H7" ]]; then
-        pathotype=\$(grep -E '^0\t' minimizers_results.tsv | head -n 1 | cut -f3 |grep -oE "HPAI|LPAI" | head -n 1 || true)
-    fi
-    if [[ "\$h_tag" == "H9" ]]; then
+    h_tag=\$(grep '[_|]HA' min.tsv | grep -oE 'H[0-9]+' | head -n 1 || true)
+    n_tag=\$(grep '[_|]NA' min.tsv | grep -oE 'N[0-9]+' | head -n 1 || true)
+    
+    pathotype=""
+    if [[ "\$h_tag" =~ ^(H5|H7)\$ ]]; then
+        pathotype=\$(grep '^0\t' min.tsv | grep -oE "HPAI|LPAI" | head -n 1 || true)
+    elif [[ "\$h_tag" == "H9" ]]; then
         pathotype="LPAI"
     fi
-    if [[ -n "\${h_tag}" && -n "\${n_tag}" ]]; then
-        subtype="\${h_tag}\${n_tag}"
-    elif [[ -n "\${h_tag}" && -z "\${n_tag}" ]]; then # If only H is detected, assign N as "Nx" to indicate unknown N subtype
-        echo "SubtypeDetection: N subtype not detected for sample ${sample_id}, assigning as Nx." > "SDerrors.log"
-        subtype="\${h_tag}Nx"
-    elif [[ -n "\${n_tag}" && -z "\${h_tag}" ]]; then # Same for H if only N is detected
-        echo "SubtypeDetection: H subtype not detected for sample ${sample_id}, assigning as Hx. Cannot proceed with clade inference." >> "SDerrors.log"
-        subtype="Hx\${n_tag}"
-    else
-        subtype="Incomplete"
-    fi
-    printf '%s,%s,%s\n' "${sample_id}" "\${subtype}" "\${pathotype}" > inferred_subtypes_${sample_id}.csv
+
+    if [[ -n "\$h_tag" && -n "\$n_tag" ]]; then subtype="\$h_tag\$n_tag"
+    elif [[ -n "\$h_tag" ]]; then subtype="\${h_tag}Nx"; echo "Missing N for ${sample_id}" > SDerrors.log
+    elif [[ -n "\$n_tag" ]]; then subtype="Hx\${n_tag}"; echo "Missing H for ${sample_id}" > SDerrors.log
+    else subtype="Incomplete"; fi
+
+    echo "${sample_id},\${subtype},\${pathotype}" > inferred_subtypes_${sample_id}.csv
     """
 }
