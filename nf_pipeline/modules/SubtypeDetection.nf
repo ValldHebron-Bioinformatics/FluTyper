@@ -27,12 +27,12 @@ process SubtypeDetection {
     minimizer_index="${params.protocols[params.protocol].resources}/${params.protocol}_minimizers.json"
     nextclade sort -m "\${minimizer_index}" -r min.tsv "\${input_fasta}"
 
-    h_tag=\$(grep '[_|]HA' min.tsv | grep -oE 'H[0-9]+' | head -n 1 || true)
-    n_tag=\$(grep '[_|]NA' min.tsv | grep -oE 'N[0-9]+' | head -n 1 || true)
+    h_tag=\$(grep '[_|]HA' min.tsv | cut -f3 | grep -oE 'H[0-9]+' | head -n 1 || true)
+    n_tag=\$(grep '[_|]NA' min.tsv | cut -f3 | grep -oE 'N[0-9]+' | head -n 1 || true)
     
     pathotype=""
     if [[ "\$h_tag" =~ ^(H5|H7)\$ ]]; then
-        pathotype=\$(grep '^0\t' min.tsv | grep -oE "HPAI|LPAI" | head -n 1 || true)
+        pathotype=\$(grep '^0\t' min.tsv | cut -f3 | grep -oE "HPAI|LPAI" | head -n 1 || true)
     elif [[ "\$h_tag" == "H9" ]]; then
         pathotype="LPAI"
     fi
