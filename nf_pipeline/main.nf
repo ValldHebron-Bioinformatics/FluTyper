@@ -152,17 +152,21 @@ workflow {
         )   
            
     publish:
-    folder = OrganizeBySample.out.results
+    // Strip the sample_id strings so the output block receives pure file/path objects
+    folder = OrganizeBySample.out.results.map { _id, path -> path }
     subtype = SubtypeMerged_ch
     datasets = GetDatasets.out
     database = FluMutDB.out
     markerfiles = MarkersFiles.out
     results = GenotypingFinal_ch
-    CDS = GetCDS.out.results
-    prot = TranslateToProtein.out.results
-    mut = MutationsFinder.out.results
+    CDS = GetCDS.out.results.map { _id, path -> path }
+    prot = TranslateToProtein.out.results.map { _id, path -> path }
+    
+    // Extract both file objects from the 3-item tuple and flatten them
+    mut = MutationsFinder.out.results.map { _id, mut_files, combined_csv -> [mut_files, combined_csv] }.flatten()
+    
     mutations_report = MutationsCompiler.out.results
-    errors = CompileErrors.out
+    errors = CompileErrors.out.map { _id, log -> log }
     errors_merged = ErrorsMerged_ch
 }
 // Bloc final de publicació de resultats
