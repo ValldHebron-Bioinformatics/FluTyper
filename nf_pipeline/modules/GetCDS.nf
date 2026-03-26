@@ -9,6 +9,7 @@ process GetCDS {
 
     output:
     tuple val(sample_id), path("samples/${sample_id}/CDS/*_CDS.fasta"), emit: results
+    tuple val(sample_id), path("${sample_id}_*_CDS_aligned.fasta"), emit: aligned
     tuple val(sample_id), path("CDSerrors.log"), optional: true, emit: errors
 
     script:
@@ -32,22 +33,30 @@ process GetCDS {
     def TrimCDS(ref_seq, aligned_seq, gap_threshold):
         start = len(ref_seq) - len(ref_seq.lstrip('-'))
         end   = len(ref_seq.rstrip('-'))
-        final_seq, tmp_chunk, gap_len = [], [], 0
+        
+        final_query, final_ref = [], []
+        tmp_query, tmp_ref = [], []
+        gap_len = 0
         
         for ref_ch, query_ch in zip(ref_seq[start:end], aligned_seq[start:end]):
             if ref_ch == '-':
                 gap_len += 1
-                tmp_chunk.append(query_ch)
+                tmp_query.append(query_ch)
+                tmp_ref.append(ref_ch)
             else:
                 if gap_len < gap_threshold:
-                    final_seq.extend(tmp_chunk)
-                gap_len, tmp_chunk = 0, []
-                final_seq.append(query_ch)
+                    final_query.extend(tmp_query)
+                    final_ref.extend(tmp_ref)
+                gap_len, tmp_query, tmp_ref = 0, [], []
+                
+                final_query.append(query_ch)
+                final_ref.append(ref_ch)
                 
         if gap_len < gap_threshold:
-            final_seq.extend(tmp_chunk)
+            final_query.extend(tmp_query)
+            final_ref.extend(tmp_ref)
             
-        return "".join(final_seq)
+        return "".join(final_ref), "".join(final_query)
     
     PATHO_SUBTYPES = {"H5", "H7", "H9"}
 
@@ -78,6 +87,7 @@ process GetCDS {
                     sequences = list(SeqIO.parse(io.StringIO(result.stdout), "fasta"))
                     
                     if len(sequences) >= 2:
+                        ref_header = sequences[0].id
                         ref_seq = str(sequences[0].seq)
                         aligned_header = sequences[1].id
                         aligned_seq = str(sequences[1].seq)
@@ -89,12 +99,21 @@ process GetCDS {
                         else:
                             current_threshold = float('inf')
                             
-                        clean_seq = TrimCDS(ref_seq, aligned_seq, current_threshold)
+                        clean_ref, clean_query = TrimCDS(ref_seq, aligned_seq, current_threshold)
                         
                         with open(f"{cds_dir}/${sample_id}_{prot}_CDS.fasta", 'w') as f_out:
                             f_out.write(f">{aligned_header}\\n")
-                            for i in range(0, len(clean_seq), 80):
-                                f_out.write(clean_seq[i:i+80] + '\\n')
+                            for i in range(0, len(clean_query), 80):
+                                f_out.write(clean_query[i:i+80] + '\\n')
+                                
+                        aligned_file = f"${sample_id}_{prot}_CDS_aligned.fasta"
+                        with open(aligned_file, 'w') as f_aln:
+                            f_aln.write(f">{ref_header}_trimmed\\n")
+                            for i in range(0, len(clean_ref), 80):
+                                f_aln.write(clean_ref[i:i+80] + '\\n')
+                            f_aln.write(f">{aligned_header}_trimmed\\n")
+                            for i in range(0, len(clean_query), 80):
+                                f_aln.write(clean_query[i:i+80] + '\\n')
                                 
             except subprocess.CalledProcessError as e:
                 with open(log_file, 'a') as f:
