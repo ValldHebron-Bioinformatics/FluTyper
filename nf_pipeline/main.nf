@@ -107,11 +107,14 @@ workflow {
         }
     
     GetCDS(CDSInput_ch)
-    TranslateToProtein(GetCDS.out.results)
+    TranslationInput_ch = GetCDS.out.results
+        .join(GetCDS.out.aligned)
+        .map { sample_id, cds_files, aligned_cds_files -> tuple(sample_id, cds_files, aligned_cds_files) }
+    TranslateToProtein(TranslationInput_ch) // Join with the aligned CDS files for use in translation and mutation finding
 
     // MUTATION IDENTIFICATION
     // Join translated protein files with genotyping info to prepare for mutation finding
-    Mutations_ch = TranslateToProtein.out.results
+    Mutations_ch = TranslateToProtein.out.aligned
         .join(GenotypingInfo_ch)
         .map { sample_id, prot_files, h_tag, n_tag, pathotype ->
             tuple(sample_id, prot_files, h_tag, n_tag, pathotype)

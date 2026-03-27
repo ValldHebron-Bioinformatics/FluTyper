@@ -10,34 +10,31 @@ nextflow_process {
             process {
                 """
                 def sampleId = "19135815"
-                
-                // Use .listFiles() to pass the actual files, not the folder itself
-                def cdsDir = file("${projectDir}/tests/data/19135815/CDS")
-                def cdsFiles = cdsDir.listFiles().findAll { it.name.endsWith(".fasta") }
+                def cdsFiles = file("${projectDir}/tests/data/19135815/CDS/*_CDS.fasta")
+                def alignedFiles = file("${projectDir}/tests/data/19135815/aligned_CDS/*_CDS_aligned.fasta")
 
-                input[0] = [ sampleId, cdsFiles ]
+                input[0] = [ sampleId, cdsFiles, alignedFiles ]
                 """
             }
         }
 
         then {
             assert process.success
+            assert process.out.results.size() > 0 && process.out.aligned.size() > 0
             
-            def outputFiles = [process.out.results[0][1]].flatten()
+            def targetFile = path(process.out.results.get(0)[1].flatten().find { it.toString().endsWith("19135815_HA1_PROT.fasta") })
+            def targetAlignedFile = path(process.out.aligned.get(0)[1].flatten().find { it.toString().endsWith("19135815_HA1_PROT_aligned.fasta") })
             
-            def targetFilePath = outputFiles.find { it.toString().endsWith("19135815_HA_PROT.fasta") }
-            assert targetFilePath != null : "The expected file 19135815_HA_PROT.fasta was not generated"
+            assert targetFile.exists() && targetAlignedFile.exists()
             
-            def targetFile = path(targetFilePath)
-            assert targetFile.exists()
+            def proteinSeq = targetFile.text.split('>')[1].split('\n', 2)[1].replaceAll('\n', '')
+            def refSeq = targetAlignedFile.text.split('>')[1].split('\n', 2)[1].replaceAll('\n', '')
+            def querySeq = targetAlignedFile.text.split('>')[2].split('\n', 2)[1].replaceAll('\n', '')
             
-            assert targetFile.getParent().getFileName().toString() == "proteins" : "The file was not placed in a folder explicitly named 'proteins'"
-            
-            def lines = targetFile.readLines()
-            def sequenceLine = lines.find { !it.startsWith(">") }
-            
-            assert sequenceLine != null : "No protein sequence data found below the FASTA header"
-            assert sequenceLine.toUpperCase().startsWith("DQICIGYHANN") : "Biological accuracy failure: Sequence does not start with 'DQICIGYHANN'"
+            assert proteinSeq.toUpperCase().startsWith("DQICIGYHANN") : "Translation failure"
+            assert refSeq.length() == querySeq.length() : "Alignment length mismatch"
+            assert refSeq.toUpperCase().startsWith("DQICIGYHANN") : "Ref missing start motif"
+            assert querySeq.toUpperCase().endsWith("REKRRKR") : "Query missing termination motif"
         }
     }
 }

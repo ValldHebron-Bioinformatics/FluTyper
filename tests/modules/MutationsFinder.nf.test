@@ -25,7 +25,7 @@ nextflow_process {
                 def nTag = "N1"
                 def pathotype = "HPAI"
                 
-                def protDir = file("${projectDir}/tests/data/19135815/proteins")
+                def protDir = file("${projectDir}/tests/data/19135815/aligned_PROT")
                 def protFiles = protDir.listFiles().findAll { it.name.endsWith(".fasta") }
 
                 input[0] = [ sampleId, protFiles, hTag, nTag, pathotype ]
@@ -36,13 +36,23 @@ nextflow_process {
         then {
             assert process.success
             
+            // Verify Master CSV
             def masterCsv = path(process.out.results[0][2])
             assert masterCsv.exists()
-
             def csvText = masterCsv.text
+            assert csvText.contains("SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,POSITION_SUBTYPE,REFERENCE_AA,QUERY_AA,MUTATION_TYPE,MARKER,EFFECT,REFERENCE")
+            assert csvText.contains('19135815,H5N1(HPAI),HA1,H5,107,107,R,R,None,Yes,Increased virulence in chickens,"Suttie A. et al., 2019"')
+
+            // Verify Individual HA1 CSV
+            def individualCsvs = [process.out.results[0][1]].flatten()
+            def ha1CsvFile = individualCsvs.find { it.toString().endsWith("19135815_HA1_mutations.csv") }
+            assert ha1CsvFile != null : "The expected file 19135815_HA1_mutations.csv was not generated"
             
-            assert csvText.contains("SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,REFERENCE_AA,QUERY_AA,MARKER,ORIGIN,EFFECT,REFERENCE")
-            assert csvText.contains('19135815,H5N1,HA1,H5,107,R,R,TRUE,,Increased virulence in chickens,"Suttie A. et al., 2019"')
+            def ha1CsvPath = path(ha1CsvFile)
+            assert ha1CsvPath.exists()
+            def ha1Text = ha1CsvPath.text
+            assert ha1Text.contains("SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,POSITION_SUBTYPE,REFERENCE_AA,QUERY_AA,MUTATION_TYPE,MARKER,EFFECT,REFERENCE")
+            assert ha1Text.contains('19135815,H5N1(HPAI),HA1,H5,134,134,A,A,None,Yes,Increased viral replication in mice lungs,"Zhang J. et al., 2023"')
         }
     }
 }
