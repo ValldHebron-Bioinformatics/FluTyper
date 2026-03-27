@@ -2,6 +2,7 @@
 import argparse
 import os
 import pandas as pd
+import sys
 
 SUBTYPE_COLUMNS = {
     "H3": "reference_site(H3_numbering)",
@@ -20,26 +21,32 @@ def main():
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
 
-    # Determine protein context from filename if column is missing
-    filename = os.path.basename(args.input).upper()
-    file_prot = "HA2" if filename.startswith("HA2") else "HA1"
-
-    # Load dictionary and create the lookup map
-    master_dict = pd.read_csv(args.dictionary, dtype=str)
-    start_col = SUBTYPE_COLUMNS.get(args.base)
-    target_col = SUBTYPE_COLUMNS.get(args.subtype)
-    
-    master_dict['region'] = master_dict['region'].fillna("HA1").str.strip().str.upper()
-    lookup = master_dict.set_index(['region', start_col])[target_col].to_dict()
-
-    # Load input and preserve original data
     df = pd.read_csv(args.input, dtype=str)
-    prots = df['PROTEIN'].str.strip().str.upper() if 'PROTEIN' in df.columns else [file_prot] * len(df)
     
-    # Create the new column while keeping the original POSITION
-    new_col_name = f"POSITION_{args.subtype}"
-    df[new_col_name] = [lookup.get((p, pos), "-") for p, pos in zip(prots, df['POSITION'])]
+    if df.empty:
+        df['POSITION_SUBTYPE'] = None
+        df.to_csv(args.output, index=False)
+        return
+
+    m_dict = pd.read_csv(args.dictionary, dtype=str)
+    m_dict.columns = m_dict.columns.str.strip()
+    m_dict['region'] = m_dict['region'].fillna("HA1").str.strip().str.upper()
+    # Assume any region containing "HA2" is HA2, otherwise HA1
+    m_dict['region'] = m_dict['region'].apply(lambda x: "HA2" if "HA2" in x else "HA1")
+
+    start_col = SUBTYPE_COLUMNS.get(args.base.upper(), SUBTYPE_COLUMNS["H5"])
+    target_col = SUBTYPE_COLUMNS.get(args.subtype.upper(), SUBTYPE_COLUMNS["H5"])
+    # Create a lookup dictionary for (region, start_col) -> target_col
+    lookup = m_dict.set_index(['region', start_col])[target_col].to_dict()
+
+    fname = os.path.basename(args.input).upper()
+    file_prot = "HA2" if "HA2" in fname else "HA1"
+
+    # Determine the protein for each row based on the 'PROTEIN' column
+    prots = df['PROTEIN'].str.strip().str.upper()
     
+    df['POSITION_SUBTYPE'] = [lookup.get((p, str(pos).strip()), str(pos).strip()) for p, pos in zip(prots, df['POSITION'])]
+
     df.to_csv(args.output, index=False)
 
 if __name__ == "__main__":

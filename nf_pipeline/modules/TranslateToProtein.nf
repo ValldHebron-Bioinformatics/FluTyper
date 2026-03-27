@@ -31,7 +31,7 @@ process TranslateToProtein {
     # Translate the aligned CDS files sequentially right after
     for aligned_cds in ${aligned_cds_files}; do
         if [[ -f "\${aligned_cds}" ]]; then
-            protname="\$(basename "\${aligned_cds}" .fasta)"
+            protname=\$(echo "\${aligned_cds}" | cut -d'_' -f2)
             output_name="${sample_id}_\${protname}_PROT_aligned.fasta"
             
             seqkit translate "\${aligned_cds}" > "\${output_name}"
