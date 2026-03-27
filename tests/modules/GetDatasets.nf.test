@@ -9,7 +9,6 @@ nextflow_process {
         when {
             process {
                 """
-                // Point directly to the new file in your tests/data folder
                 input[0] = file("${projectDir}/tests/data/19135815/inferred_subtypes.csv")
                 """
             }
