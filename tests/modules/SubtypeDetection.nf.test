@@ -7,14 +7,6 @@ nextflow_process {
     test("H5N1 HPAI sample is typed correctly") {
 
         when {
-            params {
-                protocol = "AVIAN"
-                protocols = [
-                    AVIAN: [
-                        resources: "${projectDir}/protocols/AVIAN/v1"
-                    ]
-                ]
-            }
             process {
                 """
                 input[0] = [

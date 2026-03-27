@@ -7,14 +7,6 @@ nextflow_process {
     test("Should successfully genotype H5N1 sample using local resources") {
 
         when {
-            params {
-                protocol = "AVIAN"
-                protocols = [
-                    AVIAN: [
-                        resources : "${projectDir}/protocols/AVIAN/v1"
-                    ]
-                ]
-            }
             process {
                 """
                 def sampleId = "19135815"
