@@ -21,9 +21,6 @@ nextflow_process {
                 def nTag = "N1"
                 def sampleId = "19135815"
                 def pathotype = "HPAI"
-                
-                // We pass the tests/data directory. 
-                // Nextflow will stage this as a folder named 'data' in the work directory.
                 def sampleDir = file("${projectDir}/tests/data/19135815")
 
                 input[0] = [ hTag, nTag, sampleId, pathotype, sampleDir ]
@@ -33,22 +30,21 @@ nextflow_process {
 
         then {
             assert process.success
-            assert process.out.results.size() > 0
+            assert process.out.results.size() > 0 && process.out.aligned.size() > 0
             
-            def outputFiles = [process.out.results[0][1]].flatten()
-            def targetFilePath = outputFiles.find { it.toString().endsWith("19135815_HA_CDS.fasta") }
-            assert targetFilePath != null : "The expected file 19135815_HA_CDS.fasta was not generated"
+            def targetFile = path(process.out.results.get(0)[1].flatten().find { it.toString().endsWith("19135815_HA1_CDS.fasta") })
+            def targetAlignedFile = path(process.out.aligned.get(0)[1].flatten().find { it.toString().endsWith("19135815_HA1_CDS_aligned.fasta") })
             
-            def targetFile = path(targetFilePath)
+            assert targetFile.exists() && targetAlignedFile.exists()
             
-            // Use Java NIO methods to correctly extract the parent folder name
-            assert targetFile.getParent().getFileName().toString() == "CDS" : "The file was not placed in a folder explicitly named 'CDS'"
+            def unalignedSeq = targetFile.text.split('>')[1].split('\n', 2)[1].replaceAll('\n', '')
+            def refSeq = targetAlignedFile.text.split('>')[1].split('\n', 2)[1].replaceAll('\n', '')
+            def querySeq = targetAlignedFile.text.split('>')[2].split('\n', 2)[1].replaceAll('\n', '')
             
-            def lines = targetFile.readLines()
-            def sequenceLine = lines.find { !it.startsWith(">") }
-            
-            assert sequenceLine != null : "No sequence data found below the FASTA header"
-            assert sequenceLine.toLowerCase().startsWith("gatcagattt") : "Biological accuracy failure: Sequence does not start with 'gatcagattt'"
+            assert unalignedSeq.toLowerCase().startsWith("gatcagattt") : "Unaligned sequence missing expected start motif"
+            assert refSeq.length() == querySeq.length() : "Alignment failure: Reference and Query lengths do not match"
+            assert refSeq.toLowerCase().startsWith("gatcagattt") : "Reference sequence missing expected start motif"
+            assert querySeq.toLowerCase().endsWith("gaaaaaga") : "Query sequence missing expected termination motif"
         }
     }
 }

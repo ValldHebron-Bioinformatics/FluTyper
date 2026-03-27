@@ -7,6 +7,9 @@ nextflow_process {
     test("Should successfully compile multiple mutation CSVs into Excel reports") {
 
         when {
+            params {
+                threshold = 0.25
+            }
             process {
                 """
                 // 1. Identify the CSV files to compile
@@ -21,19 +24,19 @@ nextflow_process {
 
         then {
             assert process.success
+            assert process.out.results.size() > 0 : "Process results channel is empty!"
             
-            // The output is a tuple of two Excel files
-            assert process.out.results != null
+            def finalReport = path(process.out.results.get(0)[0])
+            def relevantReport = path(process.out.results.get(0)[1])
             
-            def finalReport = path(process.out.results[0][0])
-            def relevantReport = path(process.out.results[0][1])
+            assert finalReport.exists() : "final_mutations_report.xlsx was not generated"
+            assert relevantReport.exists() : "relevant_mutations.xlsx was not generated"
             
-            assert finalReport.exists()
-            assert relevantReport.exists()
-            
-            // Basic check to ensure the files aren't 0 bytes
-            assert finalReport.size() > 0
             assert finalReport.getFileName().toString() == "final_mutations_report.xlsx"
+            assert relevantReport.getFileName().toString() == "relevant_mutations.xlsx"
+            
+            assert finalReport.size() > 0 : "The final report Excel file is completely empty"
+            assert relevantReport.size() > 0 : "The relevant report Excel file is completely empty"
         }
     }
 }
