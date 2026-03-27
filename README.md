@@ -47,8 +47,9 @@ Run the pipeline with the following command:
 nextflow run nf_pipeline/main.nf \
   --inputFasta <input.fasta> \
   --protocol <AVIAN|SWINE> \
-  --outDir <output_directory>
-	[--extraMarkers <folder_with_marker_csvs>]
+  --outDir <output_directory> \
+  --extraMarkers <folder_with_marker_csvs> \
+  --threshold <fraction>
 ```
 - Default input: `docs/fastas/prova.fasta`
 - Default protocol: `AVIAN` (SWINE is under development)
@@ -74,6 +75,20 @@ You can provide additional mutation marker data using the `--extraMarkers` flag.
 HA1, HA2, NA, NP, M1, M2, NS1, NS2, PA, PB1, PB2
 
 Each row should specify the protein in the `PROTEIN` column. The pipeline will automatically detect and use all valid markers from this file.
+
+### Threshold parameter for mutation relevance
+
+You can configure the threshold for reporting mutations that are frequent within the same protein using the `--threshold` parameter (default: 0.25).
+
+- This parameter determines the minimum fraction of samples in which a mutation at a given position (within the same protein) must appear to be considered relevant and included in the `relevant_mutations.xlsx` report.
+- For example, with the default value of 0.25, only mutations present in more than 25% of the samples for a given protein will be reported as relevant (unless they are known markers, which are always included).
+- You can adjust this value when running the pipeline:
+
+```bash
+nextflow run nf_pipeline/main.nf --threshold 0.5
+```
+
+This would only report mutations present in more than 50% of the samples for each protein as relevant.
 
 ### Testing
 The project uses `nf-test` for verification.
