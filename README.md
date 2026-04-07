@@ -49,7 +49,7 @@ nextflow run nf_pipeline/main.nf \
   --protocol <AVIAN|SWINE> \
   --outDir <output_directory> \
   --extraMarkers <folder_with_marker_csvs> \
-  --threshold <fraction>
+  --threshold <0-1>
 ```
 - Default input: `docs/fastas/prova.fasta`
 - Default protocol: `AVIAN` (SWINE is under development)
@@ -80,15 +80,18 @@ Each row should specify the protein in the `PROTEIN` column. The pipeline will a
 
 You can configure the threshold for reporting mutations that are frequent within the same protein using the `--threshold` parameter (default: 0.25).
 
-- This parameter determines the minimum fraction of samples in which a mutation at a given position (within the same protein) must appear to be considered relevant and included in the `relevant_mutations.xlsx` report.
-- For example, with the default value of 0.25, only mutations present in more than 25% of the samples for a given protein will be reported as relevant (unless they are known markers, which are always included).
+- This parameter determines the minimum fraction of samples containing a specific protein in which a mutation at a given position must appear to be considered relevant and included in the `relevant_mutations.xlsx` report.
+- Because the pipeline adjusts for missing data, the threshold is calculated independently for each protein based only on the number of samples where that protein was successfully identified rather than the total number of samples in the run.
+- For example, if the default value is 0.25 and a specific protein is only detected in 40 out of 100 total samples, a mutation must appear in more than 10 of those 40 samples to be reported as relevant.
 - You can adjust this value when running the pipeline:
 
 ```bash
 nextflow run nf_pipeline/main.nf --threshold 0.5
 ```
 
-This would only report mutations present in more than 50% of the samples for each protein as relevant.
+This would only report mutations present in more than 50% of all run samples as relevant.
+
+If some samples lack a given protein/segment, they are still part of the denominator in the current behavior.
 
 ### Testing
 The project uses `nf-test` for verification.
