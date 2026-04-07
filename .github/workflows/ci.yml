@@ -52,7 +52,7 @@ jobs:
           pip install pandas openpyxl biopython numpy
 
       - name: Setup nf-test
-        uses: nf-core/setup-nf-test@v1.3.6
+        uses: nf-core/setup-nf-test@v2.0.0
         with:
           install-pdiff: true
 
@@ -93,7 +93,7 @@ jobs:
           pip install pandas openpyxl biopython numpy
 
       - name: Setup nf-test
-        uses: nf-core/setup-nf-test@v1.3.6
+        uses: nf-core/setup-nf-test@v2.0.0
         with:
           install-pdiff: true
 
