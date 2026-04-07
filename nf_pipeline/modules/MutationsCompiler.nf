@@ -6,7 +6,6 @@ process MutationsCompiler {
 
     input:
     path csv_files
-    path
 
     output:
     tuple path("final_mutations_report.xlsx"), path("relevant_mutations.xlsx"), emit: results
