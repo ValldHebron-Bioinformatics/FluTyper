@@ -62,7 +62,7 @@ process GetCDS {
 
     for seg, prots in prot_dict.items():
         if seg == "NA":
-            ref_tag, ref_patho = "${n_tag}", ""
+            ref_tag, ref_patho = "${n_tag}", "${pathotype}"
         elif seg == "HA":
             ref_tag, ref_patho = "${h_tag}", "${pathotype}"
         else:
