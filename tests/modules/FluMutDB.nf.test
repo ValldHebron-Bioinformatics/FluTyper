@@ -53,7 +53,7 @@ nextflow_process {
                 protocol = "AVIAN"
                 protocols = [
                     AVIAN: [
-                        resources: "" // Intentionally empty to simulate missing local resource scenario 
+                        resources: "tests/data/nonexistent_flumut_resources" // Intentionally empty to simulate missing local resource scenario 
                     ]
                 ]
             }   
