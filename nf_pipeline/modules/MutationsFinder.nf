@@ -69,8 +69,7 @@ for aligned_prot in aligned_prots:
 
             pos_str = str(pos)
             is_marker = (pos_str, query_aa) in markers
-            is_mutation = ref_aa != query_aa
-
+            is_mutation = (ref_aa != query_aa) and (ref_aa != "X") and (query_aa != "X")
             pos_subtype = pos_str if prot_name.startswith("HA") else ""
 
             if is_marker:
