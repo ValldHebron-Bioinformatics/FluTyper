@@ -3,7 +3,7 @@ nextflow.enable.dsl=2
 
 process MutationsCompiler {
     errorStrategy 'ignore'
-    
+
     input:
     path csv_files
 
@@ -30,8 +30,6 @@ for csv_file in csv_list:
 
 # Combine all individual CSV dataframes into one master dataframe
 master_df = pd.concat(all_data, ignore_index=True)
-# Remove rows where the PROTEIN column is empty to prevent NaN calculations
-master_df = master_df.dropna(subset=['PROTEIN'])
 
 # Calculate total unique samples PER PROTEIN to establish a dynamic denominator
 samples_per_protein = master_df.groupby('PROTEIN')['SAMPLE_ID'].transform('nunique')
