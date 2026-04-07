@@ -7,9 +7,6 @@ nextflow_process {
     test("Should successfully compile multiple mutation CSVs into Excel reports") {
 
         when {
-            params {
-                threshold = 0.25
-            }
             process {
                 """
                 // 1. Identify the CSV files to compile

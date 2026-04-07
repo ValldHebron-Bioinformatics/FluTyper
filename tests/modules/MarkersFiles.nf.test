@@ -7,17 +7,9 @@ nextflow_process {
     test("Should run without failures") {
 
         when {
-            params {
-                protocol = "AVIAN"
-                protocols = [
-                    AVIAN: [
-                        resources: "${projectDir}/protocols/AVIAN/v1"
-                    ]
-                ]
-            }
             process {
                 """
-                input = [ file("${params.protocols[params.protocol].resources}/flumut_db.sqlite") ]
+                input[0] = [ file(params.protocols[params.protocol].resources + "/flumut_db.sqlite") ]
                 """
             }
         }

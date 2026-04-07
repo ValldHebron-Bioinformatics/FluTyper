@@ -7,17 +7,8 @@ nextflow_process {
     test("Should successfully retrieve datasets for H5N1") {
 
         when {
-            params {
-                protocol = "AVIAN"
-                protocols = [
-                    AVIAN: [
-                        resources : "${projectDir}/protocols/AVIAN/v1"
-                    ]
-                ]
-            }
             process {
                 """
-                // Point directly to the new file in your tests/data folder
                 input[0] = file("${projectDir}/tests/data/19135815/inferred_subtypes.csv")
                 """
             }

@@ -7,14 +7,6 @@ nextflow_process {
     test("Should successfully fetch, compile, and verify the SQLite database") {
 
         when {
-            params {
-                protocol = "AVIAN"
-                protocols = [
-                    AVIAN: [
-                        resources: "${projectDir}/protocols/AVIAN/v1"
-                    ]
-                ]
-            }
             process {
                 """
                 input = [ file("tests/data/19135815/inferred_subtypes.csv") ]
@@ -61,10 +53,10 @@ nextflow_process {
                 protocol = "AVIAN"
                 protocols = [
                     AVIAN: [
-                        resources: "${workDir}/empty_resources"
+                        resources: "" // Intentionally empty to simulate missing local resource scenario 
                     ]
                 ]
-            }
+            }   
             process {
                 """
                 input = [ file("tests/data/19135815/inferred_subtypes.csv") ]

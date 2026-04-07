@@ -7,17 +7,6 @@ nextflow_process {
     test("Should successfully identify mutations against marker database") {
 
         when {
-            params {
-                protocol = "AVIAN"
-                protocols = [
-                    AVIAN: [
-                        resources : "${projectDir}/protocols/AVIAN/v1"
-                    ]
-                ]
-                programs = [
-                    MutationsDictionary : "${projectDir}/bin/MutationsDictionary.py"
-                ]
-            }
             process {
                 """
                 def sampleId = "19135815"
