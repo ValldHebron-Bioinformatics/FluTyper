@@ -3,7 +3,7 @@ nextflow.enable.dsl=2
 
 process MutationsCompiler {
     errorStrategy 'ignore'
-    debug true
+    
     input:
     path csv_files
 
@@ -30,10 +30,12 @@ for csv_file in csv_list:
 
 # Combine all individual CSV dataframes into one master dataframe
 master_df = pd.concat(all_data, ignore_index=True)
+# Remove rows where the PROTEIN column is empty to prevent NaN calculations
+master_df = master_df.dropna(subset=['PROTEIN'])
 
-# Calculation for frequency threshold based on SAMPLE_ID
-total_samples = master_df['SAMPLE_ID'].nunique()
-threshold = total_samples * ${params.threshold}  # Using the threshold from params, default is 0.25 (25%)
+# Calculate total unique samples PER PROTEIN to establish a dynamic denominator
+samples_per_protein = master_df.groupby('PROTEIN')['SAMPLE_ID'].transform('nunique')
+threshold = samples_per_protein * ${params.threshold}  # Using the threshold from params, default is 0.25 (25%)
 
 # Calculate mutation frequency per protein and position
 sample_counts_per_pos = master_df.groupby(['PROTEIN', 'POSITION'])['SAMPLE_ID'].transform('nunique')
