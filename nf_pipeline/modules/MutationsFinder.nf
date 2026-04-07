@@ -59,7 +59,7 @@ for aligned_prot in aligned_prots:
     with open(output_csv, 'w', newline='') as f:
         writer = csv.writer(f)
         # HEADER
-        writer.writerow(["SAMPLE_ID", "SUBTYPE", "PROTEIN", "REF_SUBTYPE", "POSITION", "POSITION_SUBTYPE", "REFERENCE_AA", "QUERY_AA", "MUTATION_TYPE", "MARKER", "EFFECT", "REFERENCE"])
+        writer.writerow(["SAMPLE_ID", "SUBTYPE", "PROTEIN", "REF_SUBTYPE", "POSITION", "POSITION_SUBTYPE", "REFERENCE_AA", "QUERY_AA", "AA_MUTATION", "MUTATION_TYPE", "MARKER", "EFFECT", "REFERENCE"])
         
         pos = 0
         for ref_aa, query_aa in zip(ref_seq, query_seq):
@@ -74,6 +74,7 @@ for aligned_prot in aligned_prots:
             pos_subtype = pos_str if prot_name.startswith("HA") else ""
 
             if is_marker:
+                aa_mutation = f"{pos_str}{query_aa}"
                 m_info = markers[(pos_str, query_aa)]
                 if not is_mutation:
                     mutation_type = "None"
@@ -83,16 +84,18 @@ for aligned_prot in aligned_prots:
                     mutation_type = "Deletion"
                 else:
                     mutation_type = "Substitution"
-                writer.writerow(["${sample_id}", subtype_val, prot_name, ref_tag, pos_str, pos_subtype, ref_aa, query_aa, mutation_type, "Yes" , m_info[0], m_info[1]])
+                    
+                writer.writerow(["${sample_id}", subtype_val, prot_name, ref_tag, pos_str, pos_subtype, ref_aa, query_aa, aa_mutation, mutation_type, "Yes" , m_info[0], m_info[1]])
 
             elif is_mutation:
+                aa_mutation = f"{ref_aa}{pos_str}{query_aa}"
                 if ref_aa == "-" and query_aa != "-":
                     mutation_type = "Insertion"
                 elif ref_aa != "-" and query_aa == "-":
                     mutation_type = "Deletion"
                 else:
                     mutation_type = "Substitution"
-                writer.writerow(["${sample_id}", subtype_val, prot_name, ref_tag, pos_str, pos_subtype, ref_aa, query_aa, mutation_type, "No", "", ""])
+                writer.writerow(["${sample_id}", subtype_val, prot_name, ref_tag, pos_str, pos_subtype, ref_aa, query_aa, aa_mutation, mutation_type, "No", "", ""])
             else:
                 continue
                 
@@ -105,7 +108,7 @@ master_csv = Path(f"samples/${sample_id}/${sample_id}_mutations.csv")
 if output_files:
     with open(master_csv, 'w', newline='') as master_f:
         writer = csv.writer(master_f)
-        writer.writerow(["SAMPLE_ID", "SUBTYPE", "PROTEIN", "REF_SUBTYPE", "POSITION", "POSITION_SUBTYPE", "REFERENCE_AA", "QUERY_AA", "MUTATION_TYPE", "MARKER", "EFFECT", "REFERENCE"]) # Write header once
+        writer.writerow(["SAMPLE_ID", "SUBTYPE", "PROTEIN", "REF_SUBTYPE", "POSITION", "POSITION_SUBTYPE", "REFERENCE_AA", "QUERY_AA", "AA_MUTATION", "MUTATION_TYPE", "MARKER", "EFFECT", "REFERENCE"]) # Write header once
 
         for f_path in output_files:
             with open(f_path, 'r') as f:
