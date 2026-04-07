@@ -25,7 +25,7 @@ if not csv_list:
 all_data = []
 
 for csv_file in csv_list:
-    df = pd.read_csv(csv_file)
+    df = pd.read_csv(csv_file, keep_default_na=False)
     all_data.append(df)
 
 # Combine all individual CSV dataframes into one master dataframe
