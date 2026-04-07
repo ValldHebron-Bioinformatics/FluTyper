@@ -92,7 +92,7 @@ process GetCDS {
                         aligned_header = sequences[1].id
                         aligned_seq = str(sequences[1].seq)
                         
-                        if prot == "NEP":
+                        if prot == "NS2":
                             current_threshold = 400
                         elif prot == "M2":
                             current_threshold = 600
