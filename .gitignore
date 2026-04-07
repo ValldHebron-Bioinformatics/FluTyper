@@ -11,3 +11,5 @@ protocols/AVIAN/v1/config.yaml
 prova/
 protocols/AVIAN/v1/AA_dictionary_proposal
 protocols/AVIAN/v1/MARKERS
+analisis/
+nf_pipeline/bin/Headers.py
