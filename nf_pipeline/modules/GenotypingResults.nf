@@ -1,3 +1,6 @@
+#!/usr/bin/env nextflow
+nextflow.enable.dsl=2
+
 process GenotypingResults {
     input:
     tuple val(sample_id), val(h_tag), val(n_tag), val(pathotype), path(csv_path)
