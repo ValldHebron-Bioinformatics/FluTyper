@@ -120,6 +120,12 @@ workflow {
             tuple(sample_id, prot_files, h_tag, n_tag, pathotype)
         }
     MutationsFinder(Mutations_ch)
+    MutationMerged_ch = MutationsFinder.out.results
+        .map { _sample_id, _mut_files, combined_csv -> combined_csv }
+        .collectFile(
+            name: 'all_mutations_combined.csv',
+            keepHeader: true,
+        )
     MutationsCompiler_ch = MutationsFinder.out.results
         .map { _sample_id, _mut_files, combined_csv -> combined_csv }
         .collect()
@@ -164,6 +170,7 @@ workflow {
     results = GenotypingFinal_ch
     CDS = GetCDS.out.results.map { _id, path -> path }
     prot = TranslateToProtein.out.results.map { _id, path -> path }
+    mutations = MutationMerged_ch
     
     // Extract both file objects from the 3-item tuple and flatten them
     mut = MutationsFinder.out.results.map { _id, mut_files, combined_csv -> [mut_files, combined_csv] }.flatten()
@@ -190,7 +197,6 @@ output {
         path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
-    
     subtype {
         path { "${projectDir}/../${params.outDir}" }
         mode "copy"
@@ -220,6 +226,10 @@ output {
         mode "copy"
     }
     errors_merged {
+        path { "${projectDir}/../${params.outDir}" }
+        mode "copy"
+    }
+    mutations {
         path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
