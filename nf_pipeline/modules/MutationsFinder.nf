@@ -19,7 +19,7 @@ from pathlib import Path
 from Bio import SeqIO
 
 markers_dir = Path("${params.protocols[params.protocol].resources}/markers")
-dictionary = "${params.protocols[params.protocol].resources}/AA_DICT.csv"
+dictionary = "${params.protocols[params.protocol].resources}/HA_DICT.csv"
 mutations_prog = "${params.programs.MutationsDictionary}"
 log_file = "MFerrors.log"
 out_dir = Path("samples/${sample_id}/mutations")
@@ -44,9 +44,11 @@ for aligned_prot in aligned_prots:
     
     ref_tag = ref_header.split('_')[0]
     subtype_val = "${h_tag}${n_tag}(${pathotype})" if "${pathotype}" != "" else "${h_tag}${n_tag}"
-    target_H = "${h_tag}" if "${h_tag}" in {"H1", "H3", "H5", "H7", "H9"} else "H5"
-    markers = {}
     
+    # Now translation is activated for any HA subtype (H1-H18) thanks to the new dictionary
+    target_H = "${h_tag}" if re.match(r'^H\\d+\$', "${h_tag}") else "H5"
+    
+    markers = {}
     m_file = markers_dir / f"{prot_name}_markers.csv"
     if m_file.exists():
         with open(m_file) as f:
@@ -98,7 +100,7 @@ for aligned_prot in aligned_prots:
             else:
                 continue
                 
-    # Run external dictionary script safely via subprocess
+    # Call the new MutationsDictionary
     if prot_name.startswith("HA") and target_H != "H5":
         subprocess.run(["python3", mutations_prog, "--subtype", target_H, "--input", str(output_csv), "--dictionary", dictionary, "--output", str(output_csv)], check=True)
 
@@ -107,7 +109,7 @@ master_csv = Path(f"samples/${sample_id}/${sample_id}_mutations.csv")
 if output_files:
     with open(master_csv, 'w', newline='') as master_f:
         writer = csv.writer(master_f)
-        writer.writerow(["SAMPLE_ID", "SUBTYPE", "PROTEIN", "REF_SUBTYPE", "POSITION", "POSITION_SUBTYPE", "REFERENCE_AA", "QUERY_AA", "AA_MUTATION", "MUTATION_TYPE", "MARKER", "EFFECT", "REFERENCE"]) # Write header once
+        writer.writerow(["SAMPLE_ID", "SUBTYPE", "PROTEIN", "REF_SUBTYPE", "POSITION", "POSITION_SUBTYPE", "REFERENCE_AA", "QUERY_AA", "AA_MUTATION", "MUTATION_TYPE", "MARKER", "EFFECT", "REFERENCE"])
 
         for f_path in output_files:
             with open(f_path, 'r') as f:
