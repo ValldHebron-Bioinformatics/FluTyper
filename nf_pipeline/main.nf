@@ -170,7 +170,7 @@ workflow {
     results = GenotypingFinal_ch
     CDS = GetCDS.out.results.map { _id, path -> path }
     prot = TranslateToProtein.out.results.map { _id, path -> path }
-    mutations = MutationsMerged_ch
+    //mutations = MutationsMerged_ch
     
     // Extract both file objects from the 3-item tuple and flatten them
     mut = MutationsFinder.out.results.map { _id, mut_files, combined_csv -> [mut_files, combined_csv] }.flatten()
@@ -229,8 +229,8 @@ output {
         path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
-    mutations {
-        path { "${projectDir}/../${params.outDir}" }
-        mode "copy"
-    }
+    //mutations {
+    //    path { "${projectDir}/../${params.outDir}" }
+    //    mode "copy"
+    //}
 }
