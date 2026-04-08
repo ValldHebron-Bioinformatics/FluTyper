@@ -1,10 +1,10 @@
-SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,POSITION_SUBTYPE,REFERENCE_AA,QUERY_AA,MUTATION_TYPE,MARKER,EFFECT,REFERENCE
-19135815,H5N1(HPAI),NP,H5,10,,Y,H,Substitution,No,,
-19135815,H5N1(HPAI),NP,H5,22,,A,T,Substitution,No,,
-19135815,H5N1(HPAI),NP,H5,50,,R,S,Substitution,No,,
-19135815,H5N1(HPAI),NP,H5,51,,D,E,Substitution,No,,
-19135815,H5N1(HPAI),NP,H5,52,,H,H,None,Yes,Evade human BTN3A3 (inhibitor of avian influenza A viruses replication),"Pinto R. et al., 2023"
-19135815,H5N1(HPAI),NP,H5,105,,V,V,None,Yes,Increased virulence in chickens,"Suttie A. et al., 2019"
-19135815,H5N1(HPAI),NP,H5,184,,K,K,None,Yes,Enhanced interferon response,"Suttie A. et al., 2019"
-19135815,H5N1(HPAI),NP,H5,319,,N,K,Substitution,Yes,Increased polymerase activity in mammalian cells,"Gabriel G. et al., 2005"
-19135815,H5N1(HPAI),NP,H5,353,,I,V,Substitution,No,,
+SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,POSITION_SUBTYPE,REFERENCE_AA,QUERY_AA,AA_MUTATION,MUTATION_TYPE,MARKER,EFFECT,REFERENCE
+19135815,H5N1(HPAI),NP,H5,10,,Y,H,Y10H,Substitution,No,,
+19135815,H5N1(HPAI),NP,H5,22,,A,T,A22T,Substitution,No,,
+19135815,H5N1(HPAI),NP,H5,50,,R,S,R50S,Substitution,No,,
+19135815,H5N1(HPAI),NP,H5,51,,D,E,D51E,Substitution,No,,
+19135815,H5N1(HPAI),NP,H5,52,,H,H,52H,None,Yes,Evade human BTN3A3 (inhibitor of avian influenza A viruses replication),"Pinto R. et al., 2023"
+19135815,H5N1(HPAI),NP,H5,105,,V,V,105V,None,Yes,Increased virulence in chickens,"Suttie A. et al., 2019"
+19135815,H5N1(HPAI),NP,H5,184,,K,K,184K,None,Yes,Enhanced interferon response,"Suttie A. et al., 2019"
+19135815,H5N1(HPAI),NP,H5,319,,N,K,319K,Substitution,Yes,Increased polymerase activity in mammalian cells,"Gabriel G. et al., 2005"
+19135815,H5N1(HPAI),NP,H5,353,,I,V,I353V,Substitution,No,,

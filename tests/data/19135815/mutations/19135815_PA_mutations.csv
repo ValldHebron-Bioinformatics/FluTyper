@@ -1,18 +1,18 @@
-SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,POSITION_SUBTYPE,REFERENCE_AA,QUERY_AA,MUTATION_TYPE,MARKER,EFFECT,REFERENCE
-19135815,H5N1(HPAI),PA,H5,37,,A,A,None,Yes,Increased polymerase activity in mammalian cells,"Suttie A. et al., 2019"
-19135815,H5N1(HPAI),PA,H5,61,,M,T,Substitution,No,,
-19135815,H5N1(HPAI),PA,H5,86,,M,I,Substitution,No,,
-19135815,H5N1(HPAI),PA,H5,160,,D,E,Substitution,No,,
-19135815,H5N1(HPAI),PA,H5,190,,S,S,None,Yes,Decreased virulence in mice,"DesRochers B. et al., 2016"
-19135815,H5N1(HPAI),PA,H5,201,,I,T,Substitution,No,,
-19135815,H5N1(HPAI),PA,H5,266,,R,R,None,Yes,Increased polymerase activity in mammalian cells,"Leung B. et al., 2010"
-19135815,H5N1(HPAI),PA,H5,322,,I,L,Substitution,No,,
-19135815,H5N1(HPAI),PA,H5,354,,I,F,Substitution,No,,
-19135815,H5N1(HPAI),PA,H5,383,,D,D,None,Yes,Increased polymerase activity in mice cells,"Leung B. et al., 2010"
-19135815,H5N1(HPAI),PA,H5,400,,S,P,Substitution,Yes,Decreased virulence in mice,"DesRochers B. et al., 2016"
-19135815,H5N1(HPAI),PA,H5,404,,A,S,Substitution,No,,
-19135815,H5N1(HPAI),PA,H5,409,,S,S,None,Yes,Increased replication in mammalian cells,"Suttie A. et al., 2019"
-19135815,H5N1(HPAI),PA,H5,441,,V,M,Substitution,No,,
-19135815,H5N1(HPAI),PA,H5,515,,T,T,None,Yes,Increased polymerase activity in mammalian cells,"Leung B. et al., 2010"
-19135815,H5N1(HPAI),PA,H5,608,,S,T,Substitution,No,,
-19135815,H5N1(HPAI),PA,H5,711,,L,I,Substitution,No,,
+SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,POSITION_SUBTYPE,REFERENCE_AA,QUERY_AA,AA_MUTATION,MUTATION_TYPE,MARKER,EFFECT,REFERENCE
+19135815,H5N1(HPAI),PA,H5,37,,A,A,37A,None,Yes,Increased polymerase activity in mammalian cells,"Suttie A. et al., 2019"
+19135815,H5N1(HPAI),PA,H5,61,,M,T,M61T,Substitution,No,,
+19135815,H5N1(HPAI),PA,H5,86,,M,I,M86I,Substitution,No,,
+19135815,H5N1(HPAI),PA,H5,160,,D,E,D160E,Substitution,No,,
+19135815,H5N1(HPAI),PA,H5,190,,S,S,190S,None,Yes,Decreased virulence in mice,"DesRochers B. et al., 2016"
+19135815,H5N1(HPAI),PA,H5,201,,I,T,I201T,Substitution,No,,
+19135815,H5N1(HPAI),PA,H5,266,,R,R,266R,None,Yes,Increased polymerase activity in mammalian cells,"Leung B. et al., 2010"
+19135815,H5N1(HPAI),PA,H5,322,,I,L,I322L,Substitution,No,,
+19135815,H5N1(HPAI),PA,H5,354,,I,F,I354F,Substitution,No,,
+19135815,H5N1(HPAI),PA,H5,383,,D,D,383D,None,Yes,Increased polymerase activity in mice cells,"Leung B. et al., 2010"
+19135815,H5N1(HPAI),PA,H5,400,,S,P,400P,Substitution,Yes,Decreased virulence in mice,"DesRochers B. et al., 2016"
+19135815,H5N1(HPAI),PA,H5,404,,A,S,A404S,Substitution,No,,
+19135815,H5N1(HPAI),PA,H5,409,,S,S,409S,None,Yes,Increased replication in mammalian cells,"Suttie A. et al., 2019"
+19135815,H5N1(HPAI),PA,H5,441,,V,M,V441M,Substitution,No,,
+19135815,H5N1(HPAI),PA,H5,515,,T,T,515T,None,Yes,Increased polymerase activity in mammalian cells,"Leung B. et al., 2010"
+19135815,H5N1(HPAI),PA,H5,608,,S,T,S608T,Substitution,No,,
+19135815,H5N1(HPAI),PA,H5,711,,L,I,L711I,Substitution,No,,
