@@ -41,13 +41,15 @@ sample_counts_per_pos = master_df.groupby(['PROTEIN', 'POSITION'])['SAMPLE_ID'].
 # Filter for rows that are marked as markers OR appear in >25% (default) of total samples
 relevant_df = master_df[(master_df['MARKER'] == "Yes") | (sample_counts_per_pos > threshold)]
 
-# Write the Full Report with a sheet for each protein
+# Write the Full Report with a sheet for each protein, plus a combined sheet
 with pd.ExcelWriter("final_mutations_report.xlsx") as writer:
+    master_df.to_excel(writer, sheet_name="All_Proteins", index=False)
     for prot_name, group in master_df.groupby("PROTEIN"):
         group.to_excel(writer, sheet_name=str(prot_name).strip("()',"), index=False)
 
-# Write the Filtered Report with a sheet for each protein
+# Write the Filtered Report with a sheet for each protein, plus a combined sheet
 with pd.ExcelWriter("relevant_mutations.xlsx") as writer:
+    relevant_df.to_excel(writer, sheet_name="All_Proteins", index=False)
     for prot_name, group in relevant_df.groupby("PROTEIN"):
         group.to_excel(writer, sheet_name=str(prot_name).strip("()',"), index=False)
 """
