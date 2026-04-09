@@ -69,7 +69,7 @@ process OrganizeBySample {
         done < "${sample_id}_orientation.tsv"
 
         if [ "\$is_rev" = true ]; then
-            seqkit grep -p "\${clean_name}_rev" "\${combined_fasta}" | \ 
+            seqkit grep -p "\${clean_name}_rev" "\${combined_fasta}" | 
             seqkit replace -p "_rev\$" -r "" > "\$target_file"
         else
             seqkit grep -p "\${clean_name}" "\${combined_fasta}" > "\$target_file"
