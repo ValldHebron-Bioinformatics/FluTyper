@@ -18,7 +18,7 @@ process OrganizeBySample {
     """
     mkdir -p "samples/${sample_id}/segments"
     
-    raw_sample="${sample_id}_raw.fasta"
+    raw_sample="samples/${sample_id}/${sample_id}.fasta"
     combined_fasta="${sample_id}_combined.fasta"
 
     seqkit grep -r -p "^${sample_id}" "${staged_fasta}" > "\$raw_sample"
