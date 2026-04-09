@@ -120,12 +120,12 @@ workflow {
             tuple(sample_id, prot_files, h_tag, n_tag, pathotype)
         }
     MutationsFinder(Mutations_ch)
-    MutationsMerged_ch = MutationsFinder.out.results
-        .map { _sample_id, _mut_files, combined_csv -> combined_csv }
-        .collectFile(
-            name: 'all_mutations_combined.csv',
-            keepHeader: true,
-        )
+    //MutationsMerged_ch = MutationsFinder.out.results
+    //    .map { _sample_id, _mut_files, combined_csv -> combined_csv }
+    //    .collectFile(
+    //        name: 'all_mutations_combined.csv',
+    //        keepHeader: true,
+    //    )
     MutationsCompiler_ch = MutationsFinder.out.results
         .map { _sample_id, _mut_files, combined_csv -> combined_csv }
         .collect()
