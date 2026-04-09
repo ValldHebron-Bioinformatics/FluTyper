@@ -47,7 +47,7 @@ process OrganizeBySample {
 
     # Rescue and Split segments based on the orientation check results
     while read -r full_head; do
-        clean_name=\${full_head} | tr -d '>' # Remove FASTA header symbol
+        clean_name=\${full_head#>} # Remove FASTA header symbol
         
         seg_type=""
         for s in ${params.segments.join(' ')}; do
