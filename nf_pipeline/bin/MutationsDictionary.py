@@ -1,16 +1,6 @@
 #!/usr/bin/env python3
 import argparse
-import os
 import pandas as pd
-import sys
-
-SUBTYPE_COLUMNS = {
-    "H3": "reference_site(H3_numbering)",
-    "H1": "reference_H1_site(H1_numbering)",
-    "H5": "mature_H5_site(no_signal_peptide)",
-    "H7": "H7_NUMBERING",
-    "H9": "H9_NUMBERING"
-}
 
 def main():
     parser = argparse.ArgumentParser()
@@ -28,23 +18,31 @@ def main():
         df.to_csv(args.output, index=False)
         return
 
+    # Read the new mutations dictionary
     m_dict = pd.read_csv(args.dictionary, dtype=str)
     m_dict.columns = m_dict.columns.str.strip()
-    m_dict['region'] = m_dict['region'].fillna("HA1").str.strip().str.upper()
-    # Assume any region containing "HA2" is HA2, otherwise HA1
-    m_dict['region'] = m_dict['region'].apply(lambda x: "HA2" if "HA2" in x else "HA1")
+    
+    # Clean the PROTEIN column
+    m_dict['PROTEIN'] = m_dict['PROTEIN'].str.strip().str.upper()
 
-    start_col = SUBTYPE_COLUMNS.get(args.base.upper(), SUBTYPE_COLUMNS["H5"])
-    target_col = SUBTYPE_COLUMNS.get(args.subtype.upper(), SUBTYPE_COLUMNS["H5"])
-    # Create a lookup dictionary for (region, start_col) -> target_col
-    lookup = m_dict.set_index(['region', start_col])[target_col].to_dict()
+    # Generate column names dynamically based on the new format
+    start_col = f"{args.base.upper()}_numbering"
+    target_col = f"{args.subtype.upper()}_numbering"
 
-    fname = os.path.basename(args.input).upper()
-    file_prot = "HA2" if "HA2" in fname else "HA1"
+    # Check if the target subtype exists in the dictionary
+    if target_col not in m_dict.columns:
+        print(f"Warning: {target_col} not found in the dictionary. Original position will be kept.")
+        df['POSITION_SUBTYPE'] = df['POSITION']
+        df.to_csv(args.output, index=False)
+        return
 
-    # Determine the protein for each row based on the 'PROTEIN' column
+    # Create the lookup dictionary: (PROTEIN, base_pos) -> target_pos
+    lookup = m_dict.set_index(['PROTEIN', start_col])[target_col].to_dict()
+
+    # Determine the protein for each row based on the 'PROTEIN' column in the input
     prots = df['PROTEIN'].str.strip().str.upper()
     
+    # Apply conversion with fallback to the original position if unmapped
     df['POSITION_SUBTYPE'] = [lookup.get((p, str(pos).strip()), str(pos).strip()) for p, pos in zip(prots, df['POSITION'])]
 
     df.to_csv(args.output, index=False)

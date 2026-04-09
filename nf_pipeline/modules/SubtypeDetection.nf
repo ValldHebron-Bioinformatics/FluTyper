@@ -19,7 +19,7 @@ process SubtypeDetection {
     cat ${ha_fasta} ${na_fasta} 2>/dev/null > "\${input_fasta}" || true
 
     if [[ ! -s "\${input_fasta}" ]]; then
-        echo "${sample_id},Missing," > inferred_subtypes_${sample_id}.csv
+        echo "${sample_id},HxNx," > inferred_subtypes_${sample_id}.csv
         echo "Missing sequences for ${sample_id}" > SDerrors.log
         exit 0
     fi

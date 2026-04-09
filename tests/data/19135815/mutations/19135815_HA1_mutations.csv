@@ -1,15 +1,15 @@
-SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,POSITION_SUBTYPE,REFERENCE_AA,QUERY_AA,MUTATION_TYPE,MARKER,EFFECT,REFERENCE
-19135815,H5N1(HPAI),HA1,H5,104,104,M,L,Substitution,No,,
-19135815,H5N1(HPAI),HA1,H5,107,107,R,R,None,Yes,Increased virulence in chickens,"Suttie A. et al., 2019"
-19135815,H5N1(HPAI),HA1,H5,108,108,I,I,None,Yes,Increased virulence in mice,"Suttie A. et al., 2019"
-19135815,H5N1(HPAI),HA1,H5,123,123,P,P,None,Yes,Increased virus binding to α2-6,"Suttie A. et al., 2019"
-19135815,H5N1(HPAI),HA1,H5,129,129,L,R,Substitution,No,,
-19135815,H5N1(HPAI),HA1,H5,133,133,A,A,None,Yes,Increased pseudovirus binding to α2-6,"Suttie A. et al., 2019"
-19135815,H5N1(HPAI),HA1,H5,134,134,A,A,None,Yes,Increased viral replication in mice lungs,"Zhang J. et al., 2023"
-19135815,H5N1(HPAI),HA1,H5,148,148,V,L,Substitution,No,,
-19135815,H5N1(HPAI),HA1,H5,154,154,N,N,None,Yes,Increased virus binding to α2-6,"Suttie A. et al., 2019"
-19135815,H5N1(HPAI),HA1,H5,156,156,A,A,None,Yes,Transmitted via aerosol among ferrets,"Herfst S. et al., 2012"
-19135815,H5N1(HPAI),HA1,H5,182,182,N,N,None,Yes,Increased virus binding to α2-6,"Lu X. et al., 2013"
-19135815,H5N1(HPAI),HA1,H5,210,210,A,V,Substitution,No,,
-19135815,H5N1(HPAI),HA1,H5,218,218,Q,Q,None,Yes,Increased virus binding to α2-3,"Guo H. et al., 2017"
-19135815,H5N1(HPAI),HA1,H5,223,223,R,R,None,Yes,Increased virus binding to α2-3,"Guo H. et al., 2017"
+SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,POSITION_SUBTYPE,REFERENCE_AA,QUERY_AA,AA_MUTATION,MUTATION_TYPE,MARKER,EFFECT,REFERENCE
+19135815,H5N1(HPAI),HA1,H5,104,104,M,L,M104L,Substitution,No,,
+19135815,H5N1(HPAI),HA1,H5,107,107,R,R,107R,None,Yes,Increased virulence in chickens,"Suttie A. et al., 2019"
+19135815,H5N1(HPAI),HA1,H5,108,108,I,I,108I,None,Yes,Increased virulence in mice,"Suttie A. et al., 2019"
+19135815,H5N1(HPAI),HA1,H5,123,123,P,P,123P,None,Yes,Increased virus binding to α2-6,"Suttie A. et al., 2019"
+19135815,H5N1(HPAI),HA1,H5,129,129,L,R,L129R,Substitution,No,,
+19135815,H5N1(HPAI),HA1,H5,133,133,A,A,133A,None,Yes,Increased pseudovirus binding to α2-6,"Suttie A. et al., 2019"
+19135815,H5N1(HPAI),HA1,H5,134,134,A,A,134A,None,Yes,Increased viral replication in mice lungs,"Zhang J. et al., 2023"
+19135815,H5N1(HPAI),HA1,H5,148,148,V,L,V148L,Substitution,No,,
+19135815,H5N1(HPAI),HA1,H5,154,154,N,N,154N,None,Yes,Increased virus binding to α2-6,"Suttie A. et al., 2019"
+19135815,H5N1(HPAI),HA1,H5,156,156,A,A,156A,None,Yes,Transmitted via aerosol among ferrets,"Herfst S. et al., 2012"
+19135815,H5N1(HPAI),HA1,H5,182,182,N,N,182N,None,Yes,Increased virus binding to α2-6,"Lu X. et al., 2013"
+19135815,H5N1(HPAI),HA1,H5,210,210,A,V,A210V,Substitution,No,,
+19135815,H5N1(HPAI),HA1,H5,218,218,Q,Q,218Q,None,Yes,Increased virus binding to α2-3,"Guo H. et al., 2017"
+19135815,H5N1(HPAI),HA1,H5,223,223,R,R,223R,None,Yes,Increased virus binding to α2-3,"Guo H. et al., 2017"

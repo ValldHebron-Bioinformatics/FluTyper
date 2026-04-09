@@ -1,3 +1,6 @@
+#!/usr/bin/env nextflow
+nextflow.enable.dsl=2
+
 process MutationsFinder {
     errorStrategy 'ignore'
     debug true
@@ -16,7 +19,7 @@ from pathlib import Path
 from Bio import SeqIO
 
 markers_dir = Path("${params.protocols[params.protocol].resources}/markers")
-dictionary = "${params.protocols[params.protocol].resources}/AA_DICT.csv"
+dictionary = "${params.protocols[params.protocol].resources}/HA_DICT.csv"
 mutations_prog = "${params.programs.MutationsDictionary}"
 log_file = "MFerrors.log"
 out_dir = Path("samples/${sample_id}/mutations")
@@ -41,9 +44,11 @@ for aligned_prot in aligned_prots:
     
     ref_tag = ref_header.split('_')[0]
     subtype_val = "${h_tag}${n_tag}(${pathotype})" if "${pathotype}" != "" else "${h_tag}${n_tag}"
-    target_H = "${h_tag}" if "${h_tag}" in {"H1", "H3", "H5", "H7", "H9"} else "H5"
-    markers = {}
     
+    # Now translation is activated for any HA subtype (H1-H18) thanks to the new dictionary
+    target_H = "${h_tag}" if re.match(r'^H\\d+\$', "${h_tag}") else "H5"
+    
+    markers = {}
     m_file = markers_dir / f"{prot_name}_markers.csv"
     if m_file.exists():
         with open(m_file) as f:
@@ -56,7 +61,7 @@ for aligned_prot in aligned_prots:
     with open(output_csv, 'w', newline='') as f:
         writer = csv.writer(f)
         # HEADER
-        writer.writerow(["SAMPLE_ID", "SUBTYPE", "PROTEIN", "REF_SUBTYPE", "POSITION", "POSITION_SUBTYPE", "REFERENCE_AA", "QUERY_AA", "MUTATION_TYPE", "MARKER", "EFFECT", "REFERENCE"])
+        writer.writerow(["SAMPLE_ID", "SUBTYPE", "PROTEIN", "REF_SUBTYPE", "POSITION", "POSITION_SUBTYPE", "REFERENCE_AA", "QUERY_AA", "AA_MUTATION", "MUTATION_TYPE", "MARKER", "EFFECT", "REFERENCE"])
         
         pos = 0
         for ref_aa, query_aa in zip(ref_seq, query_seq):
@@ -66,11 +71,11 @@ for aligned_prot in aligned_prots:
 
             pos_str = str(pos)
             is_marker = (pos_str, query_aa) in markers
-            is_mutation = ref_aa != query_aa
-
+            is_mutation = (ref_aa != query_aa) and (ref_aa != "X") and (query_aa != "X")
             pos_subtype = pos_str if prot_name.startswith("HA") else ""
 
             if is_marker:
+                aa_mutation = f"{pos_str}{query_aa}"
                 m_info = markers[(pos_str, query_aa)]
                 if not is_mutation:
                     mutation_type = "None"
@@ -80,20 +85,22 @@ for aligned_prot in aligned_prots:
                     mutation_type = "Deletion"
                 else:
                     mutation_type = "Substitution"
-                writer.writerow(["${sample_id}", subtype_val, prot_name, ref_tag, pos_str, pos_subtype, ref_aa, query_aa, mutation_type, "Yes" , m_info[0], m_info[1]])
+                    
+                writer.writerow(["${sample_id}", subtype_val, prot_name, ref_tag, pos_str, pos_subtype, ref_aa, query_aa, aa_mutation, mutation_type, "Yes" , m_info[0], m_info[1]])
 
             elif is_mutation:
+                aa_mutation = f"{ref_aa}{pos_str}{query_aa}"
                 if ref_aa == "-" and query_aa != "-":
                     mutation_type = "Insertion"
                 elif ref_aa != "-" and query_aa == "-":
                     mutation_type = "Deletion"
                 else:
                     mutation_type = "Substitution"
-                writer.writerow(["${sample_id}", subtype_val, prot_name, ref_tag, pos_str, pos_subtype, ref_aa, query_aa, mutation_type, "No", "", ""])
+                writer.writerow(["${sample_id}", subtype_val, prot_name, ref_tag, pos_str, pos_subtype, ref_aa, query_aa, aa_mutation, mutation_type, "No", "", ""])
             else:
                 continue
                 
-    # Run external dictionary script safely via subprocess
+    # Call the new MutationsDictionary
     if prot_name.startswith("HA") and target_H != "H5":
         subprocess.run(["python3", mutations_prog, "--subtype", target_H, "--input", str(output_csv), "--dictionary", dictionary, "--output", str(output_csv)], check=True)
 
@@ -102,7 +109,7 @@ master_csv = Path(f"samples/${sample_id}/${sample_id}_mutations.csv")
 if output_files:
     with open(master_csv, 'w', newline='') as master_f:
         writer = csv.writer(master_f)
-        writer.writerow(["SAMPLE_ID", "SUBTYPE", "PROTEIN", "REF_SUBTYPE", "POSITION", "POSITION_SUBTYPE", "REFERENCE_AA", "QUERY_AA", "MUTATION_TYPE", "MARKER", "EFFECT", "REFERENCE"]) # Write header once
+        writer.writerow(["SAMPLE_ID", "SUBTYPE", "PROTEIN", "REF_SUBTYPE", "POSITION", "POSITION_SUBTYPE", "REFERENCE_AA", "QUERY_AA", "AA_MUTATION", "MUTATION_TYPE", "MARKER", "EFFECT", "REFERENCE"])
 
         for f_path in output_files:
             with open(f_path, 'r') as f:

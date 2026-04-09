@@ -1,295 +1,116 @@
-SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,POSITION_SUBTYPE,REFERENCE_AA,QUERY_AA,MUTATION_TYPE,MARKER,EFFECT,REFERENCE
-19135815,H5N1(HPAI),HA1,H5,104,104,M,L,Substitution,No,,
-19135815,H5N1(HPAI),HA1,H5,107,107,R,R,None,Yes,Increased virulence in chickens,"Suttie A. et al., 2019"
-19135815,H5N1(HPAI),HA1,H5,108,108,I,I,None,Yes,Increased virulence in mice,"Suttie A. et al., 2019"
-19135815,H5N1(HPAI),HA1,H5,123,123,P,P,None,Yes,Increased virus binding to α2-6,"Suttie A. et al., 2019"
-19135815,H5N1(HPAI),HA1,H5,129,129,L,R,Substitution,No,,
-19135815,H5N1(HPAI),HA1,H5,133,133,A,A,None,Yes,Increased pseudovirus binding to α2-6,"Suttie A. et al., 2019"
-19135815,H5N1(HPAI),HA1,H5,134,134,A,A,None,Yes,Increased viral replication in mice lungs,"Zhang J. et al., 2023"
-19135815,H5N1(HPAI),HA1,H5,148,148,V,L,Substitution,No,,
-19135815,H5N1(HPAI),HA1,H5,154,154,N,N,None,Yes,Increased virus binding to α2-6,"Suttie A. et al., 2019"
-19135815,H5N1(HPAI),HA1,H5,156,156,A,A,None,Yes,Transmitted via aerosol among ferrets,"Herfst S. et al., 2012"
-19135815,H5N1(HPAI),HA1,H5,182,182,N,N,None,Yes,Increased virus binding to α2-6,"Lu X. et al., 2013"
-19135815,H5N1(HPAI),HA1,H5,210,210,A,V,Substitution,No,,
-19135815,H5N1(HPAI),HA1,H5,218,218,Q,Q,None,Yes,Increased virus binding to α2-3,"Guo H. et al., 2017"
-19135815,H5N1(HPAI),HA1,H5,223,223,R,R,None,Yes,Increased virus binding to α2-3,"Guo H. et al., 2017"
-19135815,H5N1(HPAI),HA2,H5,64,64,E,E,None,Yes,Decreased virulence in mice,"Sun X. et al., 2019"
-19135815,H5N1(HPAI),HA2,H5,181,181,V,I,Substitution,No,,
-19135815,H5N1(HPAI),HA2,H5,203,203,M,I,Substitution,No,,
-19135815,H5N1(HPAI),M1,H5,30,,D,D,None,Yes,Increased virulence in mice,"Fan S. et al., 2009"
-19135815,H5N1(HPAI),M1,H5,43,,M,M,None,Yes,Increased virulence in mice,"Nao N. et al., 2015"
-19135815,H5N1(HPAI),M1,H5,137,,T,A,Substitution,No,,
-19135815,H5N1(HPAI),M1,H5,200,,V,A,Substitution,No,,
-19135815,H5N1(HPAI),M1,H5,211,,Q,Q,None,Yes,Transmitted via aerosol among ferrets,"Sutton T. et al., 2014"
-19135815,H5N1(HPAI),M1,H5,215,,A,A,None,Yes,Increased virulence in mice,"Fan S. et al., 2009"
-19135815,H5N1(HPAI),M2,H5,6,,E,K,Substitution,No,,
-19135815,H5N1(HPAI),M2,H5,7,,V,I,Substitution,No,,
-19135815,H5N1(HPAI),M2,H5,8,,E,C,Substitution,No,,
-19135815,H5N1(HPAI),M2,H5,9,,T,R,Substitution,No,,
-19135815,H5N1(HPAI),M2,H5,61,,G,R,Substitution,No,,
-19135815,H5N1(HPAI),M2,H5,68,,V,A,Substitution,No,,
-19135815,H5N1(HPAI),M2,H5,80,,Q,R,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,8,,T,I,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,20,,V,I,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,42,,N,S,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,44,,Y,N,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,45,,Q,Y,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,48,,P,T,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,53,,I,V,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,67,,V,I,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,74,,F,L,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,75,,L,I,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,81,,T,A,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,82,,S,P,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,218,,S,T,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,234,,V,I,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,241,,V,L,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,259,,D,E,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,262,,K,R,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,286,,G,S,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,287,,D,K,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,288,,I,V,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,289,,M,V,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,321,,V,I,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,336,,S,G,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,338,,M,V,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,395,,E,A,Substitution,No,,
-19135815,H5N1(HPAI),NP,H5,10,,Y,H,Substitution,No,,
-19135815,H5N1(HPAI),NP,H5,22,,A,T,Substitution,No,,
-19135815,H5N1(HPAI),NP,H5,50,,R,S,Substitution,No,,
-19135815,H5N1(HPAI),NP,H5,51,,D,E,Substitution,No,,
-19135815,H5N1(HPAI),NP,H5,52,,H,H,None,Yes,Evade human BTN3A3 (inhibitor of avian influenza A viruses replication),"Pinto R. et al., 2023"
-19135815,H5N1(HPAI),NP,H5,105,,V,V,None,Yes,Increased virulence in chickens,"Suttie A. et al., 2019"
-19135815,H5N1(HPAI),NP,H5,184,,K,K,None,Yes,Enhanced interferon response,"Suttie A. et al., 2019"
-19135815,H5N1(HPAI),NP,H5,319,,N,K,Substitution,Yes,Increased polymerase activity in mammalian cells,"Gabriel G. et al., 2005"
-19135815,H5N1(HPAI),NP,H5,353,,I,V,Substitution,No,,
-19135815,H5N1(HPAI),NS1,H5,53,,G,D,Substitution,No,,
-19135815,H5N1(HPAI),NS1,H5,58,,T,I,Substitution,No,,
-19135815,H5N1(HPAI),NS1,H5,76,,T,A,Substitution,No,,
-19135815,H5N1(HPAI),NS1,H5,147,,L,I,Substitution,No,,
-19135815,H5N1(HPAI),NS1,H5,171,,D,N,Substitution,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,X,S,Substitution,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,F,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,Q,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,V,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,D,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,C,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,F,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,L,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,W,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,H,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,V,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,R,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,K,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,R,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,F,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,A,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,D,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,Q,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,E,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,L,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,G,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,D,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,A,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,P,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,F,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,L,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,D,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,R,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,L,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,R,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,R,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,D,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,Q,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,K,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,S,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,L,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,R,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,G,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,R,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,G,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,S,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,T,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,L,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,G,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,L,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,D,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,I,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,E,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,T,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,A,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,I,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,R,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,A,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,G,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,K,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,Q,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,I,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,V,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,E,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,R,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,I,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,L,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,E,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,E,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,E,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,S,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,D,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,E,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,A,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,L,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,K,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,M,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,T,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,I,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,A,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,P,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,V,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,P,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,A,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,S,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,R,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,Y,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,L,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,T,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,D,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,M,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,T,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,L,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,E,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,E,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,M,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,S,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,R,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,D,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,W,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,F,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,M,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,L,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,M,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,P,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,K,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,Q,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,K,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,V,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,A,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,G,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,S,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,L,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,C,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,I,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,R,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,M,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,D,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,Q,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,A,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,I,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,M,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,D,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,K,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,N,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,I,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,I,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,L,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,K,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,A,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,N,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,F,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,S,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,V,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,I,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,F,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,D,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,R,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,L,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,E,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,T,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,L,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,I,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,L,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,I,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,R,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,A,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,F,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,T,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,E,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,E,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,G,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,A,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,I,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,V,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,G,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,E,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,I,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,S,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,P,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,L,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,P,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,8,,-,S,Insertion,No,,
-19135815,H5N1(HPAI),NS2,H5,10,,S,P,Substitution,No,,
-19135815,H5N1(HPAI),NS2,H5,14,,D,N,Substitution,No,,
-19135815,H5N1(HPAI),NS2,H5,76,,N,D,Substitution,No,,
-19135815,H5N1(HPAI),NS2,H5,100,,Y,H,Substitution,No,,
-19135815,H5N1(HPAI),PA-X,H5,61,,M,T,Substitution,No,,
-19135815,H5N1(HPAI),PA-X,H5,86,,M,I,Substitution,No,,
-19135815,H5N1(HPAI),PA-X,H5,160,,D,E,Substitution,No,,
-19135815,H5N1(HPAI),PA-X,H5,191,,X,F,Substitution,No,,
-19135815,H5N1(HPAI),PA-X,H5,201,,I,T,Substitution,No,,
-19135815,H5N1(HPAI),PA,H5,37,,A,A,None,Yes,Increased polymerase activity in mammalian cells,"Suttie A. et al., 2019"
-19135815,H5N1(HPAI),PA,H5,61,,M,T,Substitution,No,,
-19135815,H5N1(HPAI),PA,H5,86,,M,I,Substitution,No,,
-19135815,H5N1(HPAI),PA,H5,160,,D,E,Substitution,No,,
-19135815,H5N1(HPAI),PA,H5,190,,S,S,None,Yes,Decreased virulence in mice,"DesRochers B. et al., 2016"
-19135815,H5N1(HPAI),PA,H5,201,,I,T,Substitution,No,,
-19135815,H5N1(HPAI),PA,H5,266,,R,R,None,Yes,Increased polymerase activity in mammalian cells,"Leung B. et al., 2010"
-19135815,H5N1(HPAI),PA,H5,322,,I,L,Substitution,No,,
-19135815,H5N1(HPAI),PA,H5,354,,I,F,Substitution,No,,
-19135815,H5N1(HPAI),PA,H5,383,,D,D,None,Yes,Increased polymerase activity in mice cells,"Leung B. et al., 2010"
-19135815,H5N1(HPAI),PA,H5,400,,S,P,Substitution,Yes,Decreased virulence in mice,"DesRochers B. et al., 2016"
-19135815,H5N1(HPAI),PA,H5,404,,A,S,Substitution,No,,
-19135815,H5N1(HPAI),PA,H5,409,,S,S,None,Yes,Increased replication in mammalian cells,"Suttie A. et al., 2019"
-19135815,H5N1(HPAI),PA,H5,441,,V,M,Substitution,No,,
-19135815,H5N1(HPAI),PA,H5,515,,T,T,None,Yes,Increased polymerase activity in mammalian cells,"Leung B. et al., 2010"
-19135815,H5N1(HPAI),PA,H5,608,,S,T,Substitution,No,,
-19135815,H5N1(HPAI),PA,H5,711,,L,I,Substitution,No,,
-19135815,H5N1(HPAI),PB1-F2,H5,40,,D,G,Substitution,No,,
-19135815,H5N1(HPAI),PB1-F2,H5,46,,T,M,Substitution,No,,
-19135815,H5N1(HPAI),PB1-F2,H5,51,,M,M,None,Yes,Decreased virulence in ducks,"Marjuki H. et al., 2010"
-19135815,H5N1(HPAI),PB1-F2,H5,56,,A,A,None,Yes,Decreased virulence in ducks,"Marjuki H. et al., 2010"
-19135815,H5N1(HPAI),PB1-F2,H5,66,,S,S,None,Yes,Enhanced virulence in mice,"Conenello G. et al., 2007"
-19135815,H5N1(HPAI),PB1-F2,H5,73,,E,K,Substitution,No,,
-19135815,H5N1(HPAI),PB1,H5,3,,V,V,None,Yes,Increased replication in mammalian cells,"Elgendy E. et al., 2017"
-19135815,H5N1(HPAI),PB1,H5,16,,N,D,Substitution,No,,
-19135815,H5N1(HPAI),PB1,H5,104,,G,E,Substitution,No,,
-19135815,H5N1(HPAI),PB1,H5,115,,Q,Q,None,Yes,Transmitted via aerosol among guinea pigs,"Zhang C. et al., 2021"
-19135815,H5N1(HPAI),PB1,H5,157,,A,T,Substitution,No,,
-19135815,H5N1(HPAI),PB1,H5,176,,T,K,Substitution,No,,
-19135815,H5N1(HPAI),PB1,H5,213,,N,T,Substitution,No,,
-19135815,H5N1(HPAI),PB1,H5,372,,I,M,Substitution,No,,
-19135815,H5N1(HPAI),PB1,H5,430,,R,K,Substitution,No,,
-19135815,H5N1(HPAI),PB1,H5,527,,V,I,Substitution,No,,
-19135815,H5N1(HPAI),PB1,H5,598,,L,L,None,Yes,Decreased polymerase activity in mammalian cells,"Suttie A. et al., 2019"
-19135815,H5N1(HPAI),PB1,H5,622,,G,G,None,Yes,Increased virulence in mice,"Feng X. et al., 2016"
-19135815,H5N1(HPAI),PB1,H5,635,,K,R,Substitution,No,,
-19135815,H5N1(HPAI),PB1,H5,660,,I,V,Substitution,No,,
-19135815,H5N1(HPAI),PB1,H5,738,,G,E,Substitution,No,,
-19135815,H5N1(HPAI),PB1,H5,741,,S,A,Substitution,No,,
-19135815,H5N1(HPAI),PB2,H5,63,,I,V,Substitution,No,,
-19135815,H5N1(HPAI),PB2,H5,79,,G,S,Substitution,No,,
-19135815,H5N1(HPAI),PB2,H5,89,,V,V,None,Yes,Increased polymerase activity in mammalian cells,"Li J. et al., 2009"
-19135815,H5N1(HPAI),PB2,H5,174,,A,X,Substitution,No,,
-19135815,H5N1(HPAI),PB2,H5,185,,I,V,Substitution,No,,
-19135815,H5N1(HPAI),PB2,H5,195,,N,D,Substitution,No,,
-19135815,H5N1(HPAI),PB2,H5,309,,D,D,None,Yes,Increased polymerase activity in mammalian cells,"Li J. et al., 2009"
-19135815,H5N1(HPAI),PB2,H5,339,,K,K,None,Yes,Increased polymerase activity in mammalian cells,"Li J. et al., 2009"
-19135815,H5N1(HPAI),PB2,H5,389,,R,R,None,Yes,Increased polymerase activity in mammalian cells,"Hu M. et al., 2017b"
-19135815,H5N1(HPAI),PB2,H5,477,,G,G,None,Yes,Increased virulence in mice,"Li J. et al., 2009"
-19135815,H5N1(HPAI),PB2,H5,495,,V,V,None,Yes,Increased virulence in mice,"Li J. et al., 2009"
-19135815,H5N1(HPAI),PB2,H5,598,,T,T,None,Yes,Increased polymerase activity in mammalian cells,"Hu M. et al., 2017b"
-19135815,H5N1(HPAI),PB2,H5,627,,E,E,None,Yes,Increased polymerase activity in mammalian cells,"Li J. et al., 2009"
-19135815,H5N1(HPAI),PB2,H5,655,,V,V,None,Yes,Enhanced pathogenicity in mice,"Arai Y. et al., 2019"
-19135815,H5N1(HPAI),PB2,H5,666,,T,I,Substitution,No,,
-19135815,H5N1(HPAI),PB2,H5,676,,T,T,None,Yes,Increased virulence in mice,"Li J. et al., 2009"
-19135815,H5N1(HPAI),PB2,H5,680,,D,G,Substitution,No,,
-19135815,H5N1(HPAI),PB2,H5,697,,I,L,Substitution,No,,
-19135815,H5N1(HPAI),PB2,H5,715,,S,N,Substitution,Yes,Decreased virulence in mice,"Sun H. et al., 2015"
+SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,POSITION_SUBTYPE,REFERENCE_AA,QUERY_AA,AA_MUTATION,MUTATION_TYPE,MARKER,EFFECT,REFERENCE
+19135815,H5N1(HPAI),HA1,H5,104,104,M,L,M104L,Substitution,No,,
+19135815,H5N1(HPAI),HA1,H5,107,107,R,R,107R,None,Yes,Increased virulence in chickens,"Suttie A. et al., 2019"
+19135815,H5N1(HPAI),HA1,H5,108,108,I,I,108I,None,Yes,Increased virulence in mice,"Suttie A. et al., 2019"
+19135815,H5N1(HPAI),HA1,H5,123,123,P,P,123P,None,Yes,Increased virus binding to α2-6,"Suttie A. et al., 2019"
+19135815,H5N1(HPAI),HA1,H5,129,129,L,R,L129R,Substitution,No,,
+19135815,H5N1(HPAI),HA1,H5,133,133,A,A,133A,None,Yes,Increased pseudovirus binding to α2-6,"Suttie A. et al., 2019"
+19135815,H5N1(HPAI),HA1,H5,134,134,A,A,134A,None,Yes,Increased viral replication in mice lungs,"Zhang J. et al., 2023"
+19135815,H5N1(HPAI),HA1,H5,148,148,V,L,V148L,Substitution,No,,
+19135815,H5N1(HPAI),HA1,H5,154,154,N,N,154N,None,Yes,Increased virus binding to α2-6,"Suttie A. et al., 2019"
+19135815,H5N1(HPAI),HA1,H5,156,156,A,A,156A,None,Yes,Transmitted via aerosol among ferrets,"Herfst S. et al., 2012"
+19135815,H5N1(HPAI),HA1,H5,182,182,N,N,182N,None,Yes,Increased virus binding to α2-6,"Lu X. et al., 2013"
+19135815,H5N1(HPAI),HA1,H5,210,210,A,V,A210V,Substitution,No,,
+19135815,H5N1(HPAI),HA1,H5,218,218,Q,Q,218Q,None,Yes,Increased virus binding to α2-3,"Guo H. et al., 2017"
+19135815,H5N1(HPAI),HA1,H5,223,223,R,R,223R,None,Yes,Increased virus binding to α2-3,"Guo H. et al., 2017"
+19135815,H5N1(HPAI),HA2,H5,64,64,E,E,64E,None,Yes,Decreased virulence in mice,"Sun X. et al., 2019"
+19135815,H5N1(HPAI),HA2,H5,181,181,V,I,V181I,Substitution,No,,
+19135815,H5N1(HPAI),HA2,H5,203,203,M,I,M203I,Substitution,No,,
+19135815,H5N1(HPAI),M1,H5,30,,D,D,30D,None,Yes,Increased virulence in mice,"Fan S. et al., 2009"
+19135815,H5N1(HPAI),M1,H5,43,,M,M,43M,None,Yes,Increased virulence in mice,"Nao N. et al., 2015"
+19135815,H5N1(HPAI),M1,H5,137,,T,A,T137A,Substitution,No,,
+19135815,H5N1(HPAI),M1,H5,200,,V,A,V200A,Substitution,No,,
+19135815,H5N1(HPAI),M1,H5,211,,Q,Q,211Q,None,Yes,Transmitted via aerosol among ferrets,"Sutton T. et al., 2014"
+19135815,H5N1(HPAI),M1,H5,215,,A,A,215A,None,Yes,Increased virulence in mice,"Fan S. et al., 2009"
+19135815,H5N1(HPAI),M2,H5,6,,E,K,E6K,Substitution,No,,
+19135815,H5N1(HPAI),M2,H5,7,,V,I,V7I,Substitution,No,,
+19135815,H5N1(HPAI),M2,H5,8,,E,C,E8C,Substitution,No,,
+19135815,H5N1(HPAI),M2,H5,9,,T,R,T9R,Substitution,No,,
+19135815,H5N1(HPAI),M2,H5,61,,G,R,G61R,Substitution,No,,
+19135815,H5N1(HPAI),M2,H5,68,,V,A,V68A,Substitution,No,,
+19135815,H5N1(HPAI),M2,H5,80,,Q,R,Q80R,Substitution,No,,
+19135815,H5N1(HPAI),NA,N1,6,,K,R,K6R,Substitution,No,,
+19135815,H5N1(HPAI),NA,N1,8,,T,I,T8I,Substitution,No,,
+19135815,H5N1(HPAI),NA,N1,10,,I,T,I10T,Substitution,No,,
+19135815,H5N1(HPAI),NA,N1,95,,S,G,S95G,Substitution,No,,
+19135815,H5N1(HPAI),NA,N1,259,,D,E,D259E,Substitution,No,,
+19135815,H5N1(HPAI),NA,N1,287,,D,E,D287E,Substitution,No,,
+19135815,H5N1(HPAI),NA,N1,395,,E,A,E395A,Substitution,No,,
+19135815,H5N1(HPAI),NA,N1,405,,S,T,S405T,Substitution,No,,
+19135815,H5N1(HPAI),NP,H5,10,,Y,H,Y10H,Substitution,No,,
+19135815,H5N1(HPAI),NP,H5,22,,A,T,A22T,Substitution,No,,
+19135815,H5N1(HPAI),NP,H5,50,,R,S,R50S,Substitution,No,,
+19135815,H5N1(HPAI),NP,H5,51,,D,E,D51E,Substitution,No,,
+19135815,H5N1(HPAI),NP,H5,52,,H,H,52H,None,Yes,Evade human BTN3A3 (inhibitor of avian influenza A viruses replication),"Pinto R. et al., 2023"
+19135815,H5N1(HPAI),NP,H5,105,,V,V,105V,None,Yes,Increased virulence in chickens,"Suttie A. et al., 2019"
+19135815,H5N1(HPAI),NP,H5,184,,K,K,184K,None,Yes,Enhanced interferon response,"Suttie A. et al., 2019"
+19135815,H5N1(HPAI),NP,H5,319,,N,K,319K,Substitution,Yes,Increased polymerase activity in mammalian cells,"Gabriel G. et al., 2005"
+19135815,H5N1(HPAI),NP,H5,353,,I,V,I353V,Substitution,No,,
+19135815,H5N1(HPAI),NS1,H5,53,,G,D,G53D,Substitution,No,,
+19135815,H5N1(HPAI),NS1,H5,58,,T,I,T58I,Substitution,No,,
+19135815,H5N1(HPAI),NS1,H5,76,,T,A,T76A,Substitution,No,,
+19135815,H5N1(HPAI),NS1,H5,147,,L,I,L147I,Substitution,No,,
+19135815,H5N1(HPAI),NS1,H5,171,,D,N,D171N,Substitution,No,,
+19135815,H5N1(HPAI),NS2,H5,67,,E,G,E67G,Substitution,No,,
+19135815,H5N1(HPAI),NS2,H5,82,,G,E,G82E,Substitution,No,,
+19135815,H5N1(HPAI),PA-X,H5,61,,M,T,M61T,Substitution,No,,
+19135815,H5N1(HPAI),PA-X,H5,86,,M,I,M86I,Substitution,No,,
+19135815,H5N1(HPAI),PA-X,H5,160,,D,E,D160E,Substitution,No,,
+19135815,H5N1(HPAI),PA-X,H5,201,,I,T,I201T,Substitution,No,,
+19135815,H5N1(HPAI),PA,H5,37,,A,A,37A,None,Yes,Increased polymerase activity in mammalian cells,"Suttie A. et al., 2019"
+19135815,H5N1(HPAI),PA,H5,61,,M,T,M61T,Substitution,No,,
+19135815,H5N1(HPAI),PA,H5,86,,M,I,M86I,Substitution,No,,
+19135815,H5N1(HPAI),PA,H5,160,,D,E,D160E,Substitution,No,,
+19135815,H5N1(HPAI),PA,H5,190,,S,S,190S,None,Yes,Decreased virulence in mice,"DesRochers B. et al., 2016"
+19135815,H5N1(HPAI),PA,H5,201,,I,T,I201T,Substitution,No,,
+19135815,H5N1(HPAI),PA,H5,266,,R,R,266R,None,Yes,Increased polymerase activity in mammalian cells,"Leung B. et al., 2010"
+19135815,H5N1(HPAI),PA,H5,322,,I,L,I322L,Substitution,No,,
+19135815,H5N1(HPAI),PA,H5,354,,I,F,I354F,Substitution,No,,
+19135815,H5N1(HPAI),PA,H5,383,,D,D,383D,None,Yes,Increased polymerase activity in mice cells,"Leung B. et al., 2010"
+19135815,H5N1(HPAI),PA,H5,400,,S,P,400P,Substitution,Yes,Decreased virulence in mice,"DesRochers B. et al., 2016"
+19135815,H5N1(HPAI),PA,H5,404,,A,S,A404S,Substitution,No,,
+19135815,H5N1(HPAI),PA,H5,409,,S,S,409S,None,Yes,Increased replication in mammalian cells,"Suttie A. et al., 2019"
+19135815,H5N1(HPAI),PA,H5,441,,V,M,V441M,Substitution,No,,
+19135815,H5N1(HPAI),PA,H5,515,,T,T,515T,None,Yes,Increased polymerase activity in mammalian cells,"Leung B. et al., 2010"
+19135815,H5N1(HPAI),PA,H5,608,,S,T,S608T,Substitution,No,,
+19135815,H5N1(HPAI),PA,H5,711,,L,I,L711I,Substitution,No,,
+19135815,H5N1(HPAI),PB1-F2,H5,40,,D,G,D40G,Substitution,No,,
+19135815,H5N1(HPAI),PB1-F2,H5,46,,T,M,T46M,Substitution,No,,
+19135815,H5N1(HPAI),PB1-F2,H5,51,,M,M,51M,None,Yes,Decreased virulence in ducks,"Marjuki H. et al., 2010"
+19135815,H5N1(HPAI),PB1-F2,H5,56,,A,A,56A,None,Yes,Decreased virulence in ducks,"Marjuki H. et al., 2010"
+19135815,H5N1(HPAI),PB1-F2,H5,66,,S,S,66S,None,Yes,Enhanced virulence in mice,"Conenello G. et al., 2007"
+19135815,H5N1(HPAI),PB1-F2,H5,73,,E,K,E73K,Substitution,No,,
+19135815,H5N1(HPAI),PB1,H5,3,,V,V,3V,None,Yes,Increased replication in mammalian cells,"Elgendy E. et al., 2017"
+19135815,H5N1(HPAI),PB1,H5,16,,N,D,N16D,Substitution,No,,
+19135815,H5N1(HPAI),PB1,H5,104,,G,E,G104E,Substitution,No,,
+19135815,H5N1(HPAI),PB1,H5,115,,Q,Q,115Q,None,Yes,Transmitted via aerosol among guinea pigs,"Zhang C. et al., 2021"
+19135815,H5N1(HPAI),PB1,H5,157,,A,T,A157T,Substitution,No,,
+19135815,H5N1(HPAI),PB1,H5,176,,T,K,T176K,Substitution,No,,
+19135815,H5N1(HPAI),PB1,H5,213,,N,T,N213T,Substitution,No,,
+19135815,H5N1(HPAI),PB1,H5,372,,I,M,I372M,Substitution,No,,
+19135815,H5N1(HPAI),PB1,H5,430,,R,K,R430K,Substitution,No,,
+19135815,H5N1(HPAI),PB1,H5,527,,V,I,V527I,Substitution,No,,
+19135815,H5N1(HPAI),PB1,H5,598,,L,L,598L,None,Yes,Decreased polymerase activity in mammalian cells,"Suttie A. et al., 2019"
+19135815,H5N1(HPAI),PB1,H5,622,,G,G,622G,None,Yes,Increased virulence in mice,"Feng X. et al., 2016"
+19135815,H5N1(HPAI),PB1,H5,635,,K,R,K635R,Substitution,No,,
+19135815,H5N1(HPAI),PB1,H5,660,,I,V,I660V,Substitution,No,,
+19135815,H5N1(HPAI),PB1,H5,738,,G,E,G738E,Substitution,No,,
+19135815,H5N1(HPAI),PB1,H5,741,,S,A,S741A,Substitution,No,,
+19135815,H5N1(HPAI),PB2,H5,63,,I,V,I63V,Substitution,No,,
+19135815,H5N1(HPAI),PB2,H5,79,,G,S,G79S,Substitution,No,,
+19135815,H5N1(HPAI),PB2,H5,89,,V,V,89V,None,Yes,Increased polymerase activity in mammalian cells,"Li J. et al., 2009"
+19135815,H5N1(HPAI),PB2,H5,185,,I,V,I185V,Substitution,No,,
+19135815,H5N1(HPAI),PB2,H5,195,,N,D,N195D,Substitution,No,,
+19135815,H5N1(HPAI),PB2,H5,309,,D,D,309D,None,Yes,Increased polymerase activity in mammalian cells,"Li J. et al., 2009"
+19135815,H5N1(HPAI),PB2,H5,339,,K,K,339K,None,Yes,Increased polymerase activity in mammalian cells,"Li J. et al., 2009"
+19135815,H5N1(HPAI),PB2,H5,389,,R,R,389R,None,Yes,Increased polymerase activity in mammalian cells,"Hu M. et al., 2017b"
+19135815,H5N1(HPAI),PB2,H5,477,,G,G,477G,None,Yes,Increased virulence in mice,"Li J. et al., 2009"
+19135815,H5N1(HPAI),PB2,H5,495,,V,V,495V,None,Yes,Increased virulence in mice,"Li J. et al., 2009"
+19135815,H5N1(HPAI),PB2,H5,598,,T,T,598T,None,Yes,Increased polymerase activity in mammalian cells,"Hu M. et al., 2017b"
+19135815,H5N1(HPAI),PB2,H5,627,,E,E,627E,None,Yes,Increased polymerase activity in mammalian cells,"Li J. et al., 2009"
+19135815,H5N1(HPAI),PB2,H5,655,,V,V,655V,None,Yes,Enhanced pathogenicity in mice,"Arai Y. et al., 2019"
+19135815,H5N1(HPAI),PB2,H5,666,,T,I,T666I,Substitution,No,,
+19135815,H5N1(HPAI),PB2,H5,676,,T,T,676T,None,Yes,Increased virulence in mice,"Li J. et al., 2009"
+19135815,H5N1(HPAI),PB2,H5,680,,D,G,D680G,Substitution,No,,
+19135815,H5N1(HPAI),PB2,H5,697,,I,L,I697L,Substitution,No,,
+19135815,H5N1(HPAI),PB2,H5,715,,S,N,715N,Substitution,Yes,Decreased virulence in mice,"Sun H. et al., 2015"

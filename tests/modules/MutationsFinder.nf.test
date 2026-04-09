@@ -29,8 +29,8 @@ nextflow_process {
             def masterCsv = path(process.out.results[0][2])
             assert masterCsv.exists()
             def csvText = masterCsv.text
-            assert csvText.contains("SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,POSITION_SUBTYPE,REFERENCE_AA,QUERY_AA,MUTATION_TYPE,MARKER,EFFECT,REFERENCE")
-            assert csvText.contains('19135815,H5N1(HPAI),HA1,H5,107,107,R,R,None,Yes,Increased virulence in chickens,"Suttie A. et al., 2019"')
+            assert csvText.contains("SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,POSITION_SUBTYPE,REFERENCE_AA,QUERY_AA,AA_MUTATION,MUTATION_TYPE,MARKER,EFFECT,REFERENCE")
+            assert csvText.contains('19135815,H5N1(HPAI),HA1,H5,134,134,A,A,134A,None,Yes,Increased viral replication in mice lungs,"Zhang J. et al., 2023"')
 
             // Verify Individual HA1 CSV
             def individualCsvs = [process.out.results[0][1]].flatten()
@@ -40,8 +40,8 @@ nextflow_process {
             def ha1CsvPath = path(ha1CsvFile)
             assert ha1CsvPath.exists()
             def ha1Text = ha1CsvPath.text
-            assert ha1Text.contains("SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,POSITION_SUBTYPE,REFERENCE_AA,QUERY_AA,MUTATION_TYPE,MARKER,EFFECT,REFERENCE")
-            assert ha1Text.contains('19135815,H5N1(HPAI),HA1,H5,134,134,A,A,None,Yes,Increased viral replication in mice lungs,"Zhang J. et al., 2023"')
+            assert ha1Text.contains("SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,POSITION_SUBTYPE,REFERENCE_AA,QUERY_AA,AA_MUTATION,MUTATION_TYPE,MARKER,EFFECT,REFERENCE")
+            assert ha1Text.contains('19135815,H5N1(HPAI),HA1,H5,134,134,A,A,134A,None,Yes,Increased viral replication in mice lungs,"Zhang J. et al., 2023"')
         }
     }
 }

@@ -1,7 +1,7 @@
-SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,POSITION_SUBTYPE,REFERENCE_AA,QUERY_AA,MUTATION_TYPE,MARKER,EFFECT,REFERENCE
-19135815,H5N1(HPAI),M1,H5,30,,D,D,None,Yes,Increased virulence in mice,"Fan S. et al., 2009"
-19135815,H5N1(HPAI),M1,H5,43,,M,M,None,Yes,Increased virulence in mice,"Nao N. et al., 2015"
-19135815,H5N1(HPAI),M1,H5,137,,T,A,Substitution,No,,
-19135815,H5N1(HPAI),M1,H5,200,,V,A,Substitution,No,,
-19135815,H5N1(HPAI),M1,H5,211,,Q,Q,None,Yes,Transmitted via aerosol among ferrets,"Sutton T. et al., 2014"
-19135815,H5N1(HPAI),M1,H5,215,,A,A,None,Yes,Increased virulence in mice,"Fan S. et al., 2009"
+SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,POSITION_SUBTYPE,REFERENCE_AA,QUERY_AA,AA_MUTATION,MUTATION_TYPE,MARKER,EFFECT,REFERENCE
+19135815,H5N1(HPAI),M1,H5,30,,D,D,30D,None,Yes,Increased virulence in mice,"Fan S. et al., 2009"
+19135815,H5N1(HPAI),M1,H5,43,,M,M,43M,None,Yes,Increased virulence in mice,"Nao N. et al., 2015"
+19135815,H5N1(HPAI),M1,H5,137,,T,A,T137A,Substitution,No,,
+19135815,H5N1(HPAI),M1,H5,200,,V,A,V200A,Substitution,No,,
+19135815,H5N1(HPAI),M1,H5,211,,Q,Q,211Q,None,Yes,Transmitted via aerosol among ferrets,"Sutton T. et al., 2014"
+19135815,H5N1(HPAI),M1,H5,215,,A,A,215A,None,Yes,Increased virulence in mice,"Fan S. et al., 2009"

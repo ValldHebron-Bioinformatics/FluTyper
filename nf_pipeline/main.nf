@@ -120,6 +120,12 @@ workflow {
             tuple(sample_id, prot_files, h_tag, n_tag, pathotype)
         }
     MutationsFinder(Mutations_ch)
+    //MutationsMerged_ch = MutationsFinder.out.results
+    //    .map { _sample_id, _mut_files, combined_csv -> combined_csv }
+    //    .collectFile(
+    //        name: 'all_mutations_combined.csv',
+    //        keepHeader: true,
+    //    )
     MutationsCompiler_ch = MutationsFinder.out.results
         .map { _sample_id, _mut_files, combined_csv -> combined_csv }
         .collect()
@@ -164,7 +170,9 @@ workflow {
     results = GenotypingFinal_ch
     CDS = GetCDS.out.results.map { _id, path -> path }
     prot = TranslateToProtein.out.results.map { _id, path -> path }
-    
+    //aligned_prot = TranslateToProtein.out.aligned.map { _id, path -> path }
+    //aligned_cds = GetCDS.out.aligned.map { _id, path -> path }
+    //mutations = MutationsMerged_ch
     // Extract both file objects from the 3-item tuple and flatten them
     mut = MutationsFinder.out.results.map { _id, mut_files, combined_csv -> [mut_files, combined_csv] }.flatten()
     
@@ -174,6 +182,14 @@ workflow {
 }
 // Bloc final de publicació de resultats
 output {
+    //aligned_prot {
+    //    path { "${projectDir}/../${params.outDir}/aligned_prot" }
+    //    mode "copy"
+    //}
+    //aligned_cds {
+    //    path { "${projectDir}/../${params.outDir}/aligned_cds" }
+    //    mode "copy"
+    //}
     datasets {
         path { "${projectDir}/../protocols/${params.protocol}/v1/resources" }
         mode "copy"
@@ -190,7 +206,6 @@ output {
         path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
-    
     subtype {
         path { "${projectDir}/../${params.outDir}" }
         mode "copy"
@@ -223,4 +238,8 @@ output {
         path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
+    //mutations {
+    //    path { "${projectDir}/../${params.outDir}" }
+    //    mode "copy"
+    //}
 }
