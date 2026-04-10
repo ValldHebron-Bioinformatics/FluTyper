@@ -78,7 +78,7 @@ for aligned_prot in aligned_prots:
                 aa_mutation = f"{pos_str}{query_aa}"
                 m_info = markers[(pos_str, query_aa)]
                 if not is_mutation:
-                    mutation_type = "None"
+                    mutation_type = "Marker"
                 elif ref_aa == "-" and query_aa != "-":
                     mutation_type = "Insertion"
                 elif ref_aa != "-" and query_aa == "-":
