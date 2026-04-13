@@ -10,7 +10,6 @@ process OrganizeBySample {
     output:
     tuple val(sample_id), path("samples/${sample_id}"), emit: results
     tuple val(sample_id), path("OSerrors.log"), optional: true, emit: errors
-    tuple val(sample_id), path("${sample_id}_orientation.tsv"), emit: orientation
 
     script:
     // Casting the parameter to a file() object forces Nextflow to stage it into the work directory
