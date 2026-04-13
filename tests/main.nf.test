@@ -1,48 +1,76 @@
 nextflow_pipeline {
 
-    name "Test Workflow main.nf"
+    name "Test Workflow FluTyper"
     script "nf_pipeline/main.nf"
 
-    test("Should generate expected output files with content") {
+    test("Should successfully execute the AVIAN protocol") {
 
         when {
             params {
                 protocol = "AVIAN"
                 protocols = [
-                        AVIAN: [
-                            resources : "${projectDir}/protocols/AVIAN/v1"
-                        ]
+                    AVIAN: [
+                        resources : "${projectDir}/protocols/AVIAN/v1"
                     ]
-                inputFasta = "${projectDir}/tests/data/test.fasta" 
+                ]
+                inputFasta = "${projectDir}/tests/data/test.fasta"
                 outDir = "tests/results"
             }
         }
 
         then {
-            // It is still highly recommended to keep the success check 
-            // to ensure the pipeline didn't silently fail before outputting files
             assert workflow.success
+            
+            // Verify that a sufficient number of tasks completed successfully
+            assert workflow.trace.succeeded().size() >= 10
 
-            // Define the base output directory path
+            // Define the output directory
             def outputDir = path("$baseDir/tests/results")
 
-            // Assert final_mutations_report.xlsx exists and is not empty
-            assert outputDir.resolve("final_mutations_report.xlsx").exists()
-            assert outputDir.resolve("final_mutations_report.xlsx").size() > 0
+            // Precise check for the subtype CSV
+            def subtypeFile = outputDir.resolve("inferred_subtypes.csv")
+            assert subtypeFile.exists() : "inferred_subtypes.csv was not published"
+            assert subtypeFile.text.contains("19135815,H5N1,HPAI")
 
-            // Assert inferred_subtypes.csv exists and is not empty
-            assert outputDir.resolve("inferred_subtypes.csv").exists()
-            assert outputDir.resolve("inferred_subtypes.csv").size() > 0
+            // Verify Excel reports are created (without checking internal content)
+            def finalReport = outputDir.resolve("final_mutations_report.xlsx")
+            assert finalReport.exists() : "final_mutations_report.xlsx was not published"
+            
+            def relevantReport = outputDir.resolve("relevant_mutations.xlsx")
+            assert relevantReport.exists() : "relevant_mutations.xlsx was not published"
 
-            // Assert relevant_mutations.xlsx exists and is not empty
-            assert outputDir.resolve("relevant_mutations.xlsx").exists()
-            assert outputDir.resolve("relevant_mutations.xlsx").size() > 0
+            // Deep validation of the sample-specific mutations CSV
+            def sampleMutationsCsv = outputDir.resolve("samples/19135815/19135815_mutations.csv")
+            assert sampleMutationsCsv.exists() : "19135815_mutations.csv was not published"
+            
+            def csvText = sampleMutationsCsv.text
+            
+            // Use single quotes for the Groovy strings so the double quotes in the references are handled natively
+            assert csvText.contains('19135815,H5N1(HPAI),HA2,H5,181,181,V,I,V181I,Substitution,No,,')
+            assert csvText.contains('19135815,H5N1(HPAI),HA2,H5,203,203,M,I,M203I,Substitution,No,,')
+            assert csvText.contains('19135815,H5N1(HPAI),M1,H5,30,30,D,D,30D,Marker,Yes,Increased virulence in mice,"Fan S. et al., 2009"')
+            assert csvText.contains('19135815,H5N1(HPAI),M1,H5,43,43,M,M,43M,Marker,Yes,Increased virulence in mice,"Nao N. et al., 2015"')
 
-            // Assert pipeline_errors.log exists and is not empty
-            assert outputDir.resolve("pipeline_errors.log").exists()
-            assert outputDir.resolve("pipeline_errors.log").size() > 0
+            // Check standard output for the database version log
+            assert workflow.stdout.join('\n').contains("FluMutDB: Local database is up to date")
         }
-
     }
 
+    test("Should fail when the SWINE protocol is selected") {
+
+        when {
+            params {
+                protocol = "SWINE"
+                inputFasta = "${projectDir}/tests/data/test.fasta"
+                outDir = "tests/results"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            
+            // Check the exact error message from your main.nf 'exit 1' call
+            assert workflow.stdout.join('\n').contains("PROTOCOL ERROR: The SWINE protocol is currently under development")
+        }
+    }
 }

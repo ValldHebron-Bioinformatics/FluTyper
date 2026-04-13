@@ -31,4 +31,38 @@ nextflow_process {
         }
 
     }
+    test("Should incorporate extra markers from a CSV file") {
+
+    setup {
+        // Temporary CSV file to serve as the extra markers input
+        def extraFile = file("${outputDir}/custom_markers.csv")
+        extraFile.text = """PROTEIN,POSITION,AA,EFFECT,REFERENCE
+HA1,999,Z,Example,"Marc, 2026"
+"""
+    }
+
+    when {
+        params {
+            extraMarkers = "${outputDir}/custom_markers.csv"
+        }
+        process {
+            """
+            input[0] = [ file(params.protocols[params.protocol].resources + "/flumut_db.sqlite") ]
+            """
+        }
+    }
+
+    then {
+        assert process.success
+        def allFiles = process.out.results.flatten()
+        def ha1File = allFiles.find { it.toString().contains("HA1_markers.csv") }
+        assert ha1File != null : "The process failed to generate HA1_markers.csv"
+
+        // Verify that the custom marker from the setup block exists in the output
+        def content = path(ha1File).text
+        assert content.contains("999")
+        assert content.contains("Example")
+        assert content.contains("Marc, 2026")
+    }
+}
 }

@@ -37,6 +37,32 @@ nextflow_process {
             assert out_dir.resolve("segments/19135815_PA.fasta").exists()
             assert out_dir.resolve("segments/19135815_PB1.fasta").exists()
             assert out_dir.resolve("segments/19135815_NS.fasta").exists()
+            
+            def HA = out_dir.resolve("segments/19135815_HA.fasta")
+            assert HA.text.contains("atggagaacatagtacttcttcttgcaatagt")
+        }
+    }
+    test("Should work with reverse complement sequences") {
+
+        when {
+            params {
+                inputFasta = "${projectDir}/tests/data/19135815/19135815_rev.fasta"
+            }
+            process {
+                """
+                input[0] = "19135815"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def out_dir = path(process.out.results[0][1])
+            assert out_dir.resolve("segments/19135815_HA.fasta").exists()
+            assert out_dir.resolve("segments/19135815_NA.fasta").exists()
+            def HA = out_dir.resolve("segments/19135815_HA.fasta")
+            assert HA.text.contains("atggagaacatagtacttcttcttgcaatagt")
         }
     }
 }

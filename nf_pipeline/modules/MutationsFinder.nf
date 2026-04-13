@@ -19,13 +19,18 @@ from pathlib import Path
 from Bio import SeqIO
 
 markers_dir = Path("${params.protocols[params.protocol].resources}/markers")
-dictionary = "${params.protocols[params.protocol].resources}/HA_DICT.csv"
+ha_dictionary = "${params.protocols[params.protocol].resources}/HA_DICT.csv"
+na_dictionary = "${params.protocols[params.protocol].resources}/NA_DICT.csv"
 mutations_prog = "${params.programs.MutationsDictionary}"
 log_file = "MFerrors.log"
 out_dir = Path("samples/${sample_id}/mutations")
 out_dir.mkdir(parents=True, exist_ok=True)
 output_files = []
 aligned_prots = "${prot_files}".split()
+
+# Extract the target HA and NA subtypes for translation
+target_H = "${h_tag}" if re.match(r'^H\\d+\$', "${h_tag}") else "H5"
+target_N = "${n_tag}" if re.match(r'^N\\d+\$', "${n_tag}") else "N1"
 
 for aligned_prot in aligned_prots:
     file_path = Path(aligned_prot)
@@ -44,9 +49,6 @@ for aligned_prot in aligned_prots:
     
     ref_tag = ref_header.split('_')[0]
     subtype_val = "${h_tag}${n_tag}(${pathotype})" if "${pathotype}" != "" else "${h_tag}${n_tag}"
-    
-    # Now translation is activated for any HA subtype (H1-H18) thanks to the new dictionary
-    target_H = "${h_tag}" if re.match(r'^H\\d+\$', "${h_tag}") else "H5"
     
     markers = {}
     m_file = markers_dir / f"{prot_name}_markers.csv"
@@ -72,13 +74,15 @@ for aligned_prot in aligned_prots:
             pos_str = str(pos)
             is_marker = (pos_str, query_aa) in markers
             is_mutation = (ref_aa != query_aa) and (ref_aa != "X") and (query_aa != "X")
-            pos_subtype = pos_str if prot_name.startswith("HA") else ""
+            
+            # Default to the raw position. The external script will overwrite this if needed.
+            pos_subtype = pos_str
 
             if is_marker:
                 aa_mutation = f"{pos_str}{query_aa}"
                 m_info = markers[(pos_str, query_aa)]
                 if not is_mutation:
-                    mutation_type = "None"
+                    mutation_type = "Marker"
                 elif ref_aa == "-" and query_aa != "-":
                     mutation_type = "Insertion"
                 elif ref_aa != "-" and query_aa == "-":
@@ -100,9 +104,11 @@ for aligned_prot in aligned_prots:
             else:
                 continue
                 
-    # Call the new MutationsDictionary
+    # Call the dynamic MutationsDictionary for HA or NA
     if prot_name.startswith("HA") and target_H != "H5":
-        subprocess.run(["python3", mutations_prog, "--subtype", target_H, "--input", str(output_csv), "--dictionary", dictionary, "--output", str(output_csv)], check=True)
+        subprocess.run(["python3", mutations_prog, "--subtype", target_H, "--base", "H5", "--input", str(output_csv), "--dictionary", ha_dictionary, "--output", str(output_csv)], check=True)
+    elif prot_name.startswith("NA") and target_N != "N1":
+        subprocess.run(["python3", mutations_prog, "--subtype", target_N, "--base", "N1", "--input", str(output_csv), "--dictionary", na_dictionary, "--output", str(output_csv)], check=True)
 
 # Compile master CSV for the sample with all mutations from individual protein files
 master_csv = Path(f"samples/${sample_id}/${sample_id}_mutations.csv")

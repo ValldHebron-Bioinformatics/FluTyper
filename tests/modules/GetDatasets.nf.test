@@ -23,6 +23,10 @@ nextflow_process {
             def datasetDir = path(process.out[0][0])
             assert datasetDir.exists()
             assert datasetDir.getFileName().toString() == "nextclade_H5_dataset"
+
+            def pathogenJson = datasetDir.resolve("pathogen.json")
+            assert pathogenJson.exists() : "Expected pathogen.json file was not found in the dataset directory"
+            assert pathogenJson.toFile().length() > 0 : "The pathogen.json file is empty, expected it to contain metadata about the dataset"
         }
     }
 }

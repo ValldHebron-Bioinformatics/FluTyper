@@ -173,6 +173,7 @@ workflow {
     //aligned_prot = TranslateToProtein.out.aligned.map { _id, path -> path }
     //aligned_cds = GetCDS.out.aligned.map { _id, path -> path }
     //mutations = MutationsMerged_ch
+    //orientation = OrganizeBySample.out.orientation.map { _id, path -> path }
     // Extract both file objects from the 3-item tuple and flatten them
     mut = MutationsFinder.out.results.map { _id, mut_files, combined_csv -> [mut_files, combined_csv] }.flatten()
     
@@ -182,6 +183,10 @@ workflow {
 }
 // Bloc final de publicació de resultats
 output {
+    //orientation {
+    //    path { "${projectDir}/../${params.outDir}/orientation" }
+    //    mode "copy"
+    //}
     //aligned_prot {
     //    path { "${projectDir}/../${params.outDir}/aligned_prot" }
     //    mode "copy"
