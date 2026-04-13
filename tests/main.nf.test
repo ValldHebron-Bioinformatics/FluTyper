@@ -32,18 +32,21 @@ nextflow_pipeline {
             assert subtypeFile.exists() : "inferred_subtypes.csv was not published"
             assert subtypeFile.text.contains("19135815,H5N1,HPAI")
 
-            // Excel Validation using unzip
+            // Excel Validation targeting sharedStrings.xml directly
             def finalReport = outputDir.resolve("final_mutations_report.xlsx")
             assert finalReport.exists() : "final_mutations_report.xlsx was not published"
             
-            def cmd = "unzip -p ${finalReport}"
+            // Added xl/sharedStrings.xml to prevent buffer overload
+            def cmd = "unzip -p ${finalReport} xl/sharedStrings.xml"
             def excelText = cmd.execute().text
             assert excelText.contains("Increased viral replication in mice lungs")
             assert excelText.contains("Zhang J. et al., 2023")
 
             def relevantReport = outputDir.resolve("relevant_mutations.xlsx")
             assert relevantReport.exists() : "relevant_mutations.xlsx was not published"
-            def relevantText = "unzip -p ${relevantReport}".execute().text
+            
+            // Added xl/sharedStrings.xml to prevent buffer overload
+            def relevantText = "unzip -p ${relevantReport} xl/sharedStrings.xml".execute().text
             assert relevantText.contains("Decreased virulence in ducks")
             assert relevantText.contains("Conenello G. et al., 2007")
 
