@@ -10,6 +10,7 @@ process OrganizeBySample {
     output:
     tuple val(sample_id), path("samples/${sample_id}"), emit: results
     tuple val(sample_id), path("OSerrors.log"), optional: true, emit: errors
+    tuple val(sample_id), path("${sample_id}_orientation.tsv"), optional: true, emit: orientation
 
     script:
     // Casting the parameter to a file() object forces Nextflow to stage it into the work directory
@@ -33,7 +34,7 @@ process OrganizeBySample {
 
     # Nextclade Orientation Check
     minimizer_index="${params.protocols[params.protocol].resources}/Segments_minimizers.json"
-    nextclade sort -m "\${minimizer_index}" -r "orientation.tsv" "\$combined_fasta"
+    nextclade sort -m "\${minimizer_index}" -r "${sample_id}_orientation.tsv" "\$combined_fasta"
 
     # Rescue and Split segments based on the orientation check results
     while read -r seq_name; do
@@ -50,7 +51,7 @@ process OrganizeBySample {
         target_file="samples/${sample_id}/segments/${sample_id}_\${seg_type}.fasta"
 
         # Check the orientation score
-        if grep -F "rev_\$seq_name" "\$orientation_tsv" | cut -f 4 | grep -q "[0-9]"; then
+        if grep -F "rev_\$seq_name" "${sample_id}_orientation.tsv" | cut -f 4 | grep -q "[0-9]"; then
             # The reverse complement is correct: extract it and remove the '_rev' tag
             seqkit grep -p "rev_\$seq_name" "\$combined_fasta" | sed 's/^>rev_/>/' > "\$target_file"
         else
