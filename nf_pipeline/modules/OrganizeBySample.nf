@@ -28,30 +28,21 @@ process OrganizeBySample {
         exit 0
     fi
 
-    # Build the combined file (Original + RevComp)
-    rev_comp() {
-        if [[ -n "\$header" ]]; then
-            echo -e "\${header}\\n\${seq}\\n\${header}_rev" >> "\${combined_fasta}"
-            echo "\$seq" | rev | tr 'ACGTRYSWKMBDHVNacgtryswkmbdhvn' 'TGCAYRSWMKVHDBNtgcayrswmkvhdbn' >> "\${combined_fasta}"
-        fi
-    }
-    header=""; seq=""; > "\${combined_fasta}"
-    while read -r line || [[ -n "\$line" ]]; do
-        line=\$(echo "\$line" | tr -d '\\r')
-        if [[ "\$line" == ">"* ]]; then rev_comp; header="\$line"; seq=""; else seq+="\$line"; fi
-    done < "\$raw_sample"; rev_comp
+    # Generate reverse complements and rename headers with seqkit
+    seqkit seq --reverse --complement "\$raw_sample" | seqkit replace -p "(.+)" -r '\$1_rev' > rev_comp.fasta
+    cat "\$raw_sample" rev_comp.fasta > "\$combined_fasta"
 
     # Nextclade Orientation Check
     minimizer_index="${params.protocols[params.protocol].resources}/Segments_minimizers.json"
     nextclade sort -m "\${minimizer_index}" -r ${sample_id}_orientation.tsv "\${combined_fasta}"
 
     # Rescue and Split segments based on the orientation check results
-    while read -r full_head; do
-        clean_name=\${full_head#>} # Remove FASTA header symbol
+    while read -r seq_name; do
         
+        # Identify which segment this sequence belongs to
         seg_type=""
         for s in ${params.segments.join(' ')}; do
-            if [[ "\${full_head}" =~ [_|]\${s}[_|] ]]; then
+            if [[ "\$seq_name" =~ [_|]\${s}[_|] ]]; then
                 seg_type="\$s"
                 break
             fi
@@ -59,22 +50,15 @@ process OrganizeBySample {
 
         target_file="samples/${sample_id}/segments/${sample_id}_\${seg_type}.fasta"
 
-        is_rev=false
-        while IFS=\$'\\t' read -r col_idx col_seqName col_dataset col_score col_hits; do
-            # If the name matches the reverse sequence AND the score column is not empty
-            if [[ "\$col_seqName" == "\${clean_name}_rev" && -n "\$col_score" ]]; then
-                is_rev=true
-                break
-            fi
-        done < "${sample_id}_orientation.tsv"
-
-        if [ "\$is_rev" = true ]; then
-            seqkit grep -p "\${clean_name}_rev" "\${combined_fasta}" | 
-            seqkit replace -p "_rev\$" -r "" > "\$target_file"
+        # Check the orientation score
+        if grep -F "\${seq_name}_rev" "\$orientation_tsv" | cut -f 4 | grep -q "[0-9]"; then
+            # The reverse complement is correct: extract it and remove the '_rev' tag
+            seqkit grep -p "\${seq_name}_rev" "\$combined_fasta" | seqkit replace -p "_rev\$" -r "" > "\$target_file"
         else
-            seqkit grep -p "\${clean_name}" "\${combined_fasta}" > "\$target_file"
+            # The original orientation is correct
+            seqkit grep -p "\$seq_name" "\$combined_fasta" > "\$target_file"
         fi
-    done < <(grep ">" "\$raw_sample")
+    done < <(grep "^>" "\$raw_sample" | tr -d '>')
 
     # Missing segment logging
     for seg in ${params.segments.join(' ')}; do
