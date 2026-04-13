@@ -20,20 +20,32 @@ nextflow_process {
         }
 
         then {
-            assert process.success
-            assert process.out.results.size() > 0 : "Process results channel is empty!"
-            
-            def finalReport = path(process.out.results.get(0)[0])
-            def relevantReport = path(process.out.results.get(0)[1])
-            
-            assert finalReport.exists() : "final_mutations_report.xlsx was not generated"
-            assert relevantReport.exists() : "relevant_mutations.xlsx was not generated"
-            
-            assert finalReport.getFileName().toString() == "final_mutations_report.xlsx"
-            assert relevantReport.getFileName().toString() == "relevant_mutations.xlsx"
-            
-            assert finalReport.size() > 0 : "The final report Excel file is completely empty"
-            assert relevantReport.size() > 0 : "The relevant report Excel file is completely empty"
-        }
+        assert process.success
+        assert process.out.results.size() > 0 : "Process results channel is empty!"
+        
+        def finalReport = path(process.out.results.get(0)[0])
+        def relevantReport = path(process.out.results.get(0)[1])
+        
+        assert finalReport.exists() : "final_mutations_report.xlsx was not generated"
+        assert relevantReport.exists() : "relevant_mutations.xlsx was not generated"
+        
+        // Define a helper to check binary files for specific text strings
+        def fileContains = { reportPath, text ->
+            // The unzip command is used to read the contents of the Excel file without extracting it
+            def cmd = "unzip -p ${reportPath}"
+            return cmd.execute().text.contains(text)
+}
+
+        // Assert that specific mutation effects from your list are present in the final report
+        assert fileContains(finalReport, "Decreased virulence in ducks") : "Missing duck virulence marker in final report"
+        assert fileContains(finalReport, "Enhanced virulence in mice") : "Missing mouse virulence marker in final report"
+        assert fileContains(finalReport, "Marjuki H. et al., 2010") : "Missing reference citation in final report"
+
+        // Perform the same check for the relevant mutations subset
+        assert fileContains(relevantReport, "Decreased virulence in ducks")
+        assert fileContains(relevantReport, "Conenello G. et al., 2007")
+
+        assert finalReport.size() > 1000 : "The final report seems too small to contain data"
     }
+}
 }
