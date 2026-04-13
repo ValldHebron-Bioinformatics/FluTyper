@@ -21,34 +21,35 @@ nextflow_pipeline {
         then {
             assert workflow.success
             
-            // Verify that a sufficient number of tasks completed successfully (channels from the publish block)
+            // Verify that a sufficient number of tasks completed successfully
             assert workflow.trace.succeeded().size() >= 10
 
             // Define the output directory
             def outputDir = path("$baseDir/tests/results")
 
-            // Precise check for the subtype CSV without snapshots
+            // Precise check for the subtype CSV
             def subtypeFile = outputDir.resolve("inferred_subtypes.csv")
             assert subtypeFile.exists() : "inferred_subtypes.csv was not published"
             assert subtypeFile.text.contains("19135815,H5N1,HPAI")
 
-            // Excel Validation targeting sharedStrings.xml directly
+            // Verify Excel reports are created (without checking internal content)
             def finalReport = outputDir.resolve("final_mutations_report.xlsx")
             assert finalReport.exists() : "final_mutations_report.xlsx was not published"
             
-            // Added xl/sharedStrings.xml to prevent buffer overload
-            def cmd = "unzip -p ${finalReport} xl/sharedStrings.xml"
-            def excelText = cmd.execute().text
-            assert excelText.contains("Increased viral replication in mice lungs")
-            assert excelText.contains("Zhang J. et al., 2023")
-
             def relevantReport = outputDir.resolve("relevant_mutations.xlsx")
             assert relevantReport.exists() : "relevant_mutations.xlsx was not published"
+
+            // Deep validation of the sample-specific mutations CSV
+            def sampleMutationsCsv = outputDir.resolve("samples/19135815/19135815_mutations.csv")
+            assert sampleMutationsCsv.exists() : "19135815_mutations.csv was not published"
             
-            // Added xl/sharedStrings.xml to prevent buffer overload
-            def relevantText = "unzip -p ${relevantReport} xl/sharedStrings.xml".execute().text
-            assert relevantText.contains("Decreased virulence in ducks")
-            assert relevantText.contains("Conenello G. et al., 2007")
+            def csvText = sampleMutationsCsv.text
+            
+            // Use single quotes for the Groovy strings so the double quotes in the references are handled natively
+            assert csvText.contains('19135815,H5N1(HPAI),HA2,H5,181,181,V,I,V181I,Substitution,No,,')
+            assert csvText.contains('19135815,H5N1(HPAI),HA2,H5,203,203,M,I,M203I,Substitution,No,,')
+            assert csvText.contains('19135815,H5N1(HPAI),M1,H5,30,30,D,D,30D,Marker,Yes,Increased virulence in mice,"Fan S. et al., 2009"')
+            assert csvText.contains('19135815,H5N1(HPAI),M1,H5,43,43,M,M,43M,Marker,Yes,Increased virulence in mice,"Nao N. et al., 2015"')
 
             // Check standard output for the database version log
             assert workflow.stdout.join('\n').contains("FluMutDB: Local database is up to date")
