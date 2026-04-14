@@ -12,7 +12,7 @@ FluTyper is a modular, reproducible Nextflow pipeline for genotyping zoonotic in
 - Reference dataset selection and download based on detected subtypes.
 - Genotyping using Nextclade with per-sample and merged reports.
 - Extraction of coding sequences (CDS) and translation to protein sequences.
-- Mutation detection and annotation (optional, configurable).
+- Mutation detection and annotation with standardized cross-subtype numbering (optional, configurable).
 - Comprehensive error reporting and logging.
 - Support for both avian and swine influenza viruses (SWINE protocol in development).
 - Modular, reproducible workflow built with Nextflow DSL2.
@@ -55,7 +55,6 @@ nextflow run nf_pipeline/main.nf \
 - Default protocol: `AVIAN` (SWINE is under development)
 
 #### Extra Markers
-
 
 You can provide additional mutation marker data using the `--extraMarkers` flag. This flag should point to a single CSV file containing all extra markers.
 
@@ -111,7 +110,7 @@ FluTyper uses GitHub Actions for automated testing and quality assurance:
 The workflow consists of several key stages:
 
 1. **OrganizeBySample**  
-	Organizes input sequences by sample, extracts segments, and creates per-sample directories.
+	Organizes input sequences by sample, automatically detects correct sequence orientation (handling reverse complements), extracts segments, and creates per-sample directories.
 2. **SubtypeDetection**  
 	Uses Nextclade minimizer-based subtyping to infer H/N subtypes and pathotypes (H5/H7/H9).
 3.  **Database & Dataset Management:**
@@ -125,11 +124,37 @@ The workflow consists of several key stages:
 6. **GetCDS & TranslateToProtein**  
 	Extracts coding sequences (CDS) using reference alignments and translates them to proteins.
 7. **MutationsFinder**  
-	Compares sample proteins to references, annotates mutations, and checks for known markers.
+	Compares sample proteins to references, applies the designated HA and NA numeration schema for standardized coordinates, annotates mutations, and checks for known markers.
 8. **MutationsCompiler**  
 	Compiles all mutation data into a single Excel report with one sheet per protein.
 9. **CompileErrors**  
-	 Aggregates and formats error logs for each sample into a final report.
+	Aggregates and formats error logs for each sample into a final report.
+
+---
+
+## 🔢 Standardized Cross-Subtype Numbering
+
+All mutation markers stored in `flumut_db.sqlite` use a unified reference numbering based on **H5 (for HA proteins) and N1 (for NA protein)**. To enable biologically meaningful cross-subtype comparisons, FluTyper includes two positional correspondence dictionaries that translate residue positions from H5/N1 coordinates into the equivalent positions of any other detected subtype.
+
+### HA Dictionary (`HA_DICT.csv`)
+
+This dictionary covers the hemagglutinin protein and maps H5-based residue positions to the equivalent positions in 17 additional HA subtypes (H1–H18, excluding H5 itself as the reference). It contains 585 alignment positions across the following subtypes:
+
+| Reference | Subtypes covered |
+|-----------|-----------------|
+| H5 | H1, H2, H3, H4, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18 |
+
+### NA Dictionary (`NA_DICT.csv`)
+
+This dictionary covers the neuraminidase protein and maps N1-based residue positions to the equivalent positions in 10 additional NA subtypes (N2–N11). It contains 493 alignment positions across the following subtypes:
+
+| Reference | Subtypes covered |
+|-----------|-----------------|
+| N1 | N2, N3, N4, N5, N6, N7, N8, N9, N10, N11 |
+
+### How it works
+
+During the **MutationsFinder** step, once mutations are identified against the H5 or N1 reference, the `MutationsDictionary.py` script is invoked for any sample whose detected subtype differs from the reference. The script performs a lookup in the appropriate dictionary and populates the `POSITION_SUBTYPE` column in the output CSV with the subtype-specific residue number, while the `POSITION` column retains the original H5/N1 coordinate. This dual-coordinate system allows results to be interpreted both in the standardized reference framework and in the subtype-native numbering, facilitating direct comparison with published literature for any influenza subtype.
 
 ---
 
