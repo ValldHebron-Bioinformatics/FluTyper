@@ -3,6 +3,7 @@ nextflow.enable.dsl=2
 
 process MarkersFiles {
     errorStrategy 'ignore'
+    debug true
 
     input:
     path 'flumut_db.sqlite'
@@ -24,6 +25,7 @@ db_connection = sqlite3.connect('flumut_db.sqlite')
 
 mutations_query = '''
 SELECT 
+    mm.marker_id AS MARKER_ID, -- Retrieve the marker ID to correctly associate mutations combinations with markers
     m.protein_name, -- Retrieve the protein name for grouping
     m.name AS mutation_name, -- Grabs the mutation name (e.g., "M1:N30D") 
     me.effect_name AS EFFECT, -- Pulls the effect description from the markers_effects table
@@ -45,28 +47,39 @@ extra_file_path = "${extra_markers_abs}"
 
 # Check if the path points to a file
 if extra_file_path and os.path.isfile(extra_file_path):
-    extra_df = pd.read_csv(extra_file_path)
-    
-    # Standardize column names to uppercase
-    extra_df.columns = [c.upper() for c in extra_df.columns]
-    
-    # Align the PROTEIN column name with the database query output
-    if 'PROTEIN' in extra_df.columns:
-        extra_df = extra_df.rename(columns={'PROTEIN': 'protein_name'})
+    try:
+        extra_df = pd.read_csv(extra_file_path)
         
-    # Combine the extra markers with the database mutations
-    mutations_dataframe = pd.concat([mutations_dataframe, extra_df], ignore_index=True)
+        # Standardize column names to uppercase
+        extra_df.columns = [c.upper().strip() for c in extra_df.columns]
+        
+        required_columns = {'MARKER_ID', 'POSITION', 'AA', 'PROTEIN', 'EFFECT', 'REFERENCE'}
+        actual_columns = set(extra_df.columns)
+        
+        # Validation
+        if required_columns.issubset(actual_columns):
+            extra_df = extra_df.rename(columns={'PROTEIN': 'protein_name'})
+            mutations_dataframe = pd.concat([mutations_dataframe, extra_df], ignore_index=True)
+        else:
+            missing_cols = required_columns - actual_columns
+            print(f"WARNING: Skipping extra markers file. Missing required columns: {', '.join(missing_cols)}")
+    
+    except Exception as e:
+        print(f"WARNING: Could not process extra markers file. Error: {e}")
 
 # Final cleanup: ensure POSITION is numeric, deduplicate, and sort
 mutations_dataframe['POSITION'] = pd.to_numeric(mutations_dataframe['POSITION'], errors='coerce')
 mutations_dataframe = mutations_dataframe.dropna(subset=['POSITION'])
-mutations_dataframe = mutations_dataframe.drop_duplicates(subset=['protein_name', 'POSITION', 'AA', 'EFFECT'])
+
+# Added REFERENCE to the subset so multiple papers for the same effect are preserved
+mutations_dataframe = mutations_dataframe.drop_duplicates(subset=['MARKER_ID', 'protein_name', 'POSITION', 'AA', 'EFFECT', 'REFERENCE'])
 mutations_dataframe['POSITION'] = mutations_dataframe['POSITION'].astype(int)
-mutations_dataframe = mutations_dataframe.sort_values('POSITION')
+mutations_dataframe = mutations_dataframe.sort_values(['MARKER_ID', 'POSITION'])
 
 # Export grouped files
 for protein_id, protein_specific_dataframe in mutations_dataframe.groupby('protein_name'):
     if protein_id in target_prots:
-        protein_specific_dataframe[['POSITION', 'AA', 'EFFECT', 'REFERENCE']].to_csv(f"{protein_id}_markers.csv", index=False)
+        # Include MARKER_ID in the final CSV output
+        protein_specific_dataframe[['MARKER_ID', 'POSITION', 'AA', 'EFFECT', 'REFERENCE']].to_csv(f"{protein_id}_markers.csv", index=False)
     """
 }
