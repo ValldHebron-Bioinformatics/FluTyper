@@ -17,52 +17,88 @@ nextflow_process {
         then {
             assert process.success
 
-            // Use flatten() to turn the [[file1, file2]] structure into [file1, file2]
             def allFiles = process.out.results.flatten()
-            
-            // Search for the specific file in the flattened list
             def ha1File = allFiles.find { it.toString().contains("HA1_markers.csv") }
             
-            // Enhanced assertion message to help debug if the file is missing in the future
             assert ha1File != null : "HA1_markers.csv not found. Generated files: ${allFiles.collect { it.name }}"
-
-            // Now that ha1File is a single Path object, path().text will work correctly
             assert path(ha1File).text.contains("Increased virus binding to α2-6")
         }
 
     }
-    test("Should incorporate extra markers from a CSV file") {
 
-    setup {
-        // Temporary CSV file to serve as the extra markers input
-        def extraFile = file("${outputDir}/custom_markers.csv")
-        extraFile.text = """PROTEIN,POSITION,AA,EFFECT,REFERENCE
+    test("Should incorporate extra markers from a valid CSV file") {
+
+        setup {
+            def extraFile = file("${outputDir}/custom_markers.csv")
+            // Updated to include all 7 mandatory columns required by the strict validation
+            extraFile.text = """MARKER_ID,POSITION,AA,PROTEIN,EFFECT,FOUND_IN,REFERENCE
+1000,999,Z,HA1,Example Effect,H5N1,"Marc, 2026"
+"""
+        }
+
+        when {
+            params {
+                extraMarkers = "${outputDir}/custom_markers.csv"
+            }
+            process {
+                """
+                input[0] = [ file(params.protocols[params.protocol].resources + "/flumut_db.sqlite") ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            
+            def allFiles = process.out.results.flatten()
+            def ha1File = allFiles.find { it.toString().contains("HA1_markers.csv") }
+            assert ha1File != null : "The process failed to generate HA1_markers.csv"
+
+            // Verify that the properly formatted custom marker was successfully injected
+            def content = path(ha1File).text
+            assert content.contains("1000")
+            assert content.contains("999")
+            assert content.contains("Z")
+            assert content.contains("Example Effect")
+            assert content.contains("H5N1")
+            assert content.contains("Marc, 2026")
+        }
+    }
+
+    test("Should safely skip extra markers and warn if required columns are missing") {
+
+        setup {
+            def extraFile = file("${outputDir}/invalid_markers.csv")
+            // Deliberately missing MARKER_ID and FOUND_IN to trigger the validation check
+            extraFile.text = """PROTEIN,POSITION,AA,EFFECT,REFERENCE
 HA1,999,Z,Example,"Marc, 2026"
 """
-    }
-
-    when {
-        params {
-            extraMarkers = "${outputDir}/custom_markers.csv"
         }
-        process {
-            """
-            input[0] = [ file(params.protocols[params.protocol].resources + "/flumut_db.sqlite") ]
-            """
+
+        when {
+            params {
+                extraMarkers = "${outputDir}/invalid_markers.csv"
+            }
+            process {
+                """
+                input[0] = [ file(params.protocols[params.protocol].resources + "/flumut_db.sqlite") ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            
+            // Confirm the script intercepted the bad file and printed the expected warning
+            def consoleOutput = process.stdout.join("\n")
+            assert consoleOutput.contains("WARNING: Skipping extra markers file. Missing required columns")
+            
+            // Confirm the bad data was completely ignored and not written to the final output
+            def allFiles = process.out.results.flatten()
+            def ha1File = allFiles.find { it.toString().contains("HA1_markers.csv") }
+            def content = path(ha1File).text
+            assert !content.contains("999")
+            assert !content.contains("Marc, 2026")
         }
     }
-
-    then {
-        assert process.success
-        def allFiles = process.out.results.flatten()
-        def ha1File = allFiles.find { it.toString().contains("HA1_markers.csv") }
-        assert ha1File != null : "The process failed to generate HA1_markers.csv"
-
-        // Verify that the custom marker from the setup block exists in the output
-        def content = path(ha1File).text
-        assert content.contains("999")
-        assert content.contains("Example")
-        assert content.contains("Marc, 2026")
-    }
-}
 }
