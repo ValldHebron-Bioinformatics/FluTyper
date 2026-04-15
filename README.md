@@ -114,6 +114,8 @@ FluTyper uses GitHub Actions for automated testing and quality assurance:
 
 ## 🔄 Pipeline Overview
 
+![FluTyper pipeline walkthrough](docs/TFM/FluTyper.drawio.png)
+
 The workflow consists of several key stages:
 
 1. **OrganizeBySample**  
@@ -167,10 +169,34 @@ During the **MutationsFinder** step, once mutations are identified against the H
 
 ## 📂 Output
 
+![FluTyper output folder organization](docs/TFM/Folderorganization.drawio.png)
+
 - `final_genotyping_results.csv`: Summary of genotyping and QC for all samples.
 - `final_mutations_report.xlsx`: All detected mutations, organized by protein.
+- `relevant_mutations.xlsx`: Filtered mutation report including markers and mutations above the configured relevance threshold.
 - `samples/<sample_id>/`: Per-sample folders with intermediate and final sequence files.
 - `pipeline_errors.log`: Aggregated error log for the entire run.
+
+### `final_mutations_report.xlsx` columns
+
+The `All_Proteins` sheet and each protein-specific sheet contain the same columns:
+
+- `SAMPLE_ID`: Sample identifier.
+- `SUBTYPE`: Detected subtype for the sample (for example `H3N5` or `H5N1(HPAI)`).
+- `PROTEIN`: Protein where the mutation/marker was found.
+- `REF_SUBTYPE`: Reference subtype used during the alignment for that protein.
+- `POSITION`: Residue position in the target numbering used for reporting.
+- `POSITION_REF`: Standardized reference position used internally for marker matching (H5 for HA, N1 for NA).
+- `REFERENCE_AA`: Amino acid in the reference sequence at that position.
+- `QUERY_AA`: Amino acid in the sample sequence at that position.
+- `AA_MUTATION`: Mutation label. For substitutions it is formatted like `N30D`; marker-only entries can appear as `<position><AA>`. The position used is the one found in `POSITION`.
+- `MUTATION_TYPE`: One of `Substitution`, `Insertion`, `Deletion`, or `Marker`.
+- `MARKER`: `Yes` if the event matches a known marker definition, otherwise `No`.
+- `MARKER_ID`: Marker identifier(s). Multiple IDs are separated by ` | `.
+- `IS_COMBINATION`: `Yes` when the matched marker ID represents a multi-mutation combination, otherwise `No`.
+- `EFFECT`: Marker effect annotation(s), if available.
+- `FOUND_IN`: Subtype where the marker was reported in the source data.
+- `REFERENCE`: Literature/source reference(s) associated with the marker.
 
 ---
 
