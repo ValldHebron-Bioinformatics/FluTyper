@@ -29,6 +29,7 @@ SELECT
     m.protein_name, -- Retrieve the protein name for grouping
     m.name AS mutation_name, -- Grabs the mutation name (e.g., "M1:N30D") 
     me.effect_name AS EFFECT, -- Pulls the effect description from the markers_effects table
+    me.subtype AS FOUND_IN, -- Extract the subtype where the mutation was found
     me.paper_id AS REFERENCE -- Pulls the reference paper ID for the mutation effect
 FROM mutations m
 JOIN markers_mutations mm ON m.name = mm.mutation_name
@@ -49,13 +50,14 @@ extra_file_path = "${extra_markers_abs}"
 if extra_file_path and os.path.isfile(extra_file_path):
     try:
         extra_df = pd.read_csv(extra_file_path)
-        
+
         # Standardize column names to uppercase
         extra_df.columns = [c.upper().strip() for c in extra_df.columns]
         
-        required_columns = {'MARKER_ID', 'POSITION', 'AA', 'PROTEIN', 'EFFECT', 'REFERENCE'}
+        # Added FOUND_IN
+        required_columns = {'MARKER_ID', 'POSITION', 'AA', 'PROTEIN', 'EFFECT', 'FOUND_IN', 'REFERENCE'}
         actual_columns = set(extra_df.columns)
-        
+
         # Validation
         if required_columns.issubset(actual_columns):
             extra_df = extra_df.rename(columns={'PROTEIN': 'protein_name'})
@@ -67,19 +69,17 @@ if extra_file_path and os.path.isfile(extra_file_path):
     except Exception as e:
         print(f"WARNING: Could not process extra markers file. Error: {e}")
 
-# Final cleanup: ensure POSITION is numeric, deduplicate, and sort
 mutations_dataframe['POSITION'] = pd.to_numeric(mutations_dataframe['POSITION'], errors='coerce')
 mutations_dataframe = mutations_dataframe.dropna(subset=['POSITION'])
 
-# Added REFERENCE to the subset so multiple papers for the same effect are preserved
-mutations_dataframe = mutations_dataframe.drop_duplicates(subset=['MARKER_ID', 'protein_name', 'POSITION', 'AA', 'EFFECT', 'REFERENCE'])
+# Include FOUND_IN in the deduplication subset to preserve unique subtype records
+mutations_dataframe = mutations_dataframe.drop_duplicates(subset=['MARKER_ID', 'protein_name', 'POSITION', 'AA', 'EFFECT', 'FOUND_IN', 'REFERENCE'])
 mutations_dataframe['POSITION'] = mutations_dataframe['POSITION'].astype(int)
 mutations_dataframe = mutations_dataframe.sort_values(['MARKER_ID', 'POSITION'])
 
-# Export grouped files
 for protein_id, protein_specific_dataframe in mutations_dataframe.groupby('protein_name'):
     if protein_id in target_prots:
-        # Include MARKER_ID in the final CSV output
-        protein_specific_dataframe[['MARKER_ID', 'POSITION', 'AA', 'EFFECT', 'REFERENCE']].to_csv(f"{protein_id}_markers.csv", index=False)
+        # Final CSV structure
+        protein_specific_dataframe[['MARKER_ID', 'POSITION', 'AA', 'EFFECT', 'FOUND_IN', 'REFERENCE']].to_csv(f"{protein_id}_markers.csv", index=False)
     """
 }

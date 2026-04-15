@@ -48,7 +48,7 @@ nextflow run nf_pipeline/main.nf \
   --inputFasta <input.fasta> \
   --protocol <AVIAN|SWINE> \
   --outDir <output_directory> \
-  --extraMarkers <folder_with_marker_csvs> \
+	--extraMarkers <extra_markers.csv> \
   --threshold <0-1>
 ```
 - Default input: `docs/fastas/prova.fasta`
@@ -60,20 +60,27 @@ You can provide additional mutation marker data using the `--extraMarkers` flag.
 
 **CSV format:**
 
-- The file must have exactly five columns, with headers:
-	- `POSITION`, `AA`, `PROTEIN`, `EFFECT`, `REFERENCE`
+- The file must have exactly seven columns, with headers:
+	- `MARKER_ID`, `POSITION`, `AA`, `PROTEIN`, `EFFECT`, `FOUND_IN`, `REFERENCE`
+- `MARKER_ID` must be an integer and should start at `1000` for custom markers.
+- Use the same `MARKER_ID` across multiple rows when a marker is defined by a combination of mutations.
+- `FOUND_IN` should indicate the subtype/context where that marker effect was reported.
 - Example:
 	```csv
-	POSITION,AA,PROTEIN,EFFECT,REFERENCE
-	155,K,HA1,Antigenic,Reference1
-	24,R,M1,CANCER,PMID: 12345678
-	190,E,NA,Resistance,Reference2
+	MARKER_ID,POSITION,AA,PROTEIN,EFFECT,FOUND_IN,REFERENCE
+	1000,155,K,HA1,Antigenic,H5N1,Reference1
+	1001,24,R,M1,CANCER,H1N1,PMID:12345678
+	1002,190,E,NA,Resistance,H7N9,Reference2
+	1010,30,D,M1,Composite marker example,H5N1,PMID:11111111
+	1010,31,N,M1,Composite marker example,H5N1,PMID:11111111
 	```
 
 **Valid protein names:**
-HA1, HA2, NA, NP, M1, M2, NS1, NS2, PA, PB1, PB2
+HA1, HA2, M1, M2, NA, NP, NS-1, NS-2, PA, PB1, PB1-F2, PB2
 
 Each row should specify the protein in the `PROTEIN` column. The pipeline will automatically detect and use all valid markers from this file.
+Rows that share the same `MARKER_ID` are linked as a single marker definition, allowing the pipeline to evaluate combined mutation patterns together.
+If required columns are missing or the file cannot be parsed, the pipeline prints a warning and skips loading extra markers from that file.
 
 ### Threshold parameter for mutation relevance
 
