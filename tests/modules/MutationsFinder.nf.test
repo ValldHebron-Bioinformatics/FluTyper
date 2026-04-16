@@ -25,14 +25,22 @@ nextflow_process {
         then {
             assert process.success
             
-            // Verify Master CSV
             def masterCsv = path(process.out.results[0][2])
             assert masterCsv.exists()
             def csvText = masterCsv.text
-            assert csvText.contains("SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,POSITION_SUBTYPE,REFERENCE_AA,QUERY_AA,AA_MUTATION,MUTATION_TYPE,MARKER,EFFECT,REFERENCE")
-            assert csvText.contains('19135815,H5N1(HPAI),HA1,H5,134,134,A,A,134A,Marker,Yes,Increased viral replication in mice lungs,"Zhang J. et al., 2023"')
+            
+            // Verify the new expanded header
+            assert csvText.contains("SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,POSITION_REF,REFERENCE_AA,QUERY_AA,AA_MUTATION,MUTATION_TYPE,MARKER,MARKER_ID,IS_COMBINATION,EFFECT,FOUND_IN,REFERENCE")
+            
+            // Verify a standard substitution with empty marker fields
+            assert csvText.contains("19135815,H5N1(HPAI),HA1,H5,104,104,M,L,M104L,Substitution,No,,No,,,")
+            
+            // Verify a standalone marker with the new FOUND_IN column and joined effects
+            assert csvText.contains('19135815,H5N1(HPAI),HA1,H5,134,134,A,A,134A,Marker,Yes,391,No,Increased viral replication in mice lungs | Increased virus thermostability,H9N2,"Zhang J. et al., 2023"')
+            
+            // Verify a combination marker with multiple references
+            assert csvText.contains('19135815,H5N1(HPAI),HA1,H5,107,107,R,R,107R,Marker,Yes,186,Yes,Increased pH of fusion | Increased virulence in chickens | Increased virulence in mice,H5N1,"Suttie A. et al., 2019 | Wessels U. et al., 2018"')
 
-            // Verify Individual HA1 CSV
             def individualCsvs = [process.out.results[0][1]].flatten()
             def ha1CsvFile = individualCsvs.find { it.toString().endsWith("19135815_HA1_mutations.csv") }
             assert ha1CsvFile != null : "The expected file 19135815_HA1_mutations.csv was not generated"
@@ -40,8 +48,10 @@ nextflow_process {
             def ha1CsvPath = path(ha1CsvFile)
             assert ha1CsvPath.exists()
             def ha1Text = ha1CsvPath.text
-            assert ha1Text.contains("SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,POSITION_SUBTYPE,REFERENCE_AA,QUERY_AA,AA_MUTATION,MUTATION_TYPE,MARKER,EFFECT,REFERENCE")
-            assert ha1Text.contains('19135815,H5N1(HPAI),HA1,H5,134,134,A,A,134A,Marker,Yes,Increased viral replication in mice lungs,"Zhang J. et al., 2023"')
+            
+            // Verify the individual protein file maintains the exact same structure
+            assert ha1Text.contains("SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,POSITION_REF,REFERENCE_AA,QUERY_AA,AA_MUTATION,MUTATION_TYPE,MARKER,MARKER_ID,IS_COMBINATION,EFFECT,FOUND_IN,REFERENCE")
+            assert ha1Text.contains('19135815,H5N1(HPAI),HA1,H5,134,134,A,A,134A,Marker,Yes,391,No,Increased viral replication in mice lungs | Increased virus thermostability,H9N2,"Zhang J. et al., 2023"')
         }
     }
 }

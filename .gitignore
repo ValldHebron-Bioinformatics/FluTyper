@@ -13,7 +13,10 @@ protocols/AVIAN/v1/AA_dictionary_proposal
 protocols/AVIAN/v1/MARKERS
 analisis/
 nf_pipeline/bin/Headers.py
+nf_pipeline/bin/Dictcreator.py
+nf_pipeline/bin/MutationsDictionary.py
 lastyear/
 thisyear/
 tests/data
 tests/results
+RESULTS/

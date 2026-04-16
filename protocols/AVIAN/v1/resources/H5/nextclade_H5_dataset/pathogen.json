@@ -11,16 +11,13 @@
     "name": "H5Nx clade 2.3.4.4",
     "reference accession": "EPI1846961",
     "reference name": "A/Astrakhan/3212/2020(H5N8)",
-    "segment": "ha",
-    "experimental": false
+    "segment": "ha"
   },
   "compatibility": {
     "cli": "3.0.0-alpha.0",
     "web": "3.0.0-alpha.0"
   },
   "defaultCds": "HA",
-  "deprecated": false,
-  "experimental": false,
   "files": {
     "changelog": "CHANGELOG.md",
     "genomeAnnotation": "genome_annotation.gff3",
@@ -126,8 +123,8 @@
   ],
   "schemaVersion": "3.0.0",
   "version": {
-    "updatedAt": "2025-09-09T12:13:13Z",
-    "tag": "2025-09-09--12-13-13Z",
+    "updatedAt": "2026-04-14T11:55:23Z",
+    "tag": "2026-04-14--11-55-23Z",
     "compatibility": {
       "cli": "3.0.0-alpha.0",
       "web": "3.0.0-alpha.0"

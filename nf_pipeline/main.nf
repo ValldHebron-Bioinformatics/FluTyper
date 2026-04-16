@@ -170,8 +170,8 @@ workflow {
     results = GenotypingFinal_ch
     CDS = GetCDS.out.results.map { _id, path -> path }
     prot = TranslateToProtein.out.results.map { _id, path -> path }
-    //aligned_prot = TranslateToProtein.out.aligned.map { _id, path -> path }
-    //aligned_cds = GetCDS.out.aligned.map { _id, path -> path }
+    aligned_prot = TranslateToProtein.out.aligned.map { _id, path -> path }
+    aligned_cds = GetCDS.out.aligned.map { _id, path -> path }
     //mutations = MutationsMerged_ch
     //orientation = OrganizeBySample.out.orientation.map { _id, path -> path }
     // Extract both file objects from the 3-item tuple and flatten them
@@ -187,14 +187,14 @@ output {
     //    path { "${projectDir}/../${params.outDir}/orientation" }
     //    mode "copy"
     //}
-    //aligned_prot {
-    //    path { "${projectDir}/../${params.outDir}/aligned_prot" }
-    //    mode "copy"
-    //}
-    //aligned_cds {
-    //    path { "${projectDir}/../${params.outDir}/aligned_cds" }
-    //    mode "copy"
-    //}
+    aligned_prot {
+        path { "${projectDir}/../${params.outDir}/aligned_prot" }
+        mode "copy"
+    }
+    aligned_cds {
+        path { "${projectDir}/../${params.outDir}/aligned_cds" }
+        mode "copy"
+    }
     datasets {
         path { "${projectDir}/../protocols/${params.protocol}/v1/resources" }
         mode "copy"
