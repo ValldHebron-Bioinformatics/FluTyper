@@ -49,7 +49,7 @@ jobs:
           chmod +x nextclade && sudo mv nextclade /usr/local/bin/
 
           python3 -m pip install --upgrade pip
-          pip install pandas openpyxl biopython numpy plotly
+          pip install pandas openpyxl biopython numpy plotly nbformat
 
       - name: Setup nf-test
         uses: nf-core/setup-nf-test@v2.0.0
