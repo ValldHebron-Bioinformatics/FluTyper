@@ -1,116 +1,109 @@
-SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,POSITION_SUBTYPE,REFERENCE_AA,QUERY_AA,AA_MUTATION,MUTATION_TYPE,MARKER,EFFECT,REFERENCE
-19135815,H5N1(HPAI),HA1,H5,104,104,M,L,M104L,Substitution,No,,
-19135815,H5N1(HPAI),HA1,H5,107,107,R,R,107R,Marker,Yes,Increased virulence in chickens,"Suttie A. et al., 2019"
-19135815,H5N1(HPAI),HA1,H5,108,108,I,I,108I,Marker,Yes,Increased virulence in mice,"Suttie A. et al., 2019"
-19135815,H5N1(HPAI),HA1,H5,123,123,P,P,123P,Marker,Yes,Increased virus binding to α2-6,"Suttie A. et al., 2019"
-19135815,H5N1(HPAI),HA1,H5,129,129,L,R,L129R,Substitution,No,,
-19135815,H5N1(HPAI),HA1,H5,133,133,A,A,133A,Marker,Yes,Increased pseudovirus binding to α2-6,"Suttie A. et al., 2019"
-19135815,H5N1(HPAI),HA1,H5,134,134,A,A,134A,Marker,Yes,Increased viral replication in mice lungs,"Zhang J. et al., 2023"
-19135815,H5N1(HPAI),HA1,H5,148,148,V,L,V148L,Substitution,No,,
-19135815,H5N1(HPAI),HA1,H5,154,154,N,N,154N,Marker,Yes,Increased virus binding to α2-6,"Suttie A. et al., 2019"
-19135815,H5N1(HPAI),HA1,H5,156,156,A,A,156A,Marker,Yes,Transmitted via aerosol among ferrets,"Herfst S. et al., 2012"
-19135815,H5N1(HPAI),HA1,H5,182,182,N,N,182N,Marker,Yes,Increased virus binding to α2-6,"Lu X. et al., 2013"
-19135815,H5N1(HPAI),HA1,H5,210,210,A,V,A210V,Substitution,No,,
-19135815,H5N1(HPAI),HA1,H5,218,218,Q,Q,218Q,Marker,Yes,Increased virus binding to α2-3,"Guo H. et al., 2017"
-19135815,H5N1(HPAI),HA1,H5,223,223,R,R,223R,Marker,Yes,Increased virus binding to α2-3,"Guo H. et al., 2017"
-19135815,H5N1(HPAI),HA2,H5,64,64,E,E,64E,Marker,Yes,Decreased virulence in mice,"Sun X. et al., 2019"
-19135815,H5N1(HPAI),HA2,H5,181,181,V,I,V181I,Substitution,No,,
-19135815,H5N1(HPAI),HA2,H5,203,203,M,I,M203I,Substitution,No,,
-19135815,H5N1(HPAI),M1,H5,30,,D,D,30D,Marker,Yes,Increased virulence in mice,"Fan S. et al., 2009"
-19135815,H5N1(HPAI),M1,H5,43,,M,M,43M,Marker,Yes,Increased virulence in mice,"Nao N. et al., 2015"
-19135815,H5N1(HPAI),M1,H5,137,,T,A,T137A,Substitution,No,,
-19135815,H5N1(HPAI),M1,H5,200,,V,A,V200A,Substitution,No,,
-19135815,H5N1(HPAI),M1,H5,211,,Q,Q,211Q,Marker,Yes,Transmitted via aerosol among ferrets,"Sutton T. et al., 2014"
-19135815,H5N1(HPAI),M1,H5,215,,A,A,215A,Marker,Yes,Increased virulence in mice,"Fan S. et al., 2009"
-19135815,H5N1(HPAI),M2,H5,6,,E,K,E6K,Substitution,No,,
-19135815,H5N1(HPAI),M2,H5,7,,V,I,V7I,Substitution,No,,
-19135815,H5N1(HPAI),M2,H5,8,,E,C,E8C,Substitution,No,,
-19135815,H5N1(HPAI),M2,H5,9,,T,R,T9R,Substitution,No,,
-19135815,H5N1(HPAI),M2,H5,61,,G,R,G61R,Substitution,No,,
-19135815,H5N1(HPAI),M2,H5,68,,V,A,V68A,Substitution,No,,
-19135815,H5N1(HPAI),M2,H5,80,,Q,R,Q80R,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,6,,K,R,K6R,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,8,,T,I,T8I,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,10,,I,T,I10T,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,95,,S,G,S95G,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,259,,D,E,D259E,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,287,,D,E,D287E,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,395,,E,A,E395A,Substitution,No,,
-19135815,H5N1(HPAI),NA,N1,405,,S,T,S405T,Substitution,No,,
-19135815,H5N1(HPAI),NP,H5,10,,Y,H,Y10H,Substitution,No,,
-19135815,H5N1(HPAI),NP,H5,22,,A,T,A22T,Substitution,No,,
-19135815,H5N1(HPAI),NP,H5,50,,R,S,R50S,Substitution,No,,
-19135815,H5N1(HPAI),NP,H5,51,,D,E,D51E,Substitution,No,,
-19135815,H5N1(HPAI),NP,H5,52,,H,H,52H,Marker,Yes,Evade human BTN3A3 (inhibitor of avian influenza A viruses replication),"Pinto R. et al., 2023"
-19135815,H5N1(HPAI),NP,H5,105,,V,V,105V,Marker,Yes,Increased virulence in chickens,"Suttie A. et al., 2019"
-19135815,H5N1(HPAI),NP,H5,184,,K,K,184K,Marker,Yes,Enhanced interferon response,"Suttie A. et al., 2019"
-19135815,H5N1(HPAI),NP,H5,319,,N,K,319K,Substitution,Yes,Increased polymerase activity in mammalian cells,"Gabriel G. et al., 2005"
-19135815,H5N1(HPAI),NP,H5,353,,I,V,I353V,Substitution,No,,
-19135815,H5N1(HPAI),NS1,H5,53,,G,D,G53D,Substitution,No,,
-19135815,H5N1(HPAI),NS1,H5,58,,T,I,T58I,Substitution,No,,
-19135815,H5N1(HPAI),NS1,H5,76,,T,A,T76A,Substitution,No,,
-19135815,H5N1(HPAI),NS1,H5,147,,L,I,L147I,Substitution,No,,
-19135815,H5N1(HPAI),NS1,H5,171,,D,N,D171N,Substitution,No,,
-19135815,H5N1(HPAI),NS2,H5,67,,E,G,E67G,Substitution,No,,
-19135815,H5N1(HPAI),NS2,H5,82,,G,E,G82E,Substitution,No,,
-19135815,H5N1(HPAI),PA-X,H5,61,,M,T,M61T,Substitution,No,,
-19135815,H5N1(HPAI),PA-X,H5,86,,M,I,M86I,Substitution,No,,
-19135815,H5N1(HPAI),PA-X,H5,160,,D,E,D160E,Substitution,No,,
-19135815,H5N1(HPAI),PA-X,H5,201,,I,T,I201T,Substitution,No,,
-19135815,H5N1(HPAI),PA,H5,37,,A,A,37A,Marker,Yes,Increased polymerase activity in mammalian cells,"Suttie A. et al., 2019"
-19135815,H5N1(HPAI),PA,H5,61,,M,T,M61T,Substitution,No,,
-19135815,H5N1(HPAI),PA,H5,86,,M,I,M86I,Substitution,No,,
-19135815,H5N1(HPAI),PA,H5,160,,D,E,D160E,Substitution,No,,
-19135815,H5N1(HPAI),PA,H5,190,,S,S,190S,Marker,Yes,Decreased virulence in mice,"DesRochers B. et al., 2016"
-19135815,H5N1(HPAI),PA,H5,201,,I,T,I201T,Substitution,No,,
-19135815,H5N1(HPAI),PA,H5,266,,R,R,266R,Marker,Yes,Increased polymerase activity in mammalian cells,"Leung B. et al., 2010"
-19135815,H5N1(HPAI),PA,H5,322,,I,L,I322L,Substitution,No,,
-19135815,H5N1(HPAI),PA,H5,354,,I,F,I354F,Substitution,No,,
-19135815,H5N1(HPAI),PA,H5,383,,D,D,383D,Marker,Yes,Increased polymerase activity in mice cells,"Leung B. et al., 2010"
-19135815,H5N1(HPAI),PA,H5,400,,S,P,400P,Substitution,Yes,Decreased virulence in mice,"DesRochers B. et al., 2016"
-19135815,H5N1(HPAI),PA,H5,404,,A,S,A404S,Substitution,No,,
-19135815,H5N1(HPAI),PA,H5,409,,S,S,409S,Marker,Yes,Increased replication in mammalian cells,"Suttie A. et al., 2019"
-19135815,H5N1(HPAI),PA,H5,441,,V,M,V441M,Substitution,No,,
-19135815,H5N1(HPAI),PA,H5,515,,T,T,515T,Marker,Yes,Increased polymerase activity in mammalian cells,"Leung B. et al., 2010"
-19135815,H5N1(HPAI),PA,H5,608,,S,T,S608T,Substitution,No,,
-19135815,H5N1(HPAI),PA,H5,711,,L,I,L711I,Substitution,No,,
-19135815,H5N1(HPAI),PB1-F2,H5,40,,D,G,D40G,Substitution,No,,
-19135815,H5N1(HPAI),PB1-F2,H5,46,,T,M,T46M,Substitution,No,,
-19135815,H5N1(HPAI),PB1-F2,H5,51,,M,M,51M,Marker,Yes,Decreased virulence in ducks,"Marjuki H. et al., 2010"
-19135815,H5N1(HPAI),PB1-F2,H5,56,,A,A,56A,Marker,Yes,Decreased virulence in ducks,"Marjuki H. et al., 2010"
-19135815,H5N1(HPAI),PB1-F2,H5,66,,S,S,66S,Marker,Yes,Enhanced virulence in mice,"Conenello G. et al., 2007"
-19135815,H5N1(HPAI),PB1-F2,H5,73,,E,K,E73K,Substitution,No,,
-19135815,H5N1(HPAI),PB1,H5,3,,V,V,3V,Marker,Yes,Increased replication in mammalian cells,"Elgendy E. et al., 2017"
-19135815,H5N1(HPAI),PB1,H5,16,,N,D,N16D,Substitution,No,,
-19135815,H5N1(HPAI),PB1,H5,104,,G,E,G104E,Substitution,No,,
-19135815,H5N1(HPAI),PB1,H5,115,,Q,Q,115Q,Marker,Yes,Transmitted via aerosol among guinea pigs,"Zhang C. et al., 2021"
-19135815,H5N1(HPAI),PB1,H5,157,,A,T,A157T,Substitution,No,,
-19135815,H5N1(HPAI),PB1,H5,176,,T,K,T176K,Substitution,No,,
-19135815,H5N1(HPAI),PB1,H5,213,,N,T,N213T,Substitution,No,,
-19135815,H5N1(HPAI),PB1,H5,372,,I,M,I372M,Substitution,No,,
-19135815,H5N1(HPAI),PB1,H5,430,,R,K,R430K,Substitution,No,,
-19135815,H5N1(HPAI),PB1,H5,527,,V,I,V527I,Substitution,No,,
-19135815,H5N1(HPAI),PB1,H5,598,,L,L,598L,Marker,Yes,Decreased polymerase activity in mammalian cells,"Suttie A. et al., 2019"
-19135815,H5N1(HPAI),PB1,H5,622,,G,G,622G,Marker,Yes,Increased virulence in mice,"Feng X. et al., 2016"
-19135815,H5N1(HPAI),PB1,H5,635,,K,R,K635R,Substitution,No,,
-19135815,H5N1(HPAI),PB1,H5,660,,I,V,I660V,Substitution,No,,
-19135815,H5N1(HPAI),PB1,H5,738,,G,E,G738E,Substitution,No,,
-19135815,H5N1(HPAI),PB1,H5,741,,S,A,S741A,Substitution,No,,
-19135815,H5N1(HPAI),PB2,H5,63,,I,V,I63V,Substitution,No,,
-19135815,H5N1(HPAI),PB2,H5,79,,G,S,G79S,Substitution,No,,
-19135815,H5N1(HPAI),PB2,H5,89,,V,V,89V,Marker,Yes,Increased polymerase activity in mammalian cells,"Li J. et al., 2009"
-19135815,H5N1(HPAI),PB2,H5,185,,I,V,I185V,Substitution,No,,
-19135815,H5N1(HPAI),PB2,H5,195,,N,D,N195D,Substitution,No,,
-19135815,H5N1(HPAI),PB2,H5,309,,D,D,309D,Marker,Yes,Increased polymerase activity in mammalian cells,"Li J. et al., 2009"
-19135815,H5N1(HPAI),PB2,H5,339,,K,K,339K,Marker,Yes,Increased polymerase activity in mammalian cells,"Li J. et al., 2009"
-19135815,H5N1(HPAI),PB2,H5,389,,R,R,389R,Marker,Yes,Increased polymerase activity in mammalian cells,"Hu M. et al., 2017b"
-19135815,H5N1(HPAI),PB2,H5,477,,G,G,477G,Marker,Yes,Increased virulence in mice,"Li J. et al., 2009"
-19135815,H5N1(HPAI),PB2,H5,495,,V,V,495V,Marker,Yes,Increased virulence in mice,"Li J. et al., 2009"
-19135815,H5N1(HPAI),PB2,H5,598,,T,T,598T,Marker,Yes,Increased polymerase activity in mammalian cells,"Hu M. et al., 2017b"
-19135815,H5N1(HPAI),PB2,H5,627,,E,E,627E,Marker,Yes,Increased polymerase activity in mammalian cells,"Li J. et al., 2009"
-19135815,H5N1(HPAI),PB2,H5,655,,V,V,655V,Marker,Yes,Enhanced pathogenicity in mice,"Arai Y. et al., 2019"
-19135815,H5N1(HPAI),PB2,H5,666,,T,I,T666I,Substitution,No,,
-19135815,H5N1(HPAI),PB2,H5,676,,T,T,676T,Marker,Yes,Increased virulence in mice,"Li J. et al., 2009"
-19135815,H5N1(HPAI),PB2,H5,680,,D,G,D680G,Substitution,No,,
-19135815,H5N1(HPAI),PB2,H5,697,,I,L,I697L,Substitution,No,,
-19135815,H5N1(HPAI),PB2,H5,715,,S,N,715N,Substitution,Yes,Decreased virulence in mice,"Sun H. et al., 2015"
+SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,POSITION_REF,REFERENCE_AA,QUERY_AA,AA_MUTATION,MUTATION_TYPE,MARKER,MARKER_ID,IS_COMBINATION,EFFECT,FOUND_IN,REFERENCE
+19135815,H5N1(HPAI),HA1,H5,104,104,M,L,M104L,Substitution,No,,No,,,
+19135815,H5N1(HPAI),HA1,H5,107,107,R,R,107R,Marker,Yes,186,Yes,Increased pH of fusion | Increased virulence in chickens | Increased virulence in mice,H5N1,"Suttie A. et al., 2019 | Wessels U. et al., 2018"
+19135815,H5N1(HPAI),HA1,H5,108,108,I,I,108I,Marker,Yes,186,Yes,Increased pH of fusion | Increased virulence in chickens | Increased virulence in mice,H5N1,"Suttie A. et al., 2019 | Wessels U. et al., 2018"
+19135815,H5N1(HPAI),HA1,H5,123,123,P,P,123P,Marker,Yes,367,No,Increased virus binding to α2-6,H5N1,"Suttie A. et al., 2019 | Yamada S. et al., 2006"
+19135815,H5N1(HPAI),HA1,H5,129,129,L,R,L129R,Substitution,No,,No,,,
+19135815,H5N1(HPAI),HA1,H5,133,133,A,A,133A,Marker,Yes,136,No,Increased pseudovirus binding to α2-6,H5N1,"Suttie A. et al., 2019 | Yang Z. et al., 2007"
+19135815,H5N1(HPAI),HA1,H5,134,134,A,A,134A,Marker,Yes,391,No,Increased viral replication in mice lungs | Increased virus thermostability,H9N2,"Zhang J. et al., 2023"
+19135815,H5N1(HPAI),HA1,H5,148,148,V,L,V148L,Substitution,No,,No,,,
+19135815,H5N1(HPAI),HA1,H5,154,154,N,N,154N,Marker,Yes,139,No,Increased virus binding to α2-6,H5N1,"Suttie A. et al., 2019 | Wang W. et al., 2010"
+19135815,H5N1(HPAI),HA1,H5,156,156,A,A,156A,Marker,Yes,142,No,Increased transmission in guinea pigs | Increased virus binding to α2-6,H5N1,"Gao Y. et al., 2009 | Suttie A. et al., 2019 | Wang W. et al., 2010"
+19135815,H5N1(HPAI),HA1,H5,182,182,N,N,182N,Marker,Yes,146,No,Decreased virus binding to α2-3 | Increased virus binding to α2-6,H13N6,"Lu X. et al., 2013 | Suttie A. et al., 2019"
+19135815,H5N1(HPAI),HA1,H5,210,210,A,V,A210V,Substitution,No,,No,,,
+19135815,H5N1(HPAI),HA1,H5,218,218,Q,Q,218Q,Marker,Yes,216,Yes,Increased virus binding to α2-3 | Increased virus binding to α2-6,H5N1,"Guo H. et al., 2017 | Suttie A. et al., 2019"
+19135815,H5N1(HPAI),HA1,H5,223,223,R,R,223R,Marker,Yes,216,Yes,Increased virus binding to α2-3 | Increased virus binding to α2-6,H5N1,"Guo H. et al., 2017 | Suttie A. et al., 2019"
+19135815,H5N1(HPAI),HA2,H5,64,64,E,E,64E,Marker,Yes,178,No,Decreased HA stability | Decreased virulence in mice | Increased pH of fusion,H7N9,"Sun X. et al., 2019 | Suttie A. et al., 2019"
+19135815,H5N1(HPAI),HA2,H5,181,181,V,I,V181I,Substitution,No,,No,,,
+19135815,H5N1(HPAI),HA2,H5,203,203,M,I,M203I,Substitution,No,,No,,,
+19135815,H5N1(HPAI),M1,H5,30,30,D,D,30D,Marker,Yes,1,No,Increased virulence in mice,H5N1,"Fan S. et al., 2009 | Suttie A. et al., 2019"
+19135815,H5N1(HPAI),M1,H5,43,43,M,M,43M,Marker,Yes,3,No,Increased virulence in chickens | Increased virulence in ducks | Increased virulence in mice,H5N1,"Nao N. et al., 2015 | Suttie A. et al., 2019"
+19135815,H5N1(HPAI),M1,H5,137,137,T,A,T137A,Substitution,No,,No,,,
+19135815,H5N1(HPAI),M1,H5,200,200,V,A,V200A,Substitution,No,,No,,,
+19135815,H5N1(HPAI),M1,H5,215,215,A,A,215A,Marker,Yes,2,No,Increased virulence in mice,H5N1,"Fan S. et al., 2009 | Suttie A. et al., 2019"
+19135815,H5N1(HPAI),M2,H5,6,6,E,K,E6K,Substitution,No,,No,,,
+19135815,H5N1(HPAI),M2,H5,7,7,V,I,V7I,Substitution,No,,No,,,
+19135815,H5N1(HPAI),M2,H5,8,8,E,C,E8C,Substitution,No,,No,,,
+19135815,H5N1(HPAI),M2,H5,9,9,T,R,T9R,Substitution,No,,No,,,
+19135815,H5N1(HPAI),M2,H5,61,61,G,R,G61R,Substitution,No,,No,,,
+19135815,H5N1(HPAI),M2,H5,68,68,V,A,V68A,Substitution,No,,No,,,
+19135815,H5N1(HPAI),M2,H5,80,80,Q,R,Q80R,Substitution,No,,No,,,
+19135815,H5N1(HPAI),NA,N1,6,6,K,R,K6R,Substitution,No,,No,,,
+19135815,H5N1(HPAI),NA,N1,8,8,T,I,T8I,Substitution,No,,No,,,
+19135815,H5N1(HPAI),NA,N1,10,10,I,T,I10T,Substitution,No,,No,,,
+19135815,H5N1(HPAI),NA,N1,95,95,S,G,S95G,Substitution,No,,No,,,
+19135815,H5N1(HPAI),NA,N1,259,259,D,E,D259E,Substitution,No,,No,,,
+19135815,H5N1(HPAI),NA,N1,287,287,D,E,D287E,Substitution,No,,No,,,
+19135815,H5N1(HPAI),NA,N1,395,395,E,A,E395A,Substitution,No,,No,,,
+19135815,H5N1(HPAI),NA,N1,405,405,S,T,S405T,Substitution,No,,No,,,
+19135815,H5N1(HPAI),NP,H5,10,10,Y,H,Y10H,Substitution,No,,No,,,
+19135815,H5N1(HPAI),NP,H5,22,22,A,T,A22T,Substitution,No,,No,,,
+19135815,H5N1(HPAI),NP,H5,50,50,R,S,R50S,Substitution,No,,No,,,
+19135815,H5N1(HPAI),NP,H5,51,51,D,E,D51E,Substitution,No,,No,,,
+19135815,H5N1(HPAI),NP,H5,52,52,H,H,52H,Marker,Yes,421,No,Evade human BTN3A3 (inhibitor of avian influenza A viruses replication),H7N9 | H9N2,"Pinto R. et al., 2023"
+19135815,H5N1(HPAI),NP,H5,105,105,V,V,105V,Marker,Yes,32,No,Increased virulence in chickens,H5N1,"Suttie A. et al., 2019 | Tada T. et al., 2011 | Tada T. et al., 2011b"
+19135815,H5N1(HPAI),NP,H5,184,184,K,K,184K,Marker,Yes,34,No,Enhanced interferon response | Increased replication in avian cells | Increased virulence in chickens,H5N1,"Suttie A. et al., 2019 | Wasilenko J. et al., 2009"
+19135815,H5N1(HPAI),NP,H5,319,319,N,K,319K,Substitution,Yes,39,No,Increased polymerase activity in mammalian cells | Increased replication in mammalian cells,H7N7,"Gabriel G. et al., 2005 | Gabriel G. et al., 2008 | Suttie A. et al., 2019"
+19135815,H5N1(HPAI),NP,H5,353,353,I,V,I353V,Substitution,No,,No,,,
+19135815,H5N1(HPAI),NS1,H5,53,53,G,D,G53D,Substitution,No,,No,,,
+19135815,H5N1(HPAI),NS1,H5,58,58,T,I,T58I,Substitution,No,,No,,,
+19135815,H5N1(HPAI),NS1,H5,76,76,T,A,T76A,Substitution,No,,No,,,
+19135815,H5N1(HPAI),NS1,H5,147,147,L,I,L147I,Substitution,No,,No,,,
+19135815,H5N1(HPAI),NS1,H5,171,171,D,N,D171N,Substitution,No,,No,,,
+19135815,H5N1(HPAI),NS2,H5,67,67,E,G,E67G,Substitution,No,,No,,,
+19135815,H5N1(HPAI),NS2,H5,82,82,G,E,G82E,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PA-X,H5,61,61,M,T,M61T,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PA-X,H5,86,86,M,I,M86I,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PA-X,H5,160,160,D,E,D160E,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PA-X,H5,201,201,I,T,I201T,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PA,H5,37,37,A,A,37A,Marker,Yes,108,No,Increased polymerase activity in mammalian cells,H7N9,"Suttie A. et al., 2019 | Yamayoshi S. et al., 2014"
+19135815,H5N1(HPAI),PA,H5,61,61,M,T,M61T,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PA,H5,86,86,M,I,M86I,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PA,H5,160,160,D,E,D160E,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PA,H5,190,190,S,S,190S,Marker,Yes,117,No,Decreased virulence in mice,H7N3,"DesRochers B. et al., 2016 | Suttie A. et al., 2019"
+19135815,H5N1(HPAI),PA,H5,201,201,I,T,I201T,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PA,H5,322,322,I,L,I322L,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PA,H5,354,354,I,F,I354F,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PA,H5,383,383,D,D,383D,Marker,Yes,119,No,Increased polymerase activity in avian cells | Increased polymerase activity in mammalian cells,H5N1,"Song J. et al., 2011 | Song J. et al., 2015 | Suttie A. et al., 2019"
+19135815,H5N1(HPAI),PA,H5,400,400,S,P,400P,Substitution,Yes,120,No,Decreased virulence in mice,H7N3,"DesRochers B. et al., 2016 | Suttie A. et al., 2019"
+19135815,H5N1(HPAI),PA,H5,404,404,A,S,A404S,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PA,H5,409,409,S,S,409S,Marker,Yes,121,No,Increased polymerase activity in mammalian cells | Increased replication in mammalian cells,H7N9,"Suttie A. et al., 2019 | Yamayoshi S. et al., 2014"
+19135815,H5N1(HPAI),PA,H5,441,441,V,M,V441M,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PA,H5,608,608,S,T,S608T,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PA,H5,711,711,L,I,L711I,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PB1-F2,H5,40,40,D,G,D40G,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PB1-F2,H5,46,46,T,M,T46M,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PB1-F2,H5,66,66,S,S,66S,Marker,Yes,106,No,Enhanced antiviral response in mice | Enhanced replication in mice | Enhanced virulence in mice,H5N1,"Conenello G. et al., 2007 | Schmolke M. et al., 2011 | Suttie A. et al., 2019"
+19135815,H5N1(HPAI),PB1-F2,H5,73,73,E,K,E73K,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PB1,H5,3,3,V,V,3V,Marker,Yes,94,No,Increased polymerase activity in avian cells | Increased polymerase activity in mammalian cells | Increased replication in avian cells | Increased replication in mammalian cells,H5N1,"Elgendy E. et al., 2017 | Suttie A. et al., 2019"
+19135815,H5N1(HPAI),PB1,H5,16,16,N,D,N16D,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PB1,H5,104,104,G,E,G104E,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PB1,H5,115,115,Q,Q,115Q,Marker,Yes,417,No,Transmitted via aerosol among guinea pigs,H7N9,"Zhang C. et al., 2021"
+19135815,H5N1(HPAI),PB1,H5,157,157,A,T,A157T,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PB1,H5,176,176,T,K,T176K,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PB1,H5,213,213,N,T,N213T,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PB1,H5,372,372,I,M,I372M,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PB1,H5,430,430,R,K,R430K,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PB1,H5,527,527,V,I,V527I,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PB1,H5,622,622,G,G,622G,Marker,Yes,101,No,Increased polymerase activity in mammalian cells | Increased polymerase activity in mice | Increased virulence in mice,H5N1,"Feng X. et al., 2016 | Suttie A. et al., 2019"
+19135815,H5N1(HPAI),PB1,H5,635,635,K,R,K635R,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PB1,H5,660,660,I,V,I660V,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PB1,H5,738,738,G,E,G738E,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PB1,H5,741,741,S,A,S741A,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PB2,H5,63,63,I,V,I63V,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PB2,H5,79,79,G,S,G79S,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PB2,H5,89,89,V,V,89V,Marker,Yes,84 | 85,Yes,Increased polymerase activity in mammalian cells | Increased virulence in mice,H5N1,"Li J. et al., 2009 | Suttie A. et al., 2019"
+19135815,H5N1(HPAI),PB2,H5,185,185,I,V,I185V,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PB2,H5,195,195,N,D,N195D,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PB2,H5,309,309,D,D,309D,Marker,Yes,84 | 85,Yes,Increased polymerase activity in mammalian cells | Increased virulence in mice,H5N1,"Li J. et al., 2009 | Suttie A. et al., 2019"
+19135815,H5N1(HPAI),PB2,H5,339,339,K,K,339K,Marker,Yes,85,Yes,Increased polymerase activity in mammalian cells | Increased virulence in mice,H5N1,"Li J. et al., 2009 | Suttie A. et al., 2019"
+19135815,H5N1(HPAI),PB2,H5,389,389,R,R,389R,Marker,Yes,56,No,Increased polymerase activity in mammalian cells | Increased replication in mammalian cells,H7N9,"Hu M. et al., 2017b | Suttie A. et al., 2019"
+19135815,H5N1(HPAI),PB2,H5,477,477,G,G,477G,Marker,Yes,85,Yes,Increased polymerase activity in mammalian cells | Increased virulence in mice,H5N1,"Li J. et al., 2009 | Suttie A. et al., 2019"
+19135815,H5N1(HPAI),PB2,H5,495,495,V,V,495V,Marker,Yes,85,Yes,Increased polymerase activity in mammalian cells | Increased virulence in mice,H5N1,"Li J. et al., 2009 | Suttie A. et al., 2019"
+19135815,H5N1(HPAI),PB2,H5,598,598,T,T,598T,Marker,Yes,65,No,Increased polymerase activity in mammalian cells | Increased replication in mammalian cells | Increased virulence in mice,H7N9,"Hu M. et al., 2017b | Suttie A. et al., 2019"
+19135815,H5N1(HPAI),PB2,H5,627,627,E,E,627E,Marker,Yes,85,Yes,Increased polymerase activity in mammalian cells | Increased virulence in mice,H5N1,"Li J. et al., 2009 | Suttie A. et al., 2019"
+19135815,H5N1(HPAI),PB2,H5,666,666,T,I,T666I,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PB2,H5,676,676,T,T,676T,Marker,Yes,85,Yes,Increased polymerase activity in mammalian cells | Increased virulence in mice,H5N1,"Li J. et al., 2009 | Suttie A. et al., 2019"
+19135815,H5N1(HPAI),PB2,H5,680,680,D,G,D680G,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PB2,H5,697,697,I,L,I697L,Substitution,No,,No,,,
+19135815,H5N1(HPAI),PB2,H5,715,715,S,N,715N,Substitution,Yes,82,No,Decreased virulence in mice,H5N1,"Sun H. et al., 2015 | Suttie A. et al., 2019"
