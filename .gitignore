@@ -15,6 +15,5 @@ analisis/
 nf_pipeline/bin
 lastyear/
 thisyear/
-tests/data
 tests/results
 RESULTS/
