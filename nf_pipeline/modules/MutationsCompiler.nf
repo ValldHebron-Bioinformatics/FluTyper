@@ -31,15 +31,15 @@ for csv_file in csv_list:
 # Combine all individual CSV dataframes into one master dataframe
 master_df = pd.concat(all_data, ignore_index=True)
 
-# Calculate total unique samples PER PROTEIN to establish a dynamic denominator
+# Calculate total unique samples per protein
 samples_per_protein = master_df.groupby('PROTEIN')['SAMPLE_ID'].transform('nunique')
-threshold = samples_per_protein * ${params.threshold}  # Using the threshold from params, default is 0.25 (25%)
+threshold = samples_per_protein * ${params.threshold}  # Using the threshold from params
 
-# Calculate mutation frequency per protein and position
-sample_counts_per_pos = master_df.groupby(['PROTEIN', 'POSITION'])['SAMPLE_ID'].transform('nunique')
+# Calculate mutation frequency per protein, position, AND specific amino acid mutation
+sample_counts_per_mutation = master_df.groupby(['PROTEIN', 'POSITION_REF', 'AA_MUTATION'])['SAMPLE_ID'].transform('nunique')
 
-# Filter for rows that are marked as markers OR appear in >25% (default) of total samples
-relevant_df = master_df[(master_df['MARKER'] == "Yes") | (sample_counts_per_pos > threshold)]
+# Filter for rows that are marked as markers OR appear in more than the threshold of their specific protein's samples
+relevant_df = master_df[(master_df['MARKER'] == "Yes") | (sample_counts_per_mutation > threshold)]
 
 # Write the Full Report with a sheet for each protein, plus a combined sheet
 with pd.ExcelWriter("final_mutations_report.xlsx") as writer:
