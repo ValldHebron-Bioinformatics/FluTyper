@@ -150,6 +150,7 @@ process MutationsGraphicReport {
                         "<b>Occurrence:</b> %{customdata[5]} sample(s) (%{customdata[6]}%)<br>"
                         "<b>Subtype(s):</b> %{customdata[1]}<br>"
                         "<b>Sample IDs:</b> %{customdata[0]}<br>"
+                        "<extra></extra>"
                     ),
                     legendgroup=mut_type,
                     showlegend=False
