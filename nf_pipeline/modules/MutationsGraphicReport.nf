@@ -25,7 +25,7 @@ process MutationsGraphicReport {
 
     # Standardize missing values and stringify key columns
     df['MARKER_ID'] = df['MARKER_ID'].replace('', 'None').fillna('None').astype(str)
-    df['EFFECT'] = df['EFFECT'].replace('', 'None').fillna('None').astype(str)
+    df['EFFECT'] = df['EFFECT'].replace('', 'Unknown').fillna('Unknown').astype(str)
     df['SUBTYPE'] = df['SUBTYPE'].replace('', 'Unknown').fillna('Unknown').astype(str)
     df['REF_SUBTYPE'] = df['REF_SUBTYPE'].replace('', 'Unknown').fillna('Unknown').astype(str)
     df['FOUND_IN'] = df['FOUND_IN'].replace('', 'Unknown').fillna('Unknown').astype(str)
@@ -125,13 +125,13 @@ process MutationsGraphicReport {
         for mut_type in group_df['Color_Category'].unique():
             mut_df = group_df[group_df['Color_Category'] == mut_type]
             
-            # Pack aggregated data
-            hover_data = mut_df[['Sample_IDs', 'Subtypes', 'AA_MUTATION', 'EFFECT', 'MARKER_ID', 'Sample_Count', 'Percentage', 'FOUND_IN', 'POSITION_REF']].values
+            # Pack aggregated data including Total_Group_Samples at index 9
+            hover_data = mut_df[['Sample_IDs', 'Subtypes', 'AA_MUTATION', 'EFFECT', 'MARKER_ID', 'Sample_Count', 'Percentage', 'FOUND_IN', 'POSITION_REF', 'Total_Group_Samples']].values
             
             fig.add_trace(
                 go.Scatter(
                     x=mut_df['POSITION'],
-                    y=mut_df['AA_MUTATION'],
+                    y=mut_df['Percentage'],
                     mode='markers',
                     name=mut_type,
                     marker=dict(
@@ -142,14 +142,10 @@ process MutationsGraphicReport {
                     customdata=hover_data,
                     hovertemplate=(
                         "<b>Position:</b> %{x}<br>"
-                        "<b>Reference Position:</b> %{customdata[8]}<br>"
+                        "<b>Reference Position(H5N1 numbering):</b> %{customdata[8]}<br>"
                         "<b>Mutation:</b> %{customdata[2]}<br>"
-                        "<b>Marker ID:</b> %{customdata[4]}<br>"
-                        "<b>Effect:</b> %{customdata[3]}<br>"
-                        "<b>Found In:</b> %{customdata[7]}<br>"
-                        "<b>Occurrence:</b> %{customdata[5]} sample(s) (%{customdata[6]}%)<br>"
-                        "<b>Subtype(s):</b> %{customdata[1]}<br>"
-                        "<b>Sample IDs:</b> %{customdata[0]}<br>"
+                        "<b>Effect:</b> %{customdata[3]} [Found In: %{customdata[7]}]<br>"
+                        "<b>Occurrence:</b> %{customdata[5]}/%{customdata[9]} sample(s) (%{customdata[6]}%)<br>"
                         "<extra></extra>"
                     ),
                     legendgroup=mut_type,
@@ -167,14 +163,20 @@ process MutationsGraphicReport {
         else:
             fig.update_xaxes(title_text="Position", row=i, col=1)
             
-        fig.update_yaxes(type='category', title_text="Mutation", row=i, col=1)
+        # Update Y-axis to standard linear percentage scale 0-100
+        fig.update_yaxes(range=[0, 105], title_text="Frequency (%)", row=i, col=1)
 
     fig.update_layout(
-        title_text="Mutation Summary per Protein",
+        title_text=(
+            "Mutation Summary per Protein<br>"
+            "<span style='font-size:14px; color:gray; font-weight:normal;'>"
+            "Displaying markers and mutations occurring at a frequency exceeding ${params.threshold * 100}% among samples per protein group."
+            "</span>"
+        ),
         height=total_figure_height,
         showlegend=True,
         hovermode="closest",
-        margin=dict(t=80, b=80, l=80, r=80)
+        margin=dict(t=100, b=80, l=80, r=80)
     )
 
     fig.write_html("MutationsReport.html")
