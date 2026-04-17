@@ -9,7 +9,7 @@ process MutationsGraphicReport {
     path(relevant_mutations)
 
     output:
-    path("mutations_report.html"), emit: report
+    path("MutationsReport.html"), emit: report
 
     script:
     """
@@ -176,6 +176,6 @@ process MutationsGraphicReport {
         margin=dict(t=80, b=80, l=80, r=80)
     )
 
-    fig.write_html("mutations_report.html")
+    fig.write_html("MutationsReport.html")
     """
 }
