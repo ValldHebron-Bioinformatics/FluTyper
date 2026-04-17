@@ -39,6 +39,13 @@ nextflow_pipeline {
             def relevantReport = outputDir.resolve("relevant_mutations.xlsx")
             assert relevantReport.exists() : "relevant_mutations.xlsx was not published"
 
+            // Verify graphical HTML reports are published
+            def cladeGraphicReport = outputDir.resolve("graphic_reports/CladeGraphicReport.html")
+            assert cladeGraphicReport.exists() : "CladeGraphicReport.html was not published"
+
+            def mutationsGraphicReport = outputDir.resolve("graphic_reports/MutationsReport.html")
+            assert mutationsGraphicReport.exists() : "MutationsReport.html was not published"
+
             // Deep validation of the sample-specific mutations CSV
             def sampleMutationsCsv = outputDir.resolve("samples/19135815/19135815_mutations.csv")
             assert sampleMutationsCsv.exists() : "19135815_mutations.csv was not published"
