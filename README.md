@@ -223,3 +223,9 @@ CI runs on `ubuntu-latest` and handles the installation of all necessary bioinfo
 - [MAFFT](https://mafft.cbrc.jp/alignment/software/)
 - [Python 3](https://www.python.org/) (with [pandas](https://pandas.pydata.org/docs/index.html), [biopython](https://biopython.org/wiki/Documentation), [openpyxl](https://openpyxl.readthedocs.io/en/stable/), [sqlite3](https://docs.python.org/3/library/sqlite3.html))
 - [nf-test](https://www.nf-test.com/)
+
+---
+
+## 👏 Acknowledgments
+
+- The minimizer indices used by this pipeline were generated using the methodology and tools developed by the Nextstrain team for the [nextclade_data repository](https://github.com/nextstrain/nextclade_data).

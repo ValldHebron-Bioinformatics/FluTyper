@@ -1,0 +1,30 @@
+nextflow_process {
+
+    name "Test Process CladeGraphicReport"
+    script "nf_pipeline/modules/CladeGraphicReport.nf"
+    process "CladeGraphicReport"
+
+    test("Should match the expected clade HTML report") {
+
+        when {
+            process {
+                """
+                input[0] = file("${projectDir}/tests/data/Graphs_test/final_genotyping_results.csv")
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def reportFiles = process.out[0]
+            assert reportFiles != null : "Output channel is null. The HTML report was not emitted."
+            assert reportFiles.size() == 1
+
+            def htmlFile = path(reportFiles[0])
+            assert htmlFile.exists()
+        }
+
+    }
+
+}
