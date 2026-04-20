@@ -24,7 +24,6 @@ process MutationsGraphicReport {
     lengths_dict = dict(zip(lengths_df['Protein'].astype(str), lengths_df['Length']))
 
     # Standardize missing values and replace pipes with a line break + 8 HTML spaces for indentation
-    df['MARKER_ID'] = df['MARKER_ID'].replace('', 'None').fillna('None').astype(str)
     df['EFFECT'] = df['EFFECT'].replace('', 'Unknown').fillna('Unknown').astype(str).str.replace(' | ', '<br>                 ')
     df['SUBTYPE'] = df['SUBTYPE'].replace('', 'Unknown').fillna('Unknown').astype(str)
     df['REF_SUBTYPE'] = df['REF_SUBTYPE'].replace('', 'Unknown').fillna('Unknown').astype(str)
@@ -62,7 +61,7 @@ process MutationsGraphicReport {
     total_samples_per_group.rename(columns={'SAMPLE_ID': 'Total_Group_Samples'}, inplace=True)
 
     # Define the relevant columns for grouping and aggregation
-    group_cols = ['Plot_Group', 'POSITION', 'POSITION_REF', 'AA_MUTATION', 'MARKER_ID', 'EFFECT', 'Color_Category', 'ColorCode', 'FOUND_IN']
+    group_cols = ['Plot_Group', 'POSITION', 'POSITION_REF', 'AA_MUTATION', 'EFFECT', 'Color_Category', 'ColorCode', 'FOUND_IN']
     
     # Function to list unique items in a column
     def list_unique_items(data_column):
@@ -125,7 +124,7 @@ process MutationsGraphicReport {
             mut_df = group_df[group_df['Color_Category'] == mut_type]
             
             # Pack aggregated data including Total_Group_Samples at index 9
-            hover_data = mut_df[['Sample_IDs', 'Subtypes', 'AA_MUTATION', 'EFFECT', 'MARKER_ID', 'Sample_Count', 'Percentage', 'FOUND_IN', 'POSITION_REF', 'Total_Group_Samples']].values
+            hover_data = mut_df[['Sample_IDs', 'Subtypes', 'AA_MUTATION', 'EFFECT', 'Sample_Count', 'Percentage', 'FOUND_IN', 'POSITION_REF', 'Total_Group_Samples']].values
             
             fig.add_trace(
                 go.Scatter(
@@ -141,11 +140,11 @@ process MutationsGraphicReport {
                     customdata=hover_data,
                     hovertemplate=(
                         "<b>Position:</b> %{x}<br>"
-                        "<b>Reference Position(H5N1 numbering):</b> %{customdata[8]}<br>"
+                        "<b>Reference Position(H5N1 numbering):</b> %{customdata[7]}<br>"
                         "<b>Mutation:</b> %{customdata[2]}<br>"
                         "<b>Effect(s):</b> %{customdata[3]}<br>"
-                        "                 <b>Found in:</b>  %{customdata[7]}<br>"
-                        "<b>Occurrence:</b> %{customdata[5]}/%{customdata[9]} sample(s) (%{customdata[6]}%)<br>"
+                        "                 <b>Found in:</b>  %{customdata[6]}<br>"
+                        "<b>Occurrence:</b> %{customdata[4]}/%{customdata[8]} sample(s) (%{customdata[5]}%)<br>"
                         "<extra></extra>"
                     ),
                     legendgroup=mut_type,
