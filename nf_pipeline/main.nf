@@ -163,7 +163,7 @@ workflow {
         )
     
     CladeGraphicReport(GenotypingFinal_ch)
-    MutationsGraphicReport(MutationsCompiler.out.results.map { _full, relevant -> relevant })
+    MutationsGraphicReport(MutationsCompiler.out.results.map { _full, filtered -> filtered })
            
     publish:
     // Strip the sample_id strings so the output block receives pure file/path objects

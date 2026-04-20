@@ -6,7 +6,7 @@ process MutationsGraphicReport {
     debug true
 
     input:
-    path(relevant_mutations)
+    path(filtered_mutations)
 
     output:
     path("MutationsReport.html"), emit: report
@@ -19,7 +19,7 @@ process MutationsGraphicReport {
     from plotly.subplots import make_subplots
 
     # Load the mutations dataset, only first sheet (All_Proteins)
-    df = pd.read_excel("${relevant_mutations}", keep_default_na=False)
+    df = pd.read_excel("${filtered_mutations}", keep_default_na=False)
     lengths_df = pd.read_csv("${params.protocols[params.protocol].resources}/annotations.csv")
     lengths_dict = dict(zip(lengths_df['Protein'].astype(str), lengths_df['Length']))
 
