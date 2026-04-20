@@ -21,10 +21,10 @@ nextflow_process {
             assert process.out.results.size() > 0 : "Process results channel is empty!"
             
             def finalReport = path(process.out.results.get(0)[0])
-            def relevantReport = path(process.out.results.get(0)[1])
+            def filteredReport = path(process.out.results.get(0)[1])
             
             assert finalReport.exists() : "final_mutations_report.xlsx was not generated"
-            assert relevantReport.exists() : "relevant_mutations.xlsx was not generated"
+            assert filteredReport.exists() : "filtered_mutations.xlsx was not generated"
             
             // Define a helper to check binary files for specific text strings
         def fileContains = { reportPath, text ->
@@ -40,8 +40,8 @@ nextflow_process {
             assert fileContains(finalReport, "Guo H. et al., 2017") : "Missing reference citation in final report"
 
             // Perform the same check for the relevant mutations subset
-            assert fileContains(relevantReport, "Enhanced antiviral response in mice") : "Missing mouse antiviral marker in relevant report"
-            assert fileContains(relevantReport, "Fan S. et al., 2009") : "Missing reference citation in relevant report"
+            assert fileContains(filteredReport, "Enhanced antiviral response in mice") : "Missing mouse antiviral marker in filtered report"
+            assert fileContains(filteredReport, "Fan S. et al., 2009") : "Missing reference citation in filtered report"
 
             assert finalReport.size() > 1000 : "The final report seems too small to contain data"
         }
