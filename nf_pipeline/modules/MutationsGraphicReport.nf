@@ -23,9 +23,9 @@ process MutationsGraphicReport {
     lengths_df = pd.read_csv("${params.protocols[params.protocol].resources}/annotations.csv")
     lengths_dict = dict(zip(lengths_df['Protein'].astype(str), lengths_df['Length']))
 
-    # Standardize missing values and stringify key columns
+    # Standardize missing values and replace pipes with a line break + 8 HTML spaces for indentation
     df['MARKER_ID'] = df['MARKER_ID'].replace('', 'None').fillna('None').astype(str)
-    df['EFFECT'] = df['EFFECT'].replace('', 'Unknown').fillna('Unknown').astype(str)
+    df['EFFECT'] = df['EFFECT'].replace('', 'Unknown').fillna('Unknown').astype(str).str.replace(' | ', '<br>                 ')
     df['SUBTYPE'] = df['SUBTYPE'].replace('', 'Unknown').fillna('Unknown').astype(str)
     df['REF_SUBTYPE'] = df['REF_SUBTYPE'].replace('', 'Unknown').fillna('Unknown').astype(str)
     df['FOUND_IN'] = df['FOUND_IN'].replace('', 'Unknown').fillna('Unknown').astype(str)
@@ -71,7 +71,6 @@ process MutationsGraphicReport {
             # Only add the item if it is not a blank space
             if str(item).strip() != '':
                 valid_items.append(str(item))
-        # Join everything nicely with a comma
         return ', '.join(valid_items)
 
     # Group the data and calculate metrics
@@ -84,7 +83,7 @@ process MutationsGraphicReport {
     # Bring in the total sample numbers to calculate percentages
     df_grouped = pd.merge(df_grouped, total_samples_per_group, on='Plot_Group', how='left')
     
-    # Calculate the percentage in two simple mathematical steps
+    # Calculate the percentage
     df_grouped['Percentage'] = (df_grouped['Sample_Count'] / df_grouped['Total_Group_Samples']) * 100
     df_grouped['Percentage'] = df_grouped['Percentage'].round(2)
 
@@ -144,7 +143,8 @@ process MutationsGraphicReport {
                         "<b>Position:</b> %{x}<br>"
                         "<b>Reference Position(H5N1 numbering):</b> %{customdata[8]}<br>"
                         "<b>Mutation:</b> %{customdata[2]}<br>"
-                        "<b>Effect:</b> %{customdata[3]} [Found In: %{customdata[7]}]<br>"
+                        "<b>Effect(s):</b> %{customdata[3]}<br>"
+                        "                 <b>Found in:</b>  %{customdata[7]}<br>"
                         "<b>Occurrence:</b> %{customdata[5]}/%{customdata[9]} sample(s) (%{customdata[6]}%)<br>"
                         "<extra></extra>"
                     ),
@@ -163,7 +163,6 @@ process MutationsGraphicReport {
         else:
             fig.update_xaxes(title_text="Position", row=i, col=1)
             
-        # Update Y-axis to standard linear percentage scale 0-100
         fig.update_yaxes(range=[0, 105], title_text="Frequency (%)", row=i, col=1)
 
     fig.update_layout(
@@ -176,6 +175,7 @@ process MutationsGraphicReport {
         height=total_figure_height,
         showlegend=True,
         hovermode="closest",
+        hoverlabel=dict(align="left"), # Forces text to align cleanly to the left
         margin=dict(t=100, b=80, l=80, r=80)
     )
 
