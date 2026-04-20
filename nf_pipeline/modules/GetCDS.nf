@@ -114,14 +114,13 @@ process GetCDS {
                 ref_length = len(ref_seq.replace('-', ''))
                 
                 coverage_ratio = aligned_positions / ref_length if ref_length > 0 else 0
-                identity_ratio = matches / aligned_positions if aligned_positions > 0 else 0
+                identity_ratio = matches / ref_length if ref_length > 0 else 0
 
-                # Minimum 30% coverage AND minimum 60% identity
-                if coverage_ratio < 0.3 or identity_ratio < 0.6:
+                # Minimum 50% coverage AND minimum 60% identity
+                if coverage_ratio < 0.5 or identity_ratio < 0.6:
                     with open(log_file, 'a') as f:
                         f.write(f"GetCDS: ${sample_id} {prot} ignored. No real homology (Coverage: {coverage_ratio:.1%}, Identity: {identity_ratio:.1%}).\\n")
                     continue
-                
                 if prot == "NS2":
                     current_threshold = 400
                 elif prot == "M2":
