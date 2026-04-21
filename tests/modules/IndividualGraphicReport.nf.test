@@ -1,14 +1,18 @@
 nextflow_process {
 
-    name "Test Process MutationsGraphicReport"
-    script "nf_pipeline/modules/MutationsGraphicReport.nf"
-    process "MutationsGraphicReport"
+    name "Test Process IndividualGraphicReport"
+    script "nf_pipeline/modules/IndividualGraphicReport.nf"
+    process "IndividualGraphicReport"
 
     test("Should create the HTML report") {
+
         when {
             process {
                 """
-                input[0] = file("${projectDir}/tests/data/Graphs_test/relevant_mutations.xlsx")
+                def sampleId = "19135815"
+                def mutationsCsv = file("${projectDir}/tests/data/19135815/19135815_mutations.csv")
+                
+                input[0] = tuple(sampleId, mutationsCsv)
                 """
             }
         }
@@ -25,4 +29,5 @@ nextflow_process {
             assert htmlFile.exists()
         }
     }
+
 }
