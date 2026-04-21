@@ -8,7 +8,7 @@ process MutationsCompiler {
     path csv_files
 
     output:
-    tuple path("final_mutations_report.xlsx"), path("relevant_mutations.xlsx"), emit: results
+    tuple path("final_mutations_report.xlsx"), path("filtered_mutations.xlsx"), emit: results
 
     
     script:
@@ -48,7 +48,7 @@ with pd.ExcelWriter("final_mutations_report.xlsx") as writer:
         group.to_excel(writer, sheet_name=str(prot_name).strip("()',"), index=False)
 
 # Write the Filtered Report with a sheet for each protein, plus a combined sheet
-with pd.ExcelWriter("relevant_mutations.xlsx") as writer:
+with pd.ExcelWriter("filtered_mutations.xlsx") as writer:
     relevant_df.to_excel(writer, sheet_name="All_Proteins", index=False)
     for prot_name, group in relevant_df.groupby("PROTEIN"):
         group.to_excel(writer, sheet_name=str(prot_name).strip("()',"), index=False)

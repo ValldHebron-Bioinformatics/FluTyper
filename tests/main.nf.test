@@ -36,8 +36,8 @@ nextflow_pipeline {
             def finalReport = outputDir.resolve("final_mutations_report.xlsx")
             assert finalReport.exists() : "final_mutations_report.xlsx was not published"
             
-            def relevantReport = outputDir.resolve("relevant_mutations.xlsx")
-            assert relevantReport.exists() : "relevant_mutations.xlsx was not published"
+            def relevantReport = outputDir.resolve("filtered_mutations.xlsx")
+            assert relevantReport.exists() : "filtered_mutations.xlsx was not published"
 
             // Verify graphical HTML reports are published
             def cladeGraphicReport = outputDir.resolve("graphic_reports/CladeGraphicReport.html")
@@ -63,6 +63,12 @@ nextflow_pipeline {
             // Updated to reflect the new marker IDs, combination flags, FOUND_IN values, and joined metadata
             assert csvText.contains('19135815,H5N1(HPAI),M1,H5,30,30,D,D,30D,Marker,Yes,1,No,Increased virulence in mice,H5N1,"Fan S. et al., 2009 | Suttie A. et al., 2019"')
             assert csvText.contains('19135815,H5N1(HPAI),M1,H5,43,43,M,M,43M,Marker,Yes,3,No,Increased virulence in chickens | Increased virulence in ducks | Increased virulence in mice,H5N1,"Nao N. et al., 2015 | Suttie A. et al., 2019"')
+
+            // Verify the individual graphical barcode report is published
+            def individualGraphicReport = outputDir.resolve("samples/19135815/19135815_MutationsReport.html")
+            assert individualGraphicReport.exists() : "19135815_MutationsReport.html was not published"
+            assert individualGraphicReport.text.contains("<html")
+            assert individualGraphicReport.text.contains("19135815")
 
             // Check standard output for the database version log
             assert workflow.stdout.join('\n').contains("FluMutDB: Local database is up to date")

@@ -6,7 +6,7 @@ process MutationsGraphicReport {
     debug true
 
     input:
-    path(relevant_mutations)
+    path(filtered_mutations)
 
     output:
     path("MutationsReport.html"), emit: report
@@ -19,13 +19,12 @@ process MutationsGraphicReport {
     from plotly.subplots import make_subplots
 
     # Load the mutations dataset, only first sheet (All_Proteins)
-    df = pd.read_excel("${relevant_mutations}", keep_default_na=False)
+    df = pd.read_excel("${filtered_mutations}", keep_default_na=False)
     lengths_df = pd.read_csv("${params.protocols[params.protocol].resources}/annotations.csv")
     lengths_dict = dict(zip(lengths_df['Protein'].astype(str), lengths_df['Length']))
 
-    # Standardize missing values and stringify key columns
-    df['MARKER_ID'] = df['MARKER_ID'].replace('', 'None').fillna('None').astype(str)
-    df['EFFECT'] = df['EFFECT'].replace('', 'None').fillna('None').astype(str)
+    # Standardize missing values and replace pipes with a line break + spaces for indentation
+    df['EFFECT'] = df['EFFECT'].replace('', 'Unknown').fillna('Unknown').astype(str).str.replace(' | ', '<br>                 ')
     df['SUBTYPE'] = df['SUBTYPE'].replace('', 'Unknown').fillna('Unknown').astype(str)
     df['REF_SUBTYPE'] = df['REF_SUBTYPE'].replace('', 'Unknown').fillna('Unknown').astype(str)
     df['FOUND_IN'] = df['FOUND_IN'].replace('', 'Unknown').fillna('Unknown').astype(str)
@@ -62,29 +61,29 @@ process MutationsGraphicReport {
     total_samples_per_group.rename(columns={'SAMPLE_ID': 'Total_Group_Samples'}, inplace=True)
 
     # Define the relevant columns for grouping and aggregation
-    group_cols = ['Plot_Group', 'POSITION', 'POSITION_REF', 'AA_MUTATION', 'MARKER_ID', 'EFFECT', 'Color_Category', 'ColorCode', 'FOUND_IN']
+    group_cols = ['Plot_Group', 'POSITION', 'POSITION_REF', 'AA_MUTATION', 'Color_Category', 'ColorCode']
     
     # Function to list unique items in a column
-    def list_unique_items(data_column):
+    def list_unique_items(data_column, joiner=', '):
         valid_items = []
         for item in data_column.unique():
-            # Only add the item if it is not a blank space
             if str(item).strip() != '':
                 valid_items.append(str(item))
-        # Join everything nicely with a comma
-        return ', '.join(valid_items)
+        return joiner.join(valid_items)
 
     # Group the data and calculate metrics
     df_grouped = df.groupby(group_cols, dropna=False).agg(
         Sample_Count=('SAMPLE_ID', 'nunique'),
         Sample_IDs=('SAMPLE_ID', list_unique_items),
-        Subtypes=('SUBTYPE', list_unique_items)
+        Subtypes=('SUBTYPE', list_unique_items),
+        EFFECT=('EFFECT', lambda x: list_unique_items(x, '<br>                 ')),
+        FOUND_IN=('FOUND_IN', list_unique_items)
     ).reset_index()
 
     # Bring in the total sample numbers to calculate percentages
     df_grouped = pd.merge(df_grouped, total_samples_per_group, on='Plot_Group', how='left')
     
-    # Calculate the percentage in two simple mathematical steps
+    # Calculate the percentage
     df_grouped['Percentage'] = (df_grouped['Sample_Count'] / df_grouped['Total_Group_Samples']) * 100
     df_grouped['Percentage'] = df_grouped['Percentage'].round(2)
 
@@ -126,13 +125,27 @@ process MutationsGraphicReport {
             mut_df = group_df[group_df['Color_Category'] == mut_type]
             
             # Pack aggregated data
-            hover_data = mut_df[['Sample_IDs', 'Subtypes', 'AA_MUTATION', 'EFFECT', 'MARKER_ID', 'Sample_Count', 'Percentage', 'FOUND_IN', 'POSITION_REF']].values
+            hover_data = mut_df[['Sample_IDs', 'Subtypes', 'AA_MUTATION', 'EFFECT', 'Sample_Count', 'Percentage', 'FOUND_IN', 'POSITION_REF', 'Total_Group_Samples']].values
             
+            # Set mode and text for Markers only
+            if mut_type == 'Marker':
+                scatter_mode = 'markers+text'
+                scatter_text = ["<b>" + str(x) + "</b>" for x in mut_df['AA_MUTATION']]
+                # Create an alternating array to stagger text up and down
+                text_pos_array = ['top center' if idx % 2 == 0 else 'bottom center' for idx in range(len(mut_df))]
+            else:
+                scatter_mode = 'markers'
+                scatter_text = None
+                text_pos_array = None
+
             fig.add_trace(
                 go.Scatter(
                     x=mut_df['POSITION'],
-                    y=mut_df['AA_MUTATION'],
-                    mode='markers',
+                    y=mut_df['Percentage'],
+                    mode=scatter_mode,
+                    text=scatter_text,
+                    textposition=text_pos_array,
+                    textfont=dict(size=11, color="black"),
                     name=mut_type,
                     marker=dict(
                         color=mut_df['ColorCode'].tolist(), 
@@ -142,14 +155,11 @@ process MutationsGraphicReport {
                     customdata=hover_data,
                     hovertemplate=(
                         "<b>Position:</b> %{x}<br>"
-                        "<b>Reference Position:</b> %{customdata[8]}<br>"
+                        "<b>Reference Position (H5N1 numbering):</b> %{customdata[7]}<br>"
                         "<b>Mutation:</b> %{customdata[2]}<br>"
-                        "<b>Marker ID:</b> %{customdata[4]}<br>"
-                        "<b>Effect:</b> %{customdata[3]}<br>"
-                        "<b>Found In:</b> %{customdata[7]}<br>"
-                        "<b>Occurrence:</b> %{customdata[5]} sample(s) (%{customdata[6]}%)<br>"
-                        "<b>Subtype(s):</b> %{customdata[1]}<br>"
-                        "<b>Sample IDs:</b> %{customdata[0]}<br>"
+                        "<b>Effect(s):</b> %{customdata[3]}<br>"
+                        "                 <b>Found in:</b>  %{customdata[6]}<br>"
+                        "<b>Occurrence:</b> %{customdata[4]}/%{customdata[8]} sample(s) (%{customdata[5]}%)<br>"
                         "<extra></extra>"
                     ),
                     legendgroup=mut_type,
@@ -163,18 +173,24 @@ process MutationsGraphicReport {
         max_length = lengths_dict.get(group, lengths_dict.get(base_protein, None))
         
         if max_length:
-            fig.update_xaxes(range=[0, max_length], title_text="Position", row=i, col=1)
+            fig.update_xaxes(range=[0, max_length+5], title_text="Position", row=i, col=1)
         else:
             fig.update_xaxes(title_text="Position", row=i, col=1)
             
-        fig.update_yaxes(type='category', title_text="Mutation", row=i, col=1)
+        fig.update_yaxes(range=[0, 115], title_text="Frequency (%)", row=i, col=1)
 
     fig.update_layout(
-        title_text="Mutation Summary per Protein",
+        title_text=(
+            "Mutation Summary per Protein<br>"
+            "<span style='font-size:14px; color:gray; font-weight:normal;'>"
+            "Displaying markers and mutations occurring at a frequency exceeding ${params.threshold * 100}% among samples per protein group."
+            "</span>"
+        ),
         height=total_figure_height,
         showlegend=True,
         hovermode="closest",
-        margin=dict(t=80, b=80, l=80, r=80)
+        hoverlabel=dict(align="left"), 
+        margin=dict(t=100, b=80, l=80, r=80)
     )
 
     fig.write_html("MutationsReport.html")

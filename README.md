@@ -221,7 +221,7 @@ CI runs on `ubuntu-latest` and handles the installation of all necessary bioinfo
 - [Nextclade](https://clades.nextstrain.org/)
 - [seqkit](https://bioinf.shenwei.me/seqkit/)
 - [MAFFT](https://mafft.cbrc.jp/alignment/software/)
-- [Python 3](https://www.python.org/) (with [pandas](https://pandas.pydata.org/docs/index.html), [biopython](https://biopython.org/wiki/Documentation), [openpyxl](https://openpyxl.readthedocs.io/en/stable/), [sqlite3](https://docs.python.org/3/library/sqlite3.html))
+- [Python 3](https://www.python.org/) (with [pandas](https://pandas.pydata.org/docs/index.html), [biopython](https://biopython.org/wiki/Documentation), [openpyxl](https://openpyxl.readthedocs.io/en/stable/), [sqlite3](https://docs.python.org/3/library/sqlite3.html)), [plotly](https://github.com/plotly/plotly.py.git)
 - [nf-test](https://www.nf-test.com/)
 
 ---

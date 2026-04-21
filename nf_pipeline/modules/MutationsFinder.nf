@@ -96,41 +96,91 @@ for aligned_prot in "${prot_files}".split():
         if mut_set.issubset(observed_mutations):
             # Mutations can have multiple marker ids, so we append to a list for each mutation
             for mut in mut_set: active_markers.setdefault(mut, []).append(m_id)
-    
+    # Build list to store indels
+    events = []
+    pos = 0
+    for r_aa, q_aa in zip(ref_seq, query_seq):
+        if r_aa != "-": pos += 1
+        pos_raw = str(pos)
+        pos_ref = pos_to_base.get(pos_raw, pos_raw)
+
+        is_marker = (pos_ref, q_aa) in active_markers
+        is_mutation = r_aa != q_aa and "X" not in (r_aa, q_aa)
+        if not (is_marker or is_mutation):
+            continue
+
+        if is_marker:
+            m_ids = list(dict.fromkeys(active_markers[(pos_ref, q_aa)]))
+            is_combo = " | ".join(dict.fromkeys("Yes" if len(set(m[0] for m in markers_by_id[mid])) > 1 else "No" for mid in m_ids))
+            effect = " | ".join(dict.fromkeys(eff for mid in m_ids for eff, _, _ in marker_info[mid] if eff))
+            found  = " | ".join(dict.fromkeys(fnd for mid in m_ids for _, fnd, _ in marker_info[mid] if fnd))
+            ref    = " | ".join(dict.fromkeys(r   for mid in m_ids for _, _, r   in marker_info[mid] if r))
+            mut_type = "Marker"
+            aa_mut = f"{pos_raw}{q_aa}"
+            events.append({"pos": pos_raw, "pos_ref": pos_ref, "r_aa": r_aa, "q_aa": q_aa,
+                            "aa_mut": aa_mut, "mut_type": mut_type, "marker": "Yes",
+                            "m_ids": " | ".join(m_ids), "is_combo": is_combo,
+                            "effect": effect, "found": found, "ref": ref})
+        else:
+            mut_type = "Insertion" if r_aa == "-" else "Deletion" if q_aa == "-" else "Substitution"
+            aa_mut = f"{r_aa}{pos_raw}{q_aa}"
+            events.append({"pos": pos_raw, "pos_ref": pos_ref, "r_aa": r_aa, "q_aa": q_aa,
+                            "aa_mut": aa_mut, "mut_type": mut_type, "marker": "No",
+                            "m_ids": "", "is_combo": "No", "effect": "", "found": "", "ref": ""})
+
+    # Collapse consecutive indels into single events to avoid multiple rows
+    def collapse_indels(events):
+        result = []
+        i = 0
+        while i < len(events):
+            indel = events[i]
+            if indel["mut_type"] in ("Insertion", "Deletion"):
+                # Collect consecutive events of the same indel type
+                group = [indel]
+                j = i + 1
+                while j < len(events) and events[j]["mut_type"] == indel["mut_type"]:
+                    group.append(events[j])
+                    j += 1
+                # Merge: position is the first one; AAs are concatenated
+                first = group[0]
+                ref_aas   = "".join(e["r_aa"] for e in group)
+                query_aas = "".join(e["q_aa"] for e in group)
+                start_pos = first["pos"]
+                end_pos   = group[-1]["pos"]
+                pos_label = start_pos if start_pos == end_pos else f"{start_pos}-{end_pos}"
+                pos_ref_label = first["pos_ref"] if first["pos_ref"] == group[-1]["pos_ref"] \
+                                else f"{first['pos_ref']}-{group[-1]['pos_ref']}"
+                if indel["mut_type"] == "Deletion":
+                    aa_mut = f"del{pos_label}"
+                    query_aas = "-"
+                else:
+                    aa_mut = f"ins{pos_label}{query_aas}"
+                    ref_aas = "-"
+                result.append({**first,
+                                "pos": pos_label, "pos_ref": pos_ref_label,
+                                "r_aa": ref_aas, "q_aa": query_aas, "aa_mut": aa_mut})
+                i = j
+            else:
+                result.append(indel)
+                i += 1
+        return result
+
+    events = collapse_indels(events)
+
+    # --- Write output CSV ---
     out_csv = out_dir / f"${sample_id}_{prot_name}_mutations.csv"
     output_files.append(out_csv)
-    
+
     with open(out_csv, 'w', newline='') as f:
         writer = csv.writer(f)
-        writer.writerow(["SAMPLE_ID", "SUBTYPE", "PROTEIN", "REF_SUBTYPE", "POSITION", "POSITION_REF", "REFERENCE_AA", "QUERY_AA", "AA_MUTATION", "MUTATION_TYPE", "MARKER", "MARKER_ID", "IS_COMBINATION", "EFFECT", "FOUND_IN", "REFERENCE"])
-        
-        pos = 0
-        for r_aa, q_aa in zip(ref_seq, query_seq):
-            if r_aa != "-": pos += 1
-            pos_raw = str(pos)
-            pos_ref = pos_to_base.get(pos_raw, pos_raw)
-            position = pos_raw
-
-            is_marker, is_mutation = (pos_ref, q_aa) in active_markers, r_aa != q_aa and "X" not in (r_aa, q_aa)
-            if not (is_marker or is_mutation): continue
-
-            mut_type = "Marker" if not is_mutation else "Insertion" if r_aa == "-" else "Deletion" if q_aa == "-" else "Substitution"
-            aa_mut = f"{position}{q_aa}" if is_marker else f"{r_aa}{position}{q_aa}"
-
-            if is_marker:
-                # Gather all marker IDs for this mutation
-                m_ids = list(dict.fromkeys(active_markers[(pos_ref, q_aa)]))
-                # If multiple marker IDs are associated with this mutation, it's a combination
-                is_combo = " | ".join(dict.fromkeys("Yes" if len(set(m[0] for m in markers_by_id[mid])) > 1 else "No" for mid in m_ids))
-                
-                # If multiple info entries exist for the same marker ID, we combine them with " | " and remove duplicates
-                effect = " | ".join(dict.fromkeys(eff for mid in m_ids for eff, _, _ in marker_info[mid] if eff))
-                found = " | ".join(dict.fromkeys(fnd for mid in m_ids for _, fnd, _ in marker_info[mid] if fnd))
-                ref = " | ".join(dict.fromkeys(ref for mid in m_ids for _, _, ref in marker_info[mid] if ref))
-                
-                writer.writerow(["${sample_id}", subtype_val, prot_name, ref_tag, position, pos_ref, r_aa, q_aa, aa_mut, mut_type, "Yes", " | ".join(m_ids), is_combo, effect, found, ref])
-            else:
-                writer.writerow(["${sample_id}", subtype_val, prot_name, ref_tag, position, pos_ref, r_aa, q_aa, aa_mut, mut_type, "No", "", "No", "", "", ""])
+        writer.writerow(["SAMPLE_ID", "SUBTYPE", "PROTEIN", "REF_SUBTYPE", "POSITION", "POSITION_REF",
+                         "REFERENCE_AA", "QUERY_AA", "AA_MUTATION", "MUTATION_TYPE", "MARKER",
+                         "MARKER_ID", "IS_COMBINATION", "EFFECT", "FOUND_IN", "REFERENCE"])
+        for indel in events:
+            writer.writerow(["${sample_id}", subtype_val, prot_name, ref_tag,
+                             indel["pos"], indel["pos_ref"], indel["r_aa"], indel["q_aa"],
+                             indel["aa_mut"], indel["mut_type"], indel["marker"],
+                             indel["m_ids"], indel["is_combo"], indel["effect"], indel["found"], indel["ref"]])
 
 master_csv = Path(f"samples/${sample_id}/${sample_id}_mutations.csv")
 if output_files:
