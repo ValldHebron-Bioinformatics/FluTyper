@@ -23,7 +23,7 @@ process MutationsGraphicReport {
     lengths_df = pd.read_csv("${params.protocols[params.protocol].resources}/annotations.csv")
     lengths_dict = dict(zip(lengths_df['Protein'].astype(str), lengths_df['Length']))
 
-    # Standardize missing values and replace pipes with a line break + 8 HTML spaces for indentation
+    # Standardize missing values and replace pipes with a line break + spaces for indentation
     df['EFFECT'] = df['EFFECT'].replace('', 'Unknown').fillna('Unknown').astype(str).str.replace(' | ', '<br>                 ')
     df['SUBTYPE'] = df['SUBTYPE'].replace('', 'Unknown').fillna('Unknown').astype(str)
     df['REF_SUBTYPE'] = df['REF_SUBTYPE'].replace('', 'Unknown').fillna('Unknown').astype(str)
@@ -130,7 +130,7 @@ process MutationsGraphicReport {
             # Set mode and text for Markers only
             if mut_type == 'Marker':
                 scatter_mode = 'markers+text'
-                scatter_text = mut_df['AA_MUTATION']
+                scatter_text = ["<b>" + str(x) + "</b>" for x in mut_df['AA_MUTATION']]
                 # Create an alternating array to stagger text up and down
                 text_pos_array = ['top center' if idx % 2 == 0 else 'bottom center' for idx in range(len(mut_df))]
             else:
