@@ -57,7 +57,7 @@ process IndividualGraphicReport {
         'Marker': '#fe0000',      
         'Substitution': '#2243f5',
         'Deletion': '#000000',    
-        'Insertion': '#00ff73'    
+        'Insertion': '#e08e13'    
     }
     df['ColorCode'] = df['Color_Category'].map(lambda x: color_map.get(x, '#aaaaaa'))
 
@@ -76,13 +76,13 @@ process IndividualGraphicReport {
     rows_count = len(groups)
     
     row_height = 180
-    vert_spacing = 80
+    vert_spacing = 140
     # Not automatic to achieve better visibility
     total_figure_height = max(500, row_height * rows_count + 150)
     spacing = vert_spacing / total_figure_height if rows_count > 1 else 0
 
-    fig = make_subplots(rows=rows_count, cols=1, subplot_titles=groups, vertical_spacing=spacing)
-
+    fig = make_subplots(rows=rows_count, cols=1, subplot_titles=[f"<br><b>{group}</b><br> <br>" for group in groups], vertical_spacing=spacing)
+    
     # Global legend
     for mut_type, color in color_map.items():
         fig.add_trace(
@@ -148,6 +148,7 @@ process IndividualGraphicReport {
                     textfont=dict(size=11, color="black"),
                     name=mut_type,
                     marker=dict(color=color, size=10, opacity=0),
+                    cliponaxis=False,
                     customdata=hover_data,
                     hovertemplate=(
                         "<b>Position:</b> %{customdata[5]}<br>"
@@ -166,18 +167,26 @@ process IndividualGraphicReport {
         base_protein = group.split(' (')[0]
         max_length = lengths_dict.get(group, lengths_dict.get(base_protein, 800))
         
-        fig.update_xaxes(range=[-10, max_length+10], title_text="Amino acid position", showgrid=False, zeroline=False, row=i, col=1)
-        fig.update_yaxes(range=[-0.5, 1.5], showticklabels=False, showgrid=False, zeroline=False, row=i, col=1)
+        fig.update_xaxes(
+                    range=[-10, max_length+10], 
+                    title=dict(text="Amino acid position", standoff=20), 
+                    ticks="outside", 
+                    ticklen=15, 
+                    tickcolor="rgba(0,0,0,0)", 
+                    showgrid=False, 
+                    zeroline=False, 
+                    row=i, 
+                    col=1
+                )        
+        fig.update_yaxes(range=[0, 1], showticklabels=False, showgrid=False, zeroline=False, row=i, col=1)
 
     fig.update_layout(
-        title_text="Genomic Barcode Profile - Sample ${sample_id}",
+        title_text="<b>Genomic Barcode Profile - Sample ${sample_id}</b>",
         height=total_figure_height,
         showlegend=True,
         hovermode="closest",
         hoverlabel=dict(align="left"), 
         margin=dict(t=100, b=80, l=80, r=80),
-        plot_bgcolor='white',
-        paper_bgcolor='white'
     )
 
     os.makedirs("samples/${sample_id}", exist_ok=True)
