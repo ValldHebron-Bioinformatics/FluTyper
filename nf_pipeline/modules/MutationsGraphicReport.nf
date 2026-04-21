@@ -61,22 +61,23 @@ process MutationsGraphicReport {
     total_samples_per_group.rename(columns={'SAMPLE_ID': 'Total_Group_Samples'}, inplace=True)
 
     # Define the relevant columns for grouping and aggregation
-    group_cols = ['Plot_Group', 'POSITION', 'POSITION_REF', 'AA_MUTATION', 'EFFECT', 'Color_Category', 'ColorCode', 'FOUND_IN']
+    group_cols = ['Plot_Group', 'POSITION', 'POSITION_REF', 'AA_MUTATION', 'Color_Category', 'ColorCode']
     
     # Function to list unique items in a column
-    def list_unique_items(data_column):
+    def list_unique_items(data_column, joiner=', '):
         valid_items = []
         for item in data_column.unique():
-            # Only add the item if it is not a blank space
             if str(item).strip() != '':
                 valid_items.append(str(item))
-        return ', '.join(valid_items)
+        return joiner.join(valid_items)
 
     # Group the data and calculate metrics
     df_grouped = df.groupby(group_cols, dropna=False).agg(
         Sample_Count=('SAMPLE_ID', 'nunique'),
         Sample_IDs=('SAMPLE_ID', list_unique_items),
-        Subtypes=('SUBTYPE', list_unique_items)
+        Subtypes=('SUBTYPE', list_unique_items),
+        EFFECT=('EFFECT', lambda x: list_unique_items(x, '<br>                 ')),
+        FOUND_IN=('FOUND_IN', list_unique_items)
     ).reset_index()
 
     # Bring in the total sample numbers to calculate percentages
@@ -123,14 +124,28 @@ process MutationsGraphicReport {
         for mut_type in group_df['Color_Category'].unique():
             mut_df = group_df[group_df['Color_Category'] == mut_type]
             
-            # Pack aggregated data including Total_Group_Samples at index 9
+            # Pack aggregated data
             hover_data = mut_df[['Sample_IDs', 'Subtypes', 'AA_MUTATION', 'EFFECT', 'Sample_Count', 'Percentage', 'FOUND_IN', 'POSITION_REF', 'Total_Group_Samples']].values
             
+            # Set mode and text for Markers only
+            if mut_type == 'Marker':
+                scatter_mode = 'markers+text'
+                scatter_text = mut_df['AA_MUTATION']
+                # Create an alternating array to stagger text up and down
+                text_pos_array = ['top center' if idx % 2 == 0 else 'bottom center' for idx in range(len(mut_df))]
+            else:
+                scatter_mode = 'markers'
+                scatter_text = None
+                text_pos_array = None
+
             fig.add_trace(
                 go.Scatter(
                     x=mut_df['POSITION'],
                     y=mut_df['Percentage'],
-                    mode='markers',
+                    mode=scatter_mode,
+                    text=scatter_text,
+                    textposition=text_pos_array,
+                    textfont=dict(size=11, color="black"),
                     name=mut_type,
                     marker=dict(
                         color=mut_df['ColorCode'].tolist(), 
@@ -140,7 +155,7 @@ process MutationsGraphicReport {
                     customdata=hover_data,
                     hovertemplate=(
                         "<b>Position:</b> %{x}<br>"
-                        "<b>Reference Position(H5N1 numbering):</b> %{customdata[7]}<br>"
+                        "<b>Reference Position (H5N1 numbering):</b> %{customdata[7]}<br>"
                         "<b>Mutation:</b> %{customdata[2]}<br>"
                         "<b>Effect(s):</b> %{customdata[3]}<br>"
                         "                 <b>Found in:</b>  %{customdata[6]}<br>"
@@ -158,11 +173,11 @@ process MutationsGraphicReport {
         max_length = lengths_dict.get(group, lengths_dict.get(base_protein, None))
         
         if max_length:
-            fig.update_xaxes(range=[0, max_length], title_text="Position", row=i, col=1)
+            fig.update_xaxes(range=[0, max_length+5], title_text="Position", row=i, col=1)
         else:
             fig.update_xaxes(title_text="Position", row=i, col=1)
             
-        fig.update_yaxes(range=[0, 105], title_text="Frequency (%)", row=i, col=1)
+        fig.update_yaxes(range=[0, 115], title_text="Frequency (%)", row=i, col=1)
 
     fig.update_layout(
         title_text=(
@@ -174,7 +189,7 @@ process MutationsGraphicReport {
         height=total_figure_height,
         showlegend=True,
         hovermode="closest",
-        hoverlabel=dict(align="left"), # Forces text to align cleanly to the left
+        hoverlabel=dict(align="left"), 
         margin=dict(t=100, b=80, l=80, r=80)
     )
 
