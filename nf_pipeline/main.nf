@@ -2,20 +2,21 @@
 
 nextflow.enable.dsl = 2
 
-include { OrganizeBySample        } from './modules/OrganizeBySample'
-include { SubtypeDetection        } from './modules/SubtypeDetection'
-include { GetDatasets             } from './modules/GetDatasets'
-include { FluMutDB                } from './modules/FluMutDB'
-include { MarkersFiles            } from './modules/MarkersFiles'
-include { GenotypingNextclade     } from './modules/GenotypingNextclade'
-include { GenotypingResults       } from './modules/GenotypingResults'
-include { GetCDS                  } from './modules/GetCDS'
-include { TranslateToProtein      } from './modules/TranslateToProtein'
-include { MutationsFinder         } from './modules/MutationsFinder'
-include { MutationsCompiler       } from './modules/MutationsCompiler'
-include { CompileErrors           } from './modules/CompileErrors'
-include { CladeGraphicReport      } from './modules/CladeGraphicReport'
-include { MutationsGraphicReport  } from './modules/MutationsGraphicReport'
+include { OrganizeBySample         } from './modules/OrganizeBySample'
+include { SubtypeDetection         } from './modules/SubtypeDetection'
+include { GetDatasets              } from './modules/GetDatasets'
+include { FluMutDB                 } from './modules/FluMutDB'
+include { MarkersFiles             } from './modules/MarkersFiles'
+include { GenotypingNextclade      } from './modules/GenotypingNextclade'
+include { GenotypingResults        } from './modules/GenotypingResults'
+include { GetCDS                   } from './modules/GetCDS'
+include { TranslateToProtein       } from './modules/TranslateToProtein'
+include { MutationsFinder          } from './modules/MutationsFinder'
+include { MutationsCompiler        } from './modules/MutationsCompiler'
+include { CompileErrors            } from './modules/CompileErrors'
+include { CladeGraphicReport       } from './modules/CladeGraphicReport'
+include { MutationsGraphicReport   } from './modules/MutationsGraphicReport'
+include { IndividualGraphicReport  } from './modules/IndividualGraphicReport'
 
 workflow {
     main:
@@ -164,6 +165,8 @@ workflow {
     
     CladeGraphicReport(GenotypingFinal_ch)
     MutationsGraphicReport(MutationsCompiler.out.results.map { _full, filtered -> filtered })
+    IndividualMutations_Ch = MutationsFinder.out.results.map { sample_id, _mut_files, combined_csv -> tuple(sample_id, combined_csv) }
+    IndividualGraphicReport(IndividualMutations_Ch)
            
     publish:
     // Strip the sample_id strings so the output block receives pure file/path objects
@@ -179,6 +182,7 @@ workflow {
     aligned_cds = GetCDS.out.aligned.map { _id, path -> path }
     graphic_report = CladeGraphicReport.out.report
     mutations_graphic_report = MutationsGraphicReport.out.report
+    individual_graphic_report = IndividualGraphicReport.out.report
     //mutations = MutationsMerged_ch
     //orientation = OrganizeBySample.out.orientation.map { _id, path -> path }
     // Extract both file objects from the 3-item tuple and flatten them
@@ -194,6 +198,10 @@ output {
     //    path { "${projectDir}/../${params.outDir}/orientation" }
     //    mode "copy"
     //}
+    individual_graphic_report {
+        path { "${projectDir}/../${params.outDir}" }
+        mode "copy"
+    }
     mutations_graphic_report {
         path { "${projectDir}/../${params.outDir}/graphic_reports" }
         mode "copy"
