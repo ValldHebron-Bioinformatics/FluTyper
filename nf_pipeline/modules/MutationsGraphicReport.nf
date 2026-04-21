@@ -38,11 +38,12 @@ process MutationsGraphicReport {
 
     df['Color_Category'] = df.apply(get_mutation_category, axis=1)
 
+    # Colorblind-friendly palette
     color_map = {
-        'Marker': '#fe0000',      
-        'Substitution': '#2243f5',
-        'Deletion': '#000000',    
-        'Insertion': '#00ff73'    
+        'Marker': '#D55E00',       
+        'Substitution': '#0072B2', 
+        'Deletion': '#000000',     
+        'Insertion': '#009E73'    
     }
     df['ColorCode'] = df['Color_Category'].map(lambda x: color_map.get(x, '#aaaaaa'))
 
