@@ -53,13 +53,22 @@ process IndividualGraphicReport {
 
     df['Color_Category'] = df.apply(get_mutation_category, axis=1)
 
-    # Colorblind-friendly palette
-    color_map = {
-        'Marker': '#D55E00',       
-        'Substitution': '#0072B2', 
-        'Deletion': '#000000',     
-        'Insertion': '#009E73'    
-    }
+    if "${params.colorblind}".lower() == "true":
+        # Colorblind-friendly palette
+        color_map = {
+            'Marker': '#D55E00',       
+            'Substitution': '#0072B2', 
+            'Deletion': '#000000',     
+            'Insertion': '#CC79A7'    
+        }
+    else:
+        # Default plotly color palette
+        color_map = {
+            'Marker': '#EF553B',       
+            'Substitution': '#636EFA', 
+            'Deletion': '#000000',     
+            'Insertion': '#AB63FA'    
+        }
     df['ColorCode'] = df['Color_Category'].map(lambda x: color_map.get(x, '#aaaaaa'))
 
     def get_plot_group(row):
