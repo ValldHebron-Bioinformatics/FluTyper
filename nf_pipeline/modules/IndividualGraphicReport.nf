@@ -178,7 +178,7 @@ process IndividualGraphicReport {
         max_length = lengths_dict.get(group, lengths_dict.get(base_protein, 800))
         
         fig.update_xaxes(
-                    range=[-10, max_length+10], 
+                    range=[-1, max_length+10], 
                     title=dict(text="Amino acid position", standoff=20), 
                     ticks="outside", 
                     ticklen=15, 
