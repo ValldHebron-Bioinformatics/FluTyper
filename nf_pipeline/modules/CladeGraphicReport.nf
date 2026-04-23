@@ -21,10 +21,13 @@ process CladeGraphicReport {
 
     # Okabe-Ito Colors Palette (colorblind-friendly)
     okabe_ito_colors = ['#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7', '#999999', '#000000']
+    # Cris Colors Palette (she hates Barça colors)
+    cris_colors = ['#F9DC5C', '#CD733D', '#C84630', '#94B0DA', '#676F86', '#3A2D32']
+    
     if "${params.colorblind}".lower() == "true":
         color_dict= okabe_ito_colors
     else:
-        color_dict = colors.qualitative.Plotly
+        color_dict = cris_colors
     # Dataframe preparation
     genotyping_df = pd.read_csv("${genotyping_file}")
     genotyping_df['H_Subtype'] = genotyping_df['Subtype'].astype(str).str[:2]

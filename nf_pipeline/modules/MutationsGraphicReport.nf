@@ -47,12 +47,12 @@ process MutationsGraphicReport {
             'Insertion': '#CC79A7'    
         }
     else:
-        # Default plotly color palette
+        # Cris Colors Palette
         color_map = {
-            'Marker': '#EF553B',       
-            'Substitution': '#636EFA', 
-            'Deletion': '#000000',     
-            'Insertion': '#AB63FA'    
+            'Marker': '#C84630',       
+            'Substitution': '#94B0DA', 
+            'Deletion': '#3A2D32',     
+            'Insertion': '#F9DC5C'    
         }
     df['ColorCode'] = df['Color_Category'].map(lambda x: color_map.get(x, '#aaaaaa'))
 
@@ -97,8 +97,30 @@ process MutationsGraphicReport {
     df_grouped['Percentage'] = (df_grouped['Sample_Count'] / df_grouped['Total_Group_Samples']) * 100
     df_grouped['Percentage'] = df_grouped['Percentage'].round(2)
 
-    # Prepare subplots
-    groups = sorted(df_grouped['Plot_Group'].unique())
+    # Define biological segment mapping for sorting
+    segment_mapping = {
+        'PB2': 1,
+        'PB1': 2,
+        'PB1-F2': 2,
+        'PA': 3,
+        'PA-X': 3,
+        'HA1': 4,
+        'HA2': 4,
+        'NP': 5,
+        'NA': 6,
+        'M1': 7,
+        'M2': 7,
+        'NS1': 8,
+        'NS2': 8,
+    }
+
+    def custom_sort_key(group_name):
+        base_protein = group_name.split(' - ')[0]
+        segment_num = segment_mapping.get(base_protein, 99)
+        return (segment_num, group_name)
+
+    # Prepare subplots using the custom segment order
+    groups = sorted(df_grouped['Plot_Group'].unique(), key=custom_sort_key)
     rows_count = len(groups)
     
     # Calculate vertical spacing to avoid overlap
