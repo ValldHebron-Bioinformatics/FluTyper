@@ -155,7 +155,7 @@ for seg, prots in prot_dict.items():
             ref_length = len(ref_seq.replace('-', ''))
             
             coverage_ratio = aligned_informative_positions / ref_length if ref_length > 0 else 0
-            identity_ratio = matches / ref_length if ref_length > 0 else 0
+            identity_ratio = matches / aligned_informative_positions if aligned_informative_positions > 0 else 0
 
             # Minimum 50% coverage AND dynamic minimum identity
             if coverage_ratio < 0.5 or identity_ratio < min_identity:
