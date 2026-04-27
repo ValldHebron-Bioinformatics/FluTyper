@@ -219,6 +219,7 @@ process IndividualGraphicReport {
         hovermode="closest",
         hoverlabel=dict(align="left"), 
         margin=dict(t=100, b=80, l=80, r=80),
+        plot_bgcolor='#e2dfdf', 
     )
 
     os.makedirs("samples/${sample_id}", exist_ok=True)
