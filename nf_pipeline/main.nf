@@ -164,7 +164,7 @@ workflow {
         )
     
     CladeGraphicReport(GenotypingFinal_ch)
-    MutationsGraphicReport(MutationsCompiler.out.results.map { _full, filtered -> filtered })
+    MutationsGraphicReport(MutationsCompiler.out.results.map { full, _filtered -> full })
     IndividualMutations_Ch = MutationsFinder.out.results.map { sample_id, _mut_files, combined_csv -> tuple(sample_id, combined_csv) }
     IndividualGraphicReport(IndividualMutations_Ch)
            
