@@ -6,7 +6,7 @@ process MutationsGraphicReport {
     debug true
 
     input:
-    path(filtered_mutations)
+    path(full_mutations)
 
     output:
     path("MutationsReport.html"), emit: report
@@ -17,9 +17,10 @@ process MutationsGraphicReport {
     import pandas as pd
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
+    import json
 
     # Load the mutations dataset, only first sheet (All_Proteins)
-    df = pd.read_excel("${filtered_mutations}", keep_default_na=False)
+    df = pd.read_excel("${full_mutations}", keep_default_na=False)
     lengths_df = pd.read_csv("${params.protocols[params.protocol].resources}/annotations.csv")
     lengths_dict = dict(zip(lengths_df['Protein'].astype(str), lengths_df['Length']))
 
@@ -29,6 +30,7 @@ process MutationsGraphicReport {
     df['REF_SUBTYPE'] = df['REF_SUBTYPE'].replace('', 'Unknown').fillna('Unknown').astype(str)
     df['FOUND_IN'] = df['FOUND_IN'].replace('', 'Unknown').fillna('Unknown').astype(str)
     df['POSITION_REF'] = df['POSITION_REF'].replace('', 'Unknown').fillna('Unknown').astype(str)
+    df['POSITION'] = pd.to_numeric(df['POSITION'], errors='coerce')
 
     # Define the coloring logic based on mutation type or marker status
     def get_mutation_category(row):
@@ -38,12 +40,22 @@ process MutationsGraphicReport {
 
     df['Color_Category'] = df.apply(get_mutation_category, axis=1)
 
-    color_map = {
-        'Marker': '#fe0000',      
-        'Substitution': '#2243f5',
-        'Deletion': '#000000',    
-        'Insertion': '#00ff73'    
-    }
+    if "${params.colorblind}".lower() == "true":
+        # Colorblind-friendly palette
+        color_map = {
+            'Marker': '#D55E00',       
+            'Substitution': '#0072B2', 
+            'Deletion': '#000000',     
+            'Insertion': '#CC79A7'    
+        }
+    else:
+        # Cris Colors Palette
+        color_map = {
+            'Marker': '#C84630',       
+            'Substitution': '#94B0DA', 
+            'Deletion': '#3A2D32',     
+            'Insertion': '#F9DC5C'    
+        }
     df['ColorCode'] = df['Color_Category'].map(lambda x: color_map.get(x, '#aaaaaa'))
 
     # Define plot groups, extracting from REF_SUBTYPE specifically for HA and NA
@@ -87,14 +99,36 @@ process MutationsGraphicReport {
     df_grouped['Percentage'] = (df_grouped['Sample_Count'] / df_grouped['Total_Group_Samples']) * 100
     df_grouped['Percentage'] = df_grouped['Percentage'].round(2)
 
-    # Prepare subplots
-    groups = sorted(df_grouped['Plot_Group'].unique())
+    # Define biological segment mapping for sorting
+    segment_mapping = {
+        'PB2': 1,
+        'PB1': 2,
+        'PB1-F2': 2,
+        'PA': 3,
+        'PA-X': 3,
+        'HA1': 4,
+        'HA2': 4,
+        'NP': 5,
+        'NA': 6,
+        'M1': 7,
+        'M2': 7,
+        'NS1': 8,
+        'NS2': 8,
+    }
+
+    def custom_sort_key(group_name):
+        base_protein = group_name.split(' - ')[0]
+        segment_num = segment_mapping.get(base_protein, 99)
+        return (segment_num, group_name)
+
+    # Prepare subplots using the custom segment order
+    groups = sorted(df_grouped['Plot_Group'].unique(), key=custom_sort_key)
     rows_count = len(groups)
     
     # Calculate vertical spacing to avoid overlap
     row_height = 400
     vert_spacing = 80
-    total_figure_height = row_height * rows_count
+    total_figure_height = max(row_height * rows_count, 600)
     
     if rows_count > 1:
         spacing = vert_spacing / total_figure_height
@@ -178,21 +212,116 @@ process MutationsGraphicReport {
             fig.update_xaxes(title_text="Position", row=i, col=1)
             
         fig.update_yaxes(range=[0, 115], title_text="Frequency (%)", row=i, col=1)
-
+    
+    # Graph layout adjustments
     fig.update_layout(
-        title_text=(
-            "Mutation Summary per Protein<br>"
-            "<span style='font-size:14px; color:gray; font-weight:normal;'>"
-            "Displaying markers and mutations occurring at a frequency exceeding ${params.threshold * 100}% among samples per protein group."
-            "</span>"
-        ),
-        height=total_figure_height,
+        height=total_figure_height, 
         showlegend=True,
         hovermode="closest",
         hoverlabel=dict(align="left"), 
-        margin=dict(t=100, b=80, l=80, r=80)
+        margin=dict(t=40, b=80, l=80, r=80) 
     )
 
-    fig.write_html("MutationsReport.html")
+    # Plotly graph to HTML
+    graph_html = fig.to_html(full_html=False, include_plotlyjs='cdn', div_id="plotly-graphs")
+    default_val = ${params.threshold}*100
+
+    # Create the full HTML template with embedded graph and slider
+    html_template = f'''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <title>Mutations Summary</title>
+    </head>
+    <body style="font-family: arial; text-align: center; padding: 20px;">
+
+        <h2>Mutation Summary per Protein</h2>
+        <p style="color: gray; font-size: 14px;">Markers are always displayed.</p>
+
+        <div style="margin: 30px;">
+            <label><b>Minimum Frequency Threshold:</b> <span id="sliderValue">{default_val}%</span></label>
+            <br><br>
+            <input type="range" id="freqSlider" min="0" max="100" value="{default_val}" oninput="applyFrequencyFilter(this.value)" style="width: 50%;">
+        </div>
+
+        <div>
+            {graph_html}
+        </div>
+
+        <script>
+            var checkGraphReady = setInterval(function() {{
+                var graphContainer = document.getElementById('plotly-graphs');
+                
+                // If the graph is loaded and has data, we can store the original Y values.
+                if (graphContainer && graphContainer.data && graphContainer.data.length > 0) {{
+                    clearInterval(checkGraphReady); 
+                    
+                    // Save the original Y values to a custom property so we don't lose them when filtering
+                    graphContainer.originalYValues = [];
+                    for (var seriesIndex = 0; seriesIndex < graphContainer.data.length; seriesIndex++) {{
+                        var dataSeries = graphContainer.data[seriesIndex];
+                        if (dataSeries.y) {{
+                            graphContainer.originalYValues.push(Array.from(dataSeries.y));
+                        }} else {{
+                            graphContainer.originalYValues.push(null);
+                        }}
+                    }}
+                    
+                    // Initial plot update to apply the default threshold upon loading
+                    applyFrequencyFilter(document.getElementById('freqSlider').value);
+                }}
+            }}, 200);
+
+            function applyFrequencyFilter(minimumFrequency) {{
+                document.getElementById('sliderValue').innerText = minimumFrequency + '%';
+                var graphContainer = document.getElementById('plotly-graphs');
+                
+                // If the graph hasn't been properly saved to memory yet, exit silently to avoid errors
+                if (!graphContainer || !graphContainer.originalYValues) return;
+                
+                var newVerticalCoordinates = [];
+                
+                for(var seriesIndex = 0; seriesIndex < graphContainer.data.length; seriesIndex++) {{
+                    var dataSeries = graphContainer.data[seriesIndex];
+                    var baselineYValues = graphContainer.originalYValues[seriesIndex];
+                    
+                    if (!baselineYValues) {{
+                        newVerticalCoordinates.push(null);
+                        continue;
+                    }}
+
+                    // Ensure that any trace named 'Marker' bypasses the filter and remains fully visible
+                    if (dataSeries.name === 'Marker') {{
+                        newVerticalCoordinates.push(baselineYValues);
+                    }} else {{
+                        var filteredYValues = [];
+                        for(var pointIndex = 0; pointIndex < baselineYValues.length; pointIndex++) {{
+                            // Safely check that the extra custom data exists before trying to read the percentage
+                            if (dataSeries.customdata && dataSeries.customdata[pointIndex]) {{
+                                var pointPercentage = dataSeries.customdata[pointIndex][5];
+                                if (pointPercentage >= minimumFrequency) {{
+                                    filteredYValues.push(baselineYValues[pointIndex]);
+                                }} else {{
+                                    filteredYValues.push(null);
+                                }}
+                            }} else {{
+                                filteredYValues.push(null);
+                            }}
+                        }}
+                        newVerticalCoordinates.push(filteredYValues);
+                    }}
+                }}
+                
+                // Send all Y-coordinate updates to the graph at once for a smooth visual transition
+                Plotly.restyle(graphContainer, {{y: newVerticalCoordinates}});
+            }}
+        </script>
+    </body>
+    </html>
+    '''
+
+    with open("MutationsReport.html", "w", encoding="utf-8") as f:
+        f.write(html_template)
     """
 }

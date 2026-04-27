@@ -42,7 +42,7 @@ process OrganizeBySample {
         # Identify which segment this sequence belongs to
         seg_type=""
         for s in ${params.segments.join(' ')}; do
-            if [[ "\$seq_name" =~ [_|]\${s}[_|] ]]; then
+            if [[ "\$seq_name" =~ [_|]\${s}([_|]|\$) ]]; then
                 seg_type="\$s"
                 break
             fi

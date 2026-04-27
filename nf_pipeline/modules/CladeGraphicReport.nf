@@ -17,7 +17,17 @@ process CladeGraphicReport {
     import pandas as pd
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
+    from plotly import colors
 
+    # Okabe-Ito Colors Palette (colorblind-friendly)
+    okabe_ito_colors = ['#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7', '#999999', '#000000']
+    # Cris Colors Palette (she hates Barça colors)
+    cris_colors = ['#F9DC5C', '#CD733D', '#C84630', '#94B0DA', '#676F86', '#3A2D32']
+    
+    if "${params.colorblind}".lower() == "true":
+        color_dict= okabe_ito_colors
+    else:
+        color_dict = cris_colors
     # Dataframe preparation
     genotyping_df = pd.read_csv("${genotyping_file}")
     genotyping_df['H_Subtype'] = genotyping_df['Subtype'].astype(str).str[:2]
@@ -61,12 +71,12 @@ process CladeGraphicReport {
             values=h_counts['Count'], 
             name="H Subtypes", 
             text=h_counts['Text'],
-            textinfo='label+text+percent', 
+            texttemplate='<b>%{label}</b><br><b>%{text}</b><br><b>%{percent}</b>',
             textposition='auto',
             insidetextorientation='horizontal',
             automargin=True,
             hole=0.35,
-            marker=dict(line=dict(color='#ffffff', width=2)),
+            marker=dict(colors=color_dict, line=dict(color='#ffffff', width=2)),
             hoverlabel=dict(font_size=14),
             hovertemplate='<b>H Subtype:</b> %{label}<br><b>Count:</b> %{text}<br><b>Percentage:</b> %{percent}<extra></extra>'
         ),
@@ -92,13 +102,13 @@ process CladeGraphicReport {
                 labels=c_counts['Label'], 
                 values=c_counts['Count'], 
                 name=str(h), 
-                text=c_counts['Text'],
-                textinfo='label+text+percent', 
+                text=c_counts['Text'], 
+                texttemplate='<b>%{label}</b><br><b>%{text}</b><br><b>%{percent}</b>',
                 textposition='auto',
                 insidetextorientation='horizontal',
                 automargin=True,
                 hole=0.35,
-                marker=dict(line=dict(color='#ffffff', width=2)),
+                marker=dict(colors=color_dict, line=dict(color='#ffffff', width=2)),
                 hoverlabel=dict(font_size=14),
                 hovertemplate='<b>Clade:</b> %{label}<br><b>Count:</b> %{text}<br><b>Percentage:</b> %{percent}<extra></extra>'
 

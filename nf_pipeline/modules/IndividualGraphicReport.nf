@@ -53,12 +53,22 @@ process IndividualGraphicReport {
 
     df['Color_Category'] = df.apply(get_mutation_category, axis=1)
 
-    color_map = {
-        'Marker': '#fe0000',      
-        'Substitution': '#2243f5',
-        'Deletion': '#000000',    
-        'Insertion': '#00ff73'    
-    }
+    if "${params.colorblind}".lower() == "true":
+        # Colorblind-friendly palette
+        color_map = {
+            'Marker': '#D55E00',       
+            'Substitution': '#0072B2', 
+            'Deletion': '#000000',     
+            'Insertion': '#CC79A7'    
+        }
+    else:
+        # Cris Colors Palette
+        color_map = {
+            'Marker': '#C84630',       
+            'Substitution': '#94B0DA', 
+            'Deletion': '#3A2D32',     
+            'Insertion': '#F9DC5C'    
+        }
     df['ColorCode'] = df['Color_Category'].map(lambda x: color_map.get(x, '#aaaaaa'))
 
     def get_plot_group(row):
@@ -71,18 +81,40 @@ process IndividualGraphicReport {
     df['Plot_Group'] = df.apply(get_plot_group, axis=1).astype(str)
     df = df.sort_values(['Plot_Group', 'PLOT_START']).reset_index(drop=True)
 
-    # Prepare subplots
-    groups = sorted(df['Plot_Group'].unique())
+    # Define biological segment mapping for sorting
+    segment_mapping = {
+        'PB2': 1,
+        'PB1': 2,
+        'PB1-F2': 2,
+        'PA': 3,
+        'PA-X': 3,
+        'HA1': 4,
+        'HA2': 4,
+        'NP': 5,
+        'NA': 6,
+        'M1': 7,
+        'M2': 7,
+        'NS1': 8,
+        'NS2': 8,
+    }
+
+    def custom_sort_key(group_name):
+        base_protein = group_name.split(' - ')[0]
+        segment_num = segment_mapping.get(base_protein, 99)
+        return (segment_num, group_name)
+
+    # Prepare subplots using the custom segment order
+    groups = sorted(df['Plot_Group'].unique(), key=custom_sort_key)
     rows_count = len(groups)
     
     row_height = 180
-    vert_spacing = 80
+    vert_spacing = 140
     # Not automatic to achieve better visibility
     total_figure_height = max(500, row_height * rows_count + 150)
     spacing = vert_spacing / total_figure_height if rows_count > 1 else 0
 
-    fig = make_subplots(rows=rows_count, cols=1, subplot_titles=groups, vertical_spacing=spacing)
-
+    fig = make_subplots(rows=rows_count, cols=1, subplot_titles=[f"<br><b>{group}</b><br> <br>" for group in groups], vertical_spacing=spacing)
+    
     # Global legend
     for mut_type, color in color_map.items():
         fig.add_trace(
@@ -148,6 +180,7 @@ process IndividualGraphicReport {
                     textfont=dict(size=11, color="black"),
                     name=mut_type,
                     marker=dict(color=color, size=10, opacity=0),
+                    cliponaxis=False,
                     customdata=hover_data,
                     hovertemplate=(
                         "<b>Position:</b> %{customdata[5]}<br>"
@@ -163,21 +196,30 @@ process IndividualGraphicReport {
             )
 
         # Set x and y axes properties
-        base_protein = group.split(' (')[0]
+        base_protein = group.split(' - ')[0]
         max_length = lengths_dict.get(group, lengths_dict.get(base_protein, 800))
         
-        fig.update_xaxes(range=[-10, max_length+10], title_text="Amino acid position", showgrid=False, zeroline=False, row=i, col=1)
-        fig.update_yaxes(range=[-0.5, 1.5], showticklabels=False, showgrid=False, zeroline=False, row=i, col=1)
+        fig.update_xaxes(
+                    range=[-1, max_length+10], 
+                    title=dict(text="Amino acid position", standoff=20), 
+                    ticks="outside", 
+                    ticklen=15, 
+                    tickcolor="rgba(0,0,0,0)", 
+                    showgrid=False, 
+                    zeroline=False, 
+                    row=i, 
+                    col=1
+                )        
+        fig.update_yaxes(range=[0, 1], showticklabels=False, showgrid=False, zeroline=False, row=i, col=1)
 
     fig.update_layout(
-        title_text="Genomic Barcode Profile - Sample ${sample_id}",
+        title_text="<b>Genomic Barcode Profile - Sample ${sample_id}</b>",
         height=total_figure_height,
         showlegend=True,
         hovermode="closest",
         hoverlabel=dict(align="left"), 
         margin=dict(t=100, b=80, l=80, r=80),
-        plot_bgcolor='white',
-        paper_bgcolor='white'
+        plot_bgcolor='#e2dfdf', 
     )
 
     os.makedirs("samples/${sample_id}", exist_ok=True)
