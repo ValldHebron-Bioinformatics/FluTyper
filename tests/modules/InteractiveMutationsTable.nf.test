@@ -1,0 +1,30 @@
+nextflow_process {
+
+    name "Test Process InteractiveMutationsTable"
+    script "nf_pipeline/modules/InteractiveMutationsTable.nf"
+    process "InteractiveMutationsTable"
+
+    test("Should create the HTML table") {
+
+        when {
+            process {
+                """
+                input[0] = file("$projectDir/tests/data/19135815/final_mutations_report.xlsx")
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            
+            def tablehtml = process.out[0]
+            assert tablehtml != null : "Output channel is null. The HTML table was not emitted."
+            assert tablehtml.size() == 1
+
+            def htmlFile = path(tablehtml[0])
+            assert htmlFile.exists()
+        }
+
+    }
+
+}

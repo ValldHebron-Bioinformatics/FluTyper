@@ -72,6 +72,9 @@ nextflow_pipeline {
 
             // Check standard output for the database version log
             assert workflow.stdout.join('\n').contains("FluMutDB: Local database is up to date")
+            
+            def interactiveTableReport = outputDir.resolve("graphic_reports/MutationsTable.html")
+            assert interactiveTableReport.exists() : "MutationsTable.html was not published"
         }
     }
 
