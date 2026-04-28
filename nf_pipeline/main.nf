@@ -17,6 +17,7 @@ include { CompileErrors            } from './modules/CompileErrors'
 include { CladeGraphicReport       } from './modules/CladeGraphicReport'
 include { MutationsGraphicReport   } from './modules/MutationsGraphicReport'
 include { IndividualGraphicReport  } from './modules/IndividualGraphicReport'
+include { InteractiveMutationsTable } from './modules/InteractiveMutationsTable'
 
 workflow {
     main:
@@ -167,6 +168,7 @@ workflow {
     MutationsGraphicReport(MutationsCompiler.out.results.map { full, _filtered -> full })
     IndividualMutations_Ch = MutationsFinder.out.results.map { sample_id, _mut_files, combined_csv -> tuple(sample_id, combined_csv) }
     IndividualGraphicReport(IndividualMutations_Ch)
+    InteractiveMutationsTable(MutationsCompiler.out.results.map { full, _filtered -> full })
            
     publish:
     // Strip the sample_id strings so the output block receives pure file/path objects
@@ -183,6 +185,7 @@ workflow {
     graphic_report = CladeGraphicReport.out.report
     mutations_graphic_report = MutationsGraphicReport.out.report
     individual_graphic_report = IndividualGraphicReport.out.report
+    interactive_mutations_table = InteractiveMutationsTable.out.table
     //mutations = MutationsMerged_ch
     //orientation = OrganizeBySample.out.orientation.map { _id, path -> path }
     // Extract both file objects from the 3-item tuple and flatten them
@@ -198,6 +201,10 @@ output {
     //    path { "${projectDir}/../${params.outDir}/orientation" }
     //    mode "copy"
     //}
+    interactive_mutations_table {
+        path { "${projectDir}/../${params.outDir}/graphic_reports" }
+        mode "copy"
+    }
     individual_graphic_report {
         path { "${projectDir}/../${params.outDir}" }
         mode "copy"
