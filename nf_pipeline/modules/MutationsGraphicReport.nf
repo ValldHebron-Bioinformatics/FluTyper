@@ -137,20 +137,6 @@ process MutationsGraphicReport {
 
     fig = make_subplots(rows=rows_count, cols=1, subplot_titles=groups, vertical_spacing=spacing)
 
-    # Global legend
-    for mut_type, color in color_map.items():
-        fig.add_trace(
-            go.Scatter(
-                x=[None], y=[None],
-                mode='markers',
-                name=mut_type,
-                marker=dict(color=color, size=12, line=dict(width=1, color='DarkSlateGrey')),
-                legendgroup=mut_type,
-                showlegend=True
-            ),
-            row=1, col=1
-        )
-
     # Make scatter plots for each group
     for i, group in enumerate(groups, start=1):
         group_df = df_grouped[df_grouped['Plot_Group'] == group]
@@ -213,10 +199,10 @@ process MutationsGraphicReport {
             
         fig.update_yaxes(range=[0, 115], title_text="Frequency (%)", row=i, col=1)
     
-    # Graph layout adjustments
+    # Graph layout adjustments (showlegend=False because we now use an html sticky legend)
     fig.update_layout(
         height=total_figure_height, 
-        showlegend=True,
+        showlegend=False, 
         hovermode="closest",
         hoverlabel=dict(align="left"), 
         margin=dict(t=40, b=80, l=80, r=80) 
@@ -225,6 +211,13 @@ process MutationsGraphicReport {
     # Plotly graph to HTML
     graph_html = fig.to_html(full_html=False, include_plotlyjs='cdn', div_id="plotly-graphs")
     default_val = ${params.threshold}*100
+
+    # Sticky legend in html
+    legend_html = '<div style="display: flex; justify-content: center; flex-wrap: wrap; gap: 20px; margin-top: 15px; font-size: 14px; padding-top: 10px; border-top: 1px solid #eaeaea;">'
+    for mut_type, color in color_map.items():
+        legend_html += f'<div style="display: flex; align-items: center;"><span style="display: inline-block; width: 14px; height: 14px; background-color: {color}; border-radius: 50%; margin-right: 6px; border: 1px solid #555;"></span>{mut_type}</div>'
+    legend_html += '</div>'
+
 
     # Create the full HTML template with embedded graph and slider
     html_template = f'''
@@ -240,14 +233,13 @@ process MutationsGraphicReport {
                 margin: 0; 
                 padding: 0;
             }}
-            /* Aquesta classe manté el panell fixat a dalt */
             .sticky-header {{
                 position: sticky;
                 top: 0;
-                background-color: rgba(255, 255, 255, 0.95); /* Fons blanc gairebé opac */
+                background-color: rgba(255, 255, 255, 0.96); 
                 padding: 15px 20px;
-                z-index: 1000; /* Assegura que quedi per sobre dels gràfics */
-                box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); /* Ombra per separar-ho visualment */
+                z-index: 1000; 
+                box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); 
                 border-bottom: 1px solid #eaeaea;
             }}
             .slider-container {{
@@ -270,10 +262,12 @@ process MutationsGraphicReport {
                 <br><br>
                 <input type="range" id="freqSlider" min="0" max="100" value="{default_val}" oninput="applyFrequencyFilter(this.value)" style="width: 80%;">
                 
-                <p style="color: gray; font-size: 12px; margin-top: 8px;">
+                <p style="color: gray; font-size: 12px; margin-top: 8px; margin-bottom: 0;">
                     Percentage of frequency of mutations in the sequences assessed
                 </p>
             </div>
+            
+            {legend_html}
         </div>
 
         <div class="graph-container">
