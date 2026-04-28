@@ -7,7 +7,7 @@ process InteractiveMutationsTable {
     path excel_file
 
     output:
-    path "Interactive_Mutations_Table.html", emit: table
+    path "MutationsTable.html", emit: table
 
     script:
     """
@@ -17,18 +17,18 @@ process InteractiveMutationsTable {
     import re
 
     input_excel = "${excel_file}"
-    output_html = "Interactive_Mutations_Table.html"
+    output_html = "MutationsTable.html"
 
-    # Llegim la primera fulla de l'Excel, evitant valors NaN
+    # Read the Excel file. Keep default empty values to avoid errors with the 'NA' protein
     df = pd.read_excel(input_excel, sheet_name=0, keep_default_na=False)
     df.columns = df.columns.str.strip()
 
     results = {}
 
-    def get_color_class(protein, inferred_subtype, real_subtype, found_in):
-        combined_sub = f"{inferred_subtype} {real_subtype}"
-        inf_h = set(re.findall(r'H(\\d+)', combined_sub))
-        inf_n = set(re.findall(r'N(\\d+)', combined_sub))
+    # Function to determine the color of the mutation tag based on subtype match
+    def get_color_class(protein, sample_subtype, found_in):
+        inf_h = set(re.findall(r'H(\\d+)', str(sample_subtype)))
+        inf_n = set(re.findall(r'N(\\d+)', str(sample_subtype)))
         
         found_h = set(re.findall(r'H(\\d+)', str(found_in)))
         found_n = set(re.findall(r'N(\\d+)', str(found_in)))
@@ -54,11 +54,11 @@ process InteractiveMutationsTable {
             else:
                 return 'red'
 
-    # Inicialitzem l'estructura de dades per cada mostra
+    # Create an empty data structure for each unique sample
     for idx, row in df.drop_duplicates(subset=['SAMPLE_ID']).iterrows():
         sample_id = str(row['SAMPLE_ID'])
         results[sample_id] = {
-            "id_cresa": sample_id,
+            "sample_id": sample_id,
             "subtype": str(row.get('SUBTYPE', '')),
             "pb2_mutations": [],
             "ha1_mutations": [],
@@ -66,20 +66,17 @@ process InteractiveMutationsTable {
             "na_mutations": []
         }
 
-    # Filtrem només les mutacions que són marcadors
+    # Keep only Markers
     df_markers = df[df.get('MARKER', '') == 'Yes']
 
+    # Process each marker mutation and assign it to the correct sample and protein
     for index, row in df_markers.iterrows():
         sample_id = str(row['SAMPLE_ID'])
         protein = str(row.get('PROTEIN', ''))
-        
-        inferred_subtype = str(row.get('SUBTYPE', ''))
-        real_subtype = str(row.get('REAL SUBTYPE', ''))
+        sample_subtype = str(row.get('SUBTYPE', ''))
         found_in = str(row.get('FOUND_IN', ''))
-        
         ref_info = str(row.get('POSITION_REF', ''))
-        
-        color_class = get_color_class(protein, inferred_subtype, real_subtype, found_in)
+        color_class = get_color_class(protein, sample_subtype, found_in)
         
         mut_obj = {
             "mutation": str(row.get('AA_MUTATION', '')),
@@ -99,15 +96,16 @@ process InteractiveMutationsTable {
         elif protein == 'NA':
             results[sample_id]["na_mutations"].append(mut_obj)
 
-    # Convertim a llista per al JSON
+    # Convert dict to list for easier handling in the HTML template
     output_data = list(results.values())
     
-    # Provem d'ordenar si hi ha una columna d'ordre numèrica, si no, per ID
+    # Sort the output data by sample_id if possible (if they are numeric)
     try:
-        output_data.sort(key=lambda x: int(x["id_cresa"]) if x["id_cresa"].isdigit() else x["id_cresa"])
+        output_data.sort(key=lambda x: int(x["sample_id"]) if x["sample_id"].isdigit() else x["sample_id"])
     except:
         pass
 
+    # List to JSON string for embedding in the HTML
     json_data_string = json.dumps(output_data)
 
     html_template = f'''
@@ -259,9 +257,9 @@ process InteractiveMutationsTable {
                     <th>Sample ID</th>
                     <th>Subtype</th>
                     <th>PB2 Mutations</th>
-                    <th>HA1 mutations</th>
-                    <th>HA2 mutations</th>
-                    <th>NA mutations</th>
+                    <th>HA1 Mutations</th>
+                    <th>HA2 Mutations</th>
+                    <th>NA Mutations</th>
                 </tr>
             </thead>
             <tbody id="table-body">
@@ -284,6 +282,7 @@ process InteractiveMutationsTable {
         <script>
             const data = {json_data_string};
 
+            // Function to generate the HTML tags for each mutation
             function createMutationTags(mutations) {{
                 if (mutations.length === 0) return '-';
                 return mutations.map(function(m) {{
@@ -298,11 +297,13 @@ process InteractiveMutationsTable {
             }}
 
             const tbody = document.getElementById('table-body');
+            
+            // Loop through each sample and create a table row
             data.forEach(function(row) {{
                 const tr = document.createElement('tr');
                 
                 const tdId = document.createElement('td');
-                tdId.textContent = row.id_cresa;
+                tdId.textContent = row.sample_id;
 
                 const tdSubtype = document.createElement('td');
                 tdSubtype.textContent = row.subtype;
@@ -319,6 +320,7 @@ process InteractiveMutationsTable {
                 const tdNA = document.createElement('td');
                 tdNA.innerHTML = createMutationTags(row.na_mutations);
                 
+                // Add all the cells to the current row
                 tr.appendChild(tdId);
                 tr.appendChild(tdSubtype);
                 tr.appendChild(tdPB2);
@@ -326,6 +328,7 @@ process InteractiveMutationsTable {
                 tr.appendChild(tdHA2);
                 tr.appendChild(tdNA);
                 
+                // Add the row to the table body
                 tbody.appendChild(tr);
             }});
         </script>
