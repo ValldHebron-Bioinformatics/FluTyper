@@ -98,7 +98,7 @@ process MutationsGraphicReport {
     # Calculate the percentage
     df_grouped['Percentage'] = (df_grouped['Sample_Count'] / df_grouped['Total_Group_Samples']) * 100
     df_grouped['Percentage'] = df_grouped['Percentage'].round(2)
-
+    
     # Define biological segment mapping for sorting
     segment_mapping = {
         'PB2': 1,
@@ -233,19 +233,50 @@ process MutationsGraphicReport {
     <head>
         <meta charset="utf-8">
         <title>Mutations Summary</title>
+        <style>
+            body {{
+                font-family: arial; 
+                text-align: center; 
+                margin: 0; 
+                padding: 0;
+            }}
+            /* Aquesta classe manté el panell fixat a dalt */
+            .sticky-header {{
+                position: sticky;
+                top: 0;
+                background-color: rgba(255, 255, 255, 0.95); /* Fons blanc gairebé opac */
+                padding: 15px 20px;
+                z-index: 1000; /* Assegura que quedi per sobre dels gràfics */
+                box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); /* Ombra per separar-ho visualment */
+                border-bottom: 1px solid #eaeaea;
+            }}
+            .slider-container {{
+                margin: 15px auto 5px auto; 
+                max-width: 600px;
+            }}
+            .graph-container {{
+                padding: 20px;
+            }}
+        </style>
     </head>
-    <body style="font-family: arial; text-align: center; padding: 20px;">
+    <body>
 
-        <h2>Mutation Summary per Protein</h2>
-        <p style="color: gray; font-size: 14px;">Markers are always displayed.</p>
+        <div class="sticky-header">
+            <h2 style="margin: 0 0 5px 0;">Mutation Summary per Protein</h2>
+            <p style="color: gray; font-size: 14px; margin: 0;">Markers are always displayed.</p>
 
-        <div style="margin: 30px;">
-            <label><b>Minimum Frequency Threshold:</b> <span id="sliderValue">{default_val}%</span></label>
-            <br><br>
-            <input type="range" id="freqSlider" min="0" max="100" value="{default_val}" oninput="applyFrequencyFilter(this.value)" style="width: 50%;">
+            <div class="slider-container">
+                <label><b>Minimum Frequency Threshold:</b> <span id="sliderValue">{default_val}%</span></label>
+                <br><br>
+                <input type="range" id="freqSlider" min="0" max="100" value="{default_val}" oninput="applyFrequencyFilter(this.value)" style="width: 80%;">
+                
+                <p style="color: gray; font-size: 12px; margin-top: 8px;">
+                    Percentage of frequency of mutations in the sequences assessed
+                </p>
+            </div>
         </div>
 
-        <div>
+        <div class="graph-container">
             {graph_html}
         </div>
 
