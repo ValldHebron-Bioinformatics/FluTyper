@@ -83,19 +83,48 @@ process DateGraphicReport {
                     plot_df = pd.merge(cum_long, weekly_long, on=['WEEK', 'AA_MUTATION'])
                     plot_df = pd.merge(plot_df, weekly_totals, on='WEEK')
                     
-                    # Utilitzem np.nan que és universalment compatible amb Plotly i els arxius JSON
                     plot_df['Freq_Weekly'] = (plot_df['Markers (Week)'] / plot_df['Samples (Week)'].replace(0, np.nan)) * 100
                     plot_df['Freq_Cum'] = (plot_df['Markers (Cumulative)'] / plot_df['Samples (Cumulative)'].replace(0, np.nan)) * 100
                     
                     plot_df = pd.merge(plot_df, hover_info, on='AA_MUTATION', how='left')
 
                     display_name = plot_name.replace('_', ' - ')
+                    
+                    # Add dual y-axes with shared x-axis for weekly and cumulative frequencies, and total samples as secondary y-axis
                     fig = make_subplots(
                         rows=2, cols=1,
                         subplot_titles=("<b>Weekly Frequency</b>", "<b>Cumulative Frequency</b>"),
                         shared_yaxes=True,
                         vertical_spacing=0.12,
-                        shared_xaxes=True
+                        shared_xaxes=True,
+                        specs=[[{"secondary_y": True}], [{"secondary_y": True}]]
+                    )
+
+                    # Bars for total samples per week on the first subplot
+                    fig.add_trace(
+                        go.Bar(
+                            x=weekly_totals['WEEK'], 
+                            y=weekly_totals['Samples (Week)'],
+                            name="Total Samples (n)",
+                            marker_color='rgba(180,180,180,0.5)',
+                            marker_line_width=0,
+                            legend="legend2",
+                            hovertemplate="<b>Week:</b> %{x|%V, %Y}<br><b>Total sequenced:</b> %{y} samples<extra></extra>"
+                        ), row=1, col=1, secondary_y=True
+                    )
+
+                    # Add the gray area for cumulative samples
+                    fig.add_trace(
+                        go.Scatter(
+                            x=weekly_totals['WEEK'], 
+                            y=weekly_totals['Samples (Cumulative)'],
+                            name="Total Samples (n)",
+                            marker_color='rgba(180,180,180,0.3)',
+                            fillcolor='rgba(180,180,180,0.3)',
+                            fill='tozeroy',
+                            legend="legend2",
+                            hovertemplate="<b>Week:</b> %{x|%V, %Y}<br><b>Total sequenced:</b> %{y} samples<extra></extra>"
+                        ), row=2, col=1, secondary_y=True
                     )
 
                     unique_mutations = plot_df['AA_MUTATION'].unique()
@@ -121,7 +150,7 @@ process DateGraphicReport {
                                     "<b>Occurrence (Weekly):</b> %{customdata[3]}/%{customdata[4]} samples (%{customdata[5]:.2f}%)<br>"
                                     "<extra></extra>"
                                 )
-                            ), row=1, col=1
+                            ), row=1, col=1, secondary_y=False
                         )
 
                         fig.add_trace(
@@ -141,20 +170,41 @@ process DateGraphicReport {
                                     "<b>Occurrence (Cumulative):</b> %{customdata[3]}/%{customdata[4]} samples (%{customdata[5]:.2f}%)<br>"
                                     "<extra></extra>"
                                 )
-                            ), row=2, col=1
+                            ), row=2, col=1, secondary_y=False
                         )
 
-                    fig.update_yaxes(title_text="Frequency (%)", range=[-5, 105], row=1, col=1)
-                    fig.update_yaxes(title_text="Cumulative Frequency (%)", range=[-5, 105], row=2, col=1)
+                    fig.update_yaxes(title_text="Frequency (%)", range=[-5, 105], row=1, col=1, secondary_y=False)
+                    fig.update_yaxes(title_text="Cumulative Frequency (%)", range=[-5, 105], row=2, col=1, secondary_y=False)
+                    # Set secondary y-axes                    
+                    fig.update_yaxes(title_text="Total Samples (N)", showgrid=False, rangemode='nonnegative', fixedrange=True, row=1, col=1, secondary_y=True)
+                    fig.update_yaxes(title_text="Total Samples (N)", showgrid=False, rangemode='nonnegative', fixedrange=True, row=2, col=1, secondary_y=True)
                     
                     fig.update_xaxes(tickformat="Week %V<br>%Y", showticklabels=True)
                     
                     fig.update_layout(
-                        title=f"<b>Frequency in Time Report: {display_name}</b>",
+                        title=dict(
+                            text=f"<b>Frequency in Time Report: {display_name}</b>",
+                            font=dict(size=22)
+                        ),
                         height=900,
                         hovermode='closest',
-                        legend_title="<b>Markers</b>",
-                        template="plotly_white"
+                        template="plotly_white",
+                        barmode='overlay',
+                        legend=dict(
+                            title=dict(text="<b>Markers</b>", font=dict(size=14)),
+                            x=1.02, 
+                            y=1.0, 
+                            xanchor="left",
+                            yanchor="top",
+                        ),
+                        legend2=dict(
+                            title=dict(text="<b>Total Samples</b>", font=dict(size=14)),
+                            orientation="h", 
+                            x=0.5, 
+                            y=-0.1, 
+                            xanchor="center",
+                            yanchor="top",
+                        )
                     )
 
                     fig.write_html(f"FrequencyEvolution/{segment}/evolution_{plot_name}.html")

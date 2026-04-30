@@ -13,6 +13,7 @@ FluTyper is a modular, reproducible Nextflow pipeline for genotyping zoonotic in
 - Genotyping using Nextclade with per-sample and merged reports.
 - Extraction of coding sequences (CDS) and translation to protein sequences.
 - Mutation detection and annotation with standardized cross-subtype numbering (optional, configurable).
+- Aggregate, per-sample, and time-series HTML mutation reports.
 - Comprehensive error reporting and logging.
 - Support for both avian and swine influenza viruses (SWINE protocol in development).
 - Modular, reproducible workflow built with Nextflow DSL2.
@@ -49,10 +50,15 @@ nextflow run nf_pipeline/main.nf \
   --protocol <AVIAN|SWINE> \
   --outDir <output_directory> \
 	--extraMarkers <extra_markers.csv> \
-  --threshold <0-1>
+	--metadata <metadata.csv> \
+	--threshold <0-1>
 ```
 - Default input: `docs/fastas/prova.fasta`
 - Default protocol: `AVIAN` (SWINE is under development)
+- `--metadata` is optional and enables the date-based frequency report.
+- `--colorblind` is optional and switches the report palette to a colorblind-friendly set.
+
+Add `--colorblind true` if you want the colorblind-friendly palette.
 
 #### Extra Markers
 
@@ -86,18 +92,16 @@ If required columns are missing or the file cannot be parsed, the pipeline print
 
 You can configure the threshold for reporting mutations that are frequent within the same protein using the `--threshold` parameter (default: 0.25).
 
-- This parameter determines the minimum fraction of samples containing a specific protein in which a mutation at a given position must appear to be considered relevant and included in the `relevant_mutations.xlsx` report.
-- Because the pipeline adjusts for missing data, the threshold is calculated independently for each protein based only on the number of samples where that protein was successfully identified rather than the total number of samples in the run.
-- For example, if the default value is 0.25 and a specific protein is only detected in 40 out of 100 total samples, a mutation must appear in more than 10 of those 40 samples to be reported as relevant.
+- This parameter determines the minimum fraction of samples containing a specific protein in which a mutation at a given position must appear to be considered relevant and included in the `filtered_mutations.xlsx` report.
+- The threshold is calculated independently for each protein using only the number of samples where that protein was detected, not the total number of samples in the run.
+- For example, if the default value is 0.25 and a protein is detected in 40 samples, a mutation must appear in more than 10 of those 40 samples to be reported as relevant.
 - You can adjust this value when running the pipeline:
 
 ```bash
 nextflow run nf_pipeline/main.nf --threshold 0.5
 ```
 
-This would only report mutations present in more than 50% of all run samples as relevant.
-
-If some samples lack a given protein/segment, they are still part of the denominator in the current behavior.
+This would require a mutation to appear in more than 50% of the samples in which that protein was identified.
 
 ### Testing
 The project uses `nf-test` for verification.
@@ -122,7 +126,7 @@ The workflow consists of several key stages:
 	Organizes input sequences by sample, automatically detects correct sequence orientation (handling reverse complements), extracts segments, and creates per-sample directories.
 2. **SubtypeDetection**  
 	Uses Nextclade minimizer-based subtyping to infer H/N subtypes and pathotypes (H5/H7/H9).
-3.  **Database & Dataset Management:**
+3. **Database & Dataset Management:**
     - **FluMutDB:** Automatically fetches or updates the latest `flumut_db.sqlite` from the [izsvenezie-virology/FluMutDB](https://github.com/izsvenezie-virology/FluMutDB) repository.
     - **MarkersFiles:** Queries the SQLite database to generate protein-specific marker CSVs for mutation annotation.
     - **GetDatasets:** Downloads/selects Nextclade reference datasets based on detected subtypes.
@@ -130,14 +134,26 @@ The workflow consists of several key stages:
 	Runs Nextclade genotyping for each sample using the selected datasets.
 5. **GenotypingResults**  
 	Merges genotyping results into a summary report (clade, QC, dataset version).
-6. **GetCDS & TranslateToProtein**  
-	Extracts coding sequences (CDS) using reference alignments and translates them to proteins.
-7. **MutationsFinder**  
-	Compares sample proteins to references, applies the designated HA and NA numeration schema for standardized coordinates, annotates mutations, and checks for known markers.
-8. **MutationsCompiler**  
-	Compiles all mutation data into a single Excel report with one sheet per protein.
-9. **CompileErrors**  
+6. **GetCDS**  
+	Extracts coding sequences (CDS) using reference alignments.
+7. **TranslateToProtein**  
+	Translates aligned CDS files into protein sequences.
+8. **MutationsFinder**  
+	Compares sample proteins to references, applies the designated HA and NA numbering schema for standardized coordinates, annotates mutations, and checks for known markers.
+9. **MutationsCompiler**  
+	Compiles all mutation data into a full Excel report and a filtered report with relevant mutations.
+10. **CompileErrors**  
 	Aggregates and formats error logs for each sample into a final report.
+11. **CladeGraphicReport**  
+	Generates an interactive HTML report with H-subtype and clade distributions.
+12. **MutationsGraphicReport**  
+	Generates an interactive mutation frequency HTML report across proteins and mutation categories.
+13. **IndividualGraphicReport**  
+	Generates per-sample mutation barcode plots as HTML files.
+14. **InteractiveMutationsTable**  
+	Builds an interactive HTML table of marker mutations.
+15. **DateGraphicReport**  
+	Optionally generates weekly and cumulative mutation frequency plots when metadata is provided.
 
 ---
 
@@ -173,7 +189,12 @@ During the **MutationsFinder** step, once mutations are identified against the H
 
 - `final_genotyping_results.csv`: Summary of genotyping and QC for all samples.
 - `final_mutations_report.xlsx`: All detected mutations, organized by protein.
-- `relevant_mutations.xlsx`: Filtered mutation report including markers and mutations above the configured relevance threshold.
+- `filtered_mutations.xlsx`: Filtered mutation report including markers and mutations above the configured relevance threshold.
+- `graphic_reports/CladeGraphicReport.html`: Subtype and clade distribution chart.
+- `graphic_reports/MutationsReport.html`: Aggregate mutation frequency chart.
+- `graphic_reports/MutationsTable.html`: Interactive marker table.
+- `graphic_reports/FrequencyEvolution/**/*.html`: Weekly and cumulative marker frequency reports generated when `--metadata` is provided.
+- `samples/<sample_id>/<sample_id>_MutationsReport.html`: Per-sample mutation barcode plot.
 - `samples/<sample_id>/`: Per-sample folders with intermediate and final sequence files.
 - `pipeline_errors.log`: Aggregated error log for the entire run.
 
