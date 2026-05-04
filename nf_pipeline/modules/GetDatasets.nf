@@ -10,15 +10,39 @@ process GetDatasets {
 
 
     output:
-    path("*/nextclade_*_dataset")
-    
+    path("*/nextclade_*_dataset", emit: datasets, optional: true)
+
 
     script:
     """
-    # Extract unique H tags from the inferred subtypes CSV, the merged doc 
-    # This way to have only 1 process instead of 1 per sample giving the sample id and h_tag tuple
-    h_tags=\$(grep -oE 'H[0-9]+' "${inferred_subtypes}") 
-    echo "\$h_tags" | sort -u | while read -r tag; do
+    # Extract unique H tags from the inferred subtypes CSV
+    h_tags=\$(grep -oE 'H[0-9]+' "${inferred_subtypes}" || true) 
+    
+    if [ -z "\$h_tags" ]; then
+        echo "GetDatasets: No H tags found in ${inferred_subtypes}."
+        exit 0
+    fi
+
+    if [ "${params.protocol}" = "HUMAN" ]; then
+        echo "\$h_tags" | sort -u | while read -r tag; do
+            case "\$tag" in
+                H1)
+                    DATASET_NAME='flu_h1n1pdm_ha'
+                    mkdir -p H1/nextclade_H1_dataset
+                    nextclade dataset get --name "\${DATASET_NAME}" --output-dir H1/nextclade_H1_dataset
+                    ;;
+                H3)
+                    DATASET_NAME='flu_h3n2_ha'
+                    mkdir -p H3/nextclade_H3_dataset
+                    nextclade dataset get --name "\${DATASET_NAME}" --output-dir H3/nextclade_H3_dataset
+                    ;;
+                *)
+                    echo "GetDatasets: No valid H tag found for HUMAN protocol dataset retrieval: \$tag" 
+                    ;;
+            esac
+        done
+    else
+        echo "\$h_tags" | sort -u | while read -r tag; do
         case "\$tag" in
             H5)
                 DATASET_NAME='community/moncla-lab/iav-h5/ha/2.3.4.4'
@@ -42,5 +66,6 @@ process GetDatasets {
                 ;;
         esac
     done
+    fi
     """
 }
