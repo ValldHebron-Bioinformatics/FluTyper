@@ -52,8 +52,9 @@ jobs:
           pip install pandas openpyxl biopython numpy plotly nbformat
 
       - name: Setup nf-test
-        uses: nf-core/setup-nf-test@v2.0.0
+        uses: nf-core/setup-nf-test@v2.1.0
         with:
+          version: '0.9.5'
           install-pdiff: true
 
       - name: Run Module Tests
