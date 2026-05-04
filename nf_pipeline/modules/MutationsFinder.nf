@@ -81,15 +81,13 @@ for aligned_prot in "${prot_files}".split():
                 # Avoid duplicate info entries for the same marker ID
                 if info not in marker_info.setdefault(m_id, []): marker_info[m_id].append(info)
 
-    # Check observed mutations
+    # Add "X" mutations for all observed positions to allow marker detection of any mutation at that position
     observed_mutations, protein_pos = set(), 0
     for r_aa, q_aa in zip(ref_seq, query_seq):
         if r_aa != "-": protein_pos += 1
-        # Convert to standard numbering, else use raw position
         standard_pos = pos_to_base.get(str(protein_pos), str(protein_pos))
-        # Add tuple of (position, query AA) to observed mutations for marker matching    
         observed_mutations.add((standard_pos, q_aa))
-
+        observed_mutations.add((standard_pos, "X"))
     # Check which observed mutations are part of any marker sets
     active_markers = {}
     for m_id, mut_set in markers_by_id.items():
@@ -104,13 +102,18 @@ for aligned_prot in "${prot_files}".split():
         pos_raw = str(pos)
         pos_ref = pos_to_base.get(pos_raw, pos_raw)
 
-        is_marker = (pos_ref, q_aa) in active_markers
+        # Look first for exact matches, then for "X" matches
+        m_ids_exact = active_markers.get((pos_ref, q_aa), [])
+        m_ids_x = active_markers.get((pos_ref, "X"), [])
+        combined_m_ids = list(dict.fromkeys(m_ids_exact + m_ids_x)) # Ajuntem i eliminem duplicats
+        
+        is_marker = len(combined_m_ids) > 0
         is_mutation = r_aa != q_aa and "X" not in (r_aa, q_aa)
         if not (is_marker or is_mutation):
             continue
 
         if is_marker:
-            m_ids = list(dict.fromkeys(active_markers[(pos_ref, q_aa)]))
+            m_ids = combined_m_ids
             is_combo = " | ".join(dict.fromkeys("Yes" if len(set(m[0] for m in markers_by_id[mid])) > 1 else "No" for mid in m_ids))
             effect = " | ".join(dict.fromkeys(eff for mid in m_ids for eff, _, _ in marker_info[mid] if eff))
             found  = " | ".join(dict.fromkeys(fnd for mid in m_ids for _, fnd, _ in marker_info[mid] if fnd))

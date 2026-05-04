@@ -15,6 +15,7 @@ nextflow_pipeline {
                 ]
                 inputFasta = "${projectDir}/tests/data/test.fasta"
                 outDir = "tests/results"
+                metadata= "${projectDir}/tests/data/metadata.csv"
             }
         }
 
@@ -75,6 +76,8 @@ nextflow_pipeline {
             
             def interactiveTableReport = outputDir.resolve("graphic_reports/MutationsTable.html")
             assert interactiveTableReport.exists() : "MutationsTable.html was not published"
+            def dateGraphicReport = outputDir.resolve("graphic_reports/FrequencyEvolution/PB2/evolution_PB2.html")
+            assert dateGraphicReport.exists() : "FrequencyEvolution HTML reports were not published"
         }
     }
 

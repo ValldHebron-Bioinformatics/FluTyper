@@ -1,0 +1,38 @@
+nextflow_process {
+
+    name "Test Process DateGraphicReport"
+    script "nf_pipeline/modules/DateGraphicReport.nf"
+    process "DateGraphicReport"
+
+    test("Should create the folders and the HTML reports") {
+
+        when {
+            process {
+                """
+                input[0] = file("${projectDir}/tests/data/19135815/final_mutations_report.xlsx")
+                input[1] = file("${projectDir}/tests/data/19135815/metadata.csv")
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            
+        
+            assert process.out.metadata != null : "Output channel 'metadata' is null"
+            assert process.out.metadata.size() > 0 : "No HTML files were found!"
+
+            // Get the first output from the metadata channel and check if it's a collection of HTML files
+            def raw_output = process.out.metadata.get(0)
+            def html_reports = raw_output instanceof Collection ? raw_output : [raw_output]
+            // Check that the output is not null and contains at least one HTML file
+            assert html_reports != null
+            assert html_reports.size() > 0
+            // Check that all outputs are HTML files and contain 'FrequencyEvolution' in their names
+            assert html_reports.every { it.toString().endsWith('.html') }
+            assert html_reports.every { it.toString().contains('FrequencyEvolution') }
+        }
+
+    }
+
+}
