@@ -66,17 +66,18 @@ workflow {
     // GENOTYPING ANALYSIS (NEXTCLADE)
     // Parse subtyping results immediately for use in downstream filtering
     GenotypingInfo_ch = SubtypeDetection.out.results
-    .splitCsv()
-    .map { sample_id, row ->
-        def subtype = row[1]
-        def pathotype = row[2]
-        def h_tag = subtype.find(/H\d+/) ?: "Hx" // .find() is a groovy method similar to grep -oE
-        def n_tag = subtype.find(/N\d+/) ?: "Nx"
-        tuple(sample_id, h_tag, n_tag, pathotype)
-    }
+        .splitCsv()
+        .map { sample_id, row ->
+            def subtype = row[1]
+            def pathotype = row[2]
+            def h_tag = subtype.find(/H\d+/) ?: "Hx" // .find() is a groovy method similar to grep -oE
+            def n_tag = subtype.find(/N\d+/) ?: "Nx"
+            tuple(sample_id, h_tag, n_tag, pathotype)
+        }
     GenotypingHfile_ch = SubtypeInput_ch.map { sample_id, ha_fasta, _na_fasta -> 
         tuple(sample_id, ha_fasta) 
-        }
+    }
+    
     // Join with subtyping info to filter datasets based on H-type
     GenotypingNextcladeInput_ch = GenotypingHfile_ch
         .join(GenotypingInfo_ch)
@@ -87,15 +88,16 @@ workflow {
 
     GenotypingNextclade(GenotypingNextcladeInput_ch)
     
-    // RESULTS REPORTING & CDS EXTRACTION
     // Join genotyping info with Nextclade results to prepare the final report
     GenotypingResultsInput_ch = GenotypingInfo_ch
         .join(GenotypingNextclade.out.results, remainder: true) // remainder: true to keep samples without Nextclade results (e.g. due to missing datasets) for reporting as well
         .map { sample_id, h_tag, n_tag, pathotype, csv_file -> 
             tuple(sample_id, h_tag, n_tag, pathotype, csv_file ?: [])
         }
+        
     // GenotypingResults will need to handle cases where csv_path is empty (no Nextclade result) and report accordingly
     GenotypingResults(GenotypingResultsInput_ch, GetDatasets.out.collect()) // .collect() is key to pass the full list of datasets to each sample so no error when trying to access the dataset dir for a sample with no valid H subtype
+    
     // Merge final genotyping results 
     GenotypingFinal_ch = GenotypingResults.out.results.map { tup -> tup[1] }
         .collectFile(
@@ -103,7 +105,7 @@ workflow {
             keepHeader: true,
         )
 
-    // CDS EXTRACTION & TRANSLATION
+    // CDS EXTRACTION & TRANSLATION TO PROTEIN
     // Prepare inputs for sequence extraction
     CDSInput_ch = GenotypingInfo_ch
         .join(OrganizeBySample.out.results)
@@ -112,30 +114,60 @@ workflow {
         }
     
     GetCDS(CDSInput_ch)
+
     TranslationInput_ch = GetCDS.out.results
         .join(GetCDS.out.aligned)
         .map { sample_id, cds_files, aligned_cds_files -> tuple(sample_id, cds_files, aligned_cds_files) }
+        
     TranslateToProtein(TranslationInput_ch) // Join with the aligned CDS files for use in translation and mutation finding
 
-    // MUTATION IDENTIFICATION
+    // MUTATION IDENTIFICATION & COMPILATION
+
     // Join translated protein files with genotyping info to prepare for mutation finding
     Mutations_ch = TranslateToProtein.out.aligned
         .join(GenotypingInfo_ch)
         .map { sample_id, prot_files, h_tag, n_tag, pathotype ->
             tuple(sample_id, prot_files, h_tag, n_tag, pathotype)
         }
+        
     MutationsFinder(Mutations_ch)
+    
     //MutationsMerged_ch = MutationsFinder.out.results
     //    .map { _sample_id, _mut_files, combined_csv -> combined_csv }
     //    .collectFile(
     //        name: 'all_mutations_combined.csv',
     //        keepHeader: true,
     //    )
+    
     MutationsCompiler_ch = MutationsFinder.out.results
         .map { _sample_id, _mut_files, combined_csv -> combined_csv }
         .collect()
+        
     MutationsCompiler(MutationsCompiler_ch)
+
+    // GRAPHIC REPORTS & METADATA
+
+    CladeGraphicReport(GenotypingFinal_ch)
+    MutationsGraphicReport(MutationsCompiler.out.results.map { full, _filtered -> full })
+    InteractiveMutationsTable(MutationsCompiler.out.results.map { full, _filtered -> full })
     
+    IndividualMutations_Ch = MutationsFinder.out.results.map { sample_id, _mut_files, combined_csv -> tuple(sample_id, combined_csv) }
+    IndividualGraphicReport(IndividualMutations_Ch)
+    
+    date_report_ch = channel.empty()
+    if (params.metadata) {
+        // Create a channel from the metadata path
+        Metadata_ch = channel.fromPath(params.metadata, checkIfExists: true)
+        
+        // Run the process, passing the required inputs. 
+        // Usually, this needs the genotyping results or mutation data + the metadata file.
+        DateGraphicReport(MutationsCompiler.out.results.map { full, _filtered -> full }, Metadata_ch)
+        date_report_ch = DateGraphicReport.out.metadata
+    }
+
+
+    // ERROR HANDLING & COMPILATION
+
     // Funnel all optional error channels together, then group by sample_id
     Errors_ch = OrganizeBySample.out.errors
         .mix(
@@ -150,6 +182,7 @@ workflow {
 
     // Pass the grouped bundles to a final concatenation process
     CompileErrors(Errors_ch)
+    
     ErrorsMerged_ch = CompileErrors.out
         .map { sample_id, log_file ->
             // Read the raw text from the individual log file
@@ -164,83 +197,46 @@ workflow {
         .collectFile(
             name: 'pipeline_errors.log',
         )
-    
-    CladeGraphicReport(GenotypingFinal_ch)
-    MutationsGraphicReport(MutationsCompiler.out.results.map { full, _filtered -> full })
-    IndividualMutations_Ch = MutationsFinder.out.results.map { sample_id, _mut_files, combined_csv -> tuple(sample_id, combined_csv) }
-    IndividualGraphicReport(IndividualMutations_Ch)
-    InteractiveMutationsTable(MutationsCompiler.out.results.map { full, _filtered -> full })
-    date_report_ch = channel.empty()
-    if (params.metadata) {
-    // Create a channel from the metadata path
-    Metadata_ch = channel.fromPath(params.metadata, checkIfExists: true)
-    
-    // Run the process, passing the required inputs. 
-    // Usually, this needs the genotyping results or mutation data + the metadata file.
-    DateGraphicReport(MutationsCompiler.out.results.map { full, _filtered -> full }, Metadata_ch)
-    date_report_ch = DateGraphicReport.out.metadata
-    }
-           
+
+    // PUBLISH DECLARATIONS
+
     publish:
-    // Strip the sample_id strings so the output block receives pure file/path objects
-    folder = OrganizeBySample.out.results.map { _id, path -> path }
-    subtype = SubtypeMerged_ch
+    
+    // Resources & Databases
     datasets = GetDatasets.out
     database = FluMutDB.out
     markerfiles = MarkersFiles.out
-    results = GenotypingFinal_ch
+
+    // Core Sample Directories & Files
+    folder = OrganizeBySample.out.results.map { _id, path -> path }
     CDS = GetCDS.out.results.map { _id, path -> path }
+    // aligned_cds = GetCDS.out.aligned.map { _id, path -> path }
     prot = TranslateToProtein.out.results.map { _id, path -> path }
-    aligned_prot = TranslateToProtein.out.aligned.map { _id, path -> path }
-    aligned_cds = GetCDS.out.aligned.map { _id, path -> path }
+    // aligned_prot = TranslateToProtein.out.aligned.map { _id, path -> path }
+    // orientation = OrganizeBySample.out.orientation.map { _id, path -> path }
+    // Global Results & Compilations
+    subtype = SubtypeMerged_ch
+    results = GenotypingFinal_ch
+    mutations_report = MutationsCompiler.out.results
+    // mutations = MutationsMerged_ch
+    // Individual Mutation Files
+    // Extract both file objects from the 3-item tuple and flatten them
+    mut = MutationsFinder.out.results.map { _id, mut_files, combined_csv -> [mut_files, combined_csv] }.flatten()
+    // Graphic Reports
     graphic_report = CladeGraphicReport.out.report
     mutations_graphic_report = MutationsGraphicReport.out.report
     individual_graphic_report = IndividualGraphicReport.out.report
     interactive_mutations_table = InteractiveMutationsTable.out.table
     date_report = date_report_ch
-    //mutations = MutationsMerged_ch
-    //orientation = OrganizeBySample.out.orientation.map { _id, path -> path }
-    // Extract both file objects from the 3-item tuple and flatten them
-    mut = MutationsFinder.out.results.map { _id, mut_files, combined_csv -> [mut_files, combined_csv] }.flatten()
     
-    mutations_report = MutationsCompiler.out.results
+    // Error Logs
     errors = CompileErrors.out.map { _id, log -> log }
     errors_merged = ErrorsMerged_ch
 }
-// Bloc final de publicació de resultats
+
 output {
-    //orientation {
-    //    path { "${projectDir}/../${params.outDir}/orientation" }
-    //    mode "copy"
-    //}
-    date_report {
-        path { "${projectDir}/../${params.outDir}/graphic_reports" }
-        mode "copy"
-    }
-    interactive_mutations_table {
-        path { "${projectDir}/../${params.outDir}/graphic_reports" }
-        mode "copy"
-    }
-    individual_graphic_report {
-        path { "${projectDir}/../${params.outDir}" }
-        mode "copy"
-    }
-    mutations_graphic_report {
-        path { "${projectDir}/../${params.outDir}/graphic_reports" }
-        mode "copy"
-    }
-    graphic_report {
-        path { "${projectDir}/../${params.outDir}/graphic_reports" }
-        mode "copy"
-    }
-    aligned_prot {
-        path { "${projectDir}/../${params.outDir}/aligned_prot" }
-        mode "copy"
-    }
-    aligned_cds {
-        path { "${projectDir}/../${params.outDir}/aligned_cds" }
-        mode "copy"
-    }
+
+    // Resources & Databases
     datasets {
         path { "${projectDir}/../protocols/${params.protocol}/v1/resources" }
         mode "copy"
@@ -253,10 +249,34 @@ output {
         path { "${projectDir}/../protocols/${params.protocol}/v1/markers" }
         mode "copy"
     }
+
+    // Core Sample Directories & Files
     folder {
         path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
+    // orientation {
+    //    path { "${projectDir}/../${params.outDir}/orientation" }
+    //    mode "copy"
+    // }
+    CDS {
+        path { "${projectDir}/../${params.outDir}" }
+        mode "copy"
+    }
+    //aligned_cds {
+    //    path { "${projectDir}/../${params.outDir}/aligned_cds" }
+    //    mode "copy"
+    //}
+    prot {
+        path { "${projectDir}/../${params.outDir}" }
+        mode "copy"
+    }
+    //aligned_prot {
+    //    path { "${projectDir}/../${params.outDir}/aligned_prot" }
+    //    mode "copy"
+    //}
+
+    // Global Results & Compilations
     subtype {
         path { "${projectDir}/../${params.outDir}" }
         mode "copy"
@@ -265,22 +285,44 @@ output {
         path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
-    CDS {
-        path { "${projectDir}/../${params.outDir}" }
-        mode "copy"
-    }
-    prot {
-        path { "${projectDir}/../${params.outDir}" }
-        mode "copy"
-    }
-    mut {
-        path { "${projectDir}/../${params.outDir}" }
-        mode "copy"
-    }
     mutations_report {
         path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
+    // mutations {
+    //    path { "${projectDir}/../${params.outDir}" }
+    //    mode "copy"
+    // }
+
+    // Individual Mutation Files
+    mut {
+        path { "${projectDir}/../${params.outDir}" }
+        mode "copy"
+    }
+
+    // Graphic Reports
+    graphic_report {
+        path { "${projectDir}/../${params.outDir}/graphic_reports" }
+        mode "copy"
+    }
+    mutations_graphic_report {
+        path { "${projectDir}/../${params.outDir}/graphic_reports" }
+        mode "copy"
+    }
+    individual_graphic_report {
+        path { "${projectDir}/../${params.outDir}" }
+        mode "copy"
+    }
+    interactive_mutations_table {
+        path { "${projectDir}/../${params.outDir}/graphic_reports" }
+        mode "copy"
+    }
+    date_report {
+        path { "${projectDir}/../${params.outDir}/graphic_reports" }
+        mode "copy"
+    }
+
+    // Error Logs
     errors {
         path { "${projectDir}/../${params.outDir}" }
         mode "copy"
@@ -289,8 +331,4 @@ output {
         path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
-    //mutations {
-    //    path { "${projectDir}/../${params.outDir}" }
-    //    mode "copy"
-    //}
 }
