@@ -135,7 +135,9 @@ for aligned_prot in "${prot_files}".split():
             found  = " | ".join(dict.fromkeys(item.strip() for mid in m_ids for _, fnd, _ in marker_info[mid] if fnd for item in fnd.split('|') if item.strip()))
             ref    = " | ".join(dict.fromkeys(item.strip() for mid in m_ids for _, _, r   in marker_info[mid] if r for item in r.split('|') if item.strip()))
             mut_type = "Marker"
-            aa_mut = f"{pos_raw}{q_aa}"
+            # Included the reference amino acid conditionally if a mutation actually occurred
+            aa_mut = f"{r_aa}{pos_raw}{q_aa}" if is_mutation else f"{pos_raw}{q_aa}"
+            
             events.append({"pos": pos_raw, "pos_ref": pos_ref, "r_aa": r_aa, "q_aa": q_aa,
                             "aa_mut": aa_mut, "mut_type": mut_type, "marker": "Yes",
                             "m_ids": " | ".join(m_ids), "is_combo": is_combo,
