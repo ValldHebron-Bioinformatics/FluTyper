@@ -81,6 +81,10 @@ for aligned_prot in "${prot_files}".split():
     if m_file.exists():
         with open(m_file, encoding='utf-8-sig') as f:
             for row in csv.DictReader(f):
+                # Enforce subtype matching for HUMAN protocol
+                if "${params.protocol}" == "HUMAN" and "${h_tag}${n_tag}" not in row.get('FOUND_IN', ''):
+                    continue
+                    
                 m_id = row['MARKER_ID'].strip()
                 # setdefault allows us to merge multiple position/AA pairs for the same marker ID
                 markers_by_id.setdefault(m_id, set()).add((row['POSITION'].strip(), row['AA'].strip()))
