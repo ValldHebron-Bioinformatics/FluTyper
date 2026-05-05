@@ -1,7 +1,7 @@
 # FluTyper 🧬🐔🐷
 [![nf-test](https://img.shields.io/badge/tested_with-nf--test-337ab7.svg)](https://code.askimed.com/nf-test)
 
-FluTyper is a modular, reproducible Nextflow pipeline for genotyping zoonotic influenza viruses (avian and swine) and characterizing relevant mutations. It is designed for genomic surveillance, research, and integration within a **One Health** framework.
+FluTyper is a modular, reproducible Nextflow pipeline for genotyping influenza viruses (avian and human) and characterizing relevant mutations. It is designed for genomic surveillance, research, and integration within a **One Health** framework.
 
 ---
 
@@ -15,7 +15,7 @@ FluTyper is a modular, reproducible Nextflow pipeline for genotyping zoonotic in
 - Mutation detection and annotation with standardized cross-subtype numbering (optional, configurable).
 - Aggregate, per-sample, and time-series HTML mutation reports.
 - Comprehensive error reporting and logging.
-- Support for both avian and swine influenza viruses (SWINE protocol in development).
+- Support for avian and human influenza workflows (SWINE protocol is still in development).
 - Modular, reproducible workflow built with Nextflow DSL2.
 
 ---
@@ -47,18 +47,40 @@ Run the pipeline with the following command:
 ```bash
 nextflow run nf_pipeline/main.nf \
   --inputFasta <input.fasta> \
-  --protocol <AVIAN|SWINE> \
+	--protocol <AVIAN|HUMAN> \
   --outDir <output_directory> \
 	--extraMarkers <extra_markers.csv> \
 	--metadata <metadata.csv> \
 	--threshold <0-1>
 ```
 - Default input: `docs/fastas/prova.fasta`
-- Default protocol: `AVIAN` (SWINE is under development)
+- Default protocol: `AVIAN`
+- Supported protocols: `AVIAN`, `HUMAN` (`SWINE` remains under development and is blocked at runtime)
 - `--metadata` is optional and enables the date-based frequency report.
 - `--colorblind` is optional and switches the report palette to a colorblind-friendly set.
+- Colorblind accessibility applies to the main HTML charts (`CladeGraphicReport`, `MutationsReport`, per-sample mutation plots, and date-based frequency plots).
 
 Add `--colorblind true` if you want the colorblind-friendly palette.
+
+### HUMAN Protocol Notes
+
+The HUMAN protocol includes dedicated resources under `protocols/HUMAN/v1` and introduces marker annotations tailored to human seasonal influenza.
+
+- **Supported HA datasets for genotyping:** `H1` and `H3`.
+	- `H1` uses Nextclade dataset `flu_h1n1pdm_ha`.
+	- `H3` uses Nextclade dataset `flu_h3n2_ha`.
+- **Marker source:** HUMAN marker files are read from `protocols/HUMAN/v1/markers/*_markers.csv` (instead of querying FluMutDB).
+- **Metadata plots:** when `--metadata` is provided, HUMAN runs generate the same time-evolution reports in `graphic_reports/FrequencyEvolution/`.
+
+Example HUMAN run:
+
+```bash
+nextflow run nf_pipeline/main.nf \
+	--inputFasta tests/data/HUMAN.fasta \
+	--protocol HUMAN \
+	--metadata tests/data/humanmetadata.csv \
+	--outDir results_human
+```
 
 #### Extra Markers
 
@@ -69,6 +91,8 @@ You can provide additional mutation marker data using the `--extraMarkers` flag.
 - The file must have exactly seven columns, with headers:
 	- `MARKER_ID`, `POSITION`, `AA`, `PROTEIN`, `EFFECT`, `FOUND_IN`, `REFERENCE`
 - `MARKER_ID` must be an integer and should start at `1000` for custom markers.
+- In the `AA` column, use `X` as a wildcard when you want a marker to trigger on any true amino-acid change at that position.
+- This wildcard behavior is useful for EPITOP tracking (for example, `EFFECT=EPITOP(B)`), where the position is biologically relevant regardless of the resulting amino acid.
 - Use the same `MARKER_ID` across multiple rows when a marker is defined by a combination of mutations.
 - `FOUND_IN` should indicate the subtype/context where that marker effect was reported.
 - Example:
@@ -88,20 +112,29 @@ Each row should specify the protein in the `PROTEIN` column. The pipeline will a
 Rows that share the same `MARKER_ID` are linked as a single marker definition, allowing the pipeline to evaluate combined mutation patterns together.
 If required columns are missing or the file cannot be parsed, the pipeline prints a warning and skips loading extra markers from that file.
 
-### Threshold parameter for mutation relevance
+### Threshold parameter behavior
 
-You can configure the threshold for reporting mutations that are frequent within the same protein using the `--threshold` parameter (default: 0.25).
+You can configure `--threshold` (default: `0.25`) as the baseline frequency cutoff used in two places:
 
-- This parameter determines the minimum fraction of samples containing a specific protein in which a mutation at a given position must appear to be considered relevant and included in the `filtered_mutations.xlsx` report.
-- The threshold is calculated independently for each protein using only the number of samples where that protein was detected, not the total number of samples in the run.
-- For example, if the default value is 0.25 and a protein is detected in 40 samples, a mutation must appear in more than 10 of those 40 samples to be reported as relevant.
-- You can adjust this value when running the pipeline:
+1. **`filtered_mutations.xlsx` generation:**
+	- Mutations are retained if they are markers, or if they exceed the per-protein frequency cutoff.
+	- The frequency denominator is the number of samples where that protein is present (not the total samples in the run).
+2. **`MutationsReport.html` initial view:**
+	- The same value is used as the initial slider value in the interactive mutation frequency plot.
+	- Users can modify the slider directly in the HTML report without re-running the pipeline.
+
+Example:
+
+- If `--threshold 0.25` and a protein is found in 40 samples, non-marker mutations need to appear in more than 10 samples to be included in `filtered_mutations.xlsx`.
+- In `MutationsReport.html`, the threshold slider starts at `25%` and can be changed interactively.
+
+Set a different baseline at run time:
 
 ```bash
 nextflow run nf_pipeline/main.nf --threshold 0.5
 ```
 
-This would require a mutation to appear in more than 50% of the samples in which that protein was identified.
+This sets a `50%` starting cutoff for both the filtered Excel export and the initial interactive plot view.
 
 ### Testing
 The project uses `nf-test` for verification.
@@ -128,8 +161,10 @@ The workflow consists of several key stages:
 	Uses Nextclade minimizer-based subtyping to infer H/N subtypes and pathotypes (H5/H7/H9).
 3. **Database & Dataset Management:**
     - **FluMutDB:** Automatically fetches or updates the latest `flumut_db.sqlite` from the [izsvenezie-virology/FluMutDB](https://github.com/izsvenezie-virology/FluMutDB) repository.
-    - **MarkersFiles:** Queries the SQLite database to generate protein-specific marker CSVs for mutation annotation.
-    - **GetDatasets:** Downloads/selects Nextclade reference datasets based on detected subtypes.
+		- **MarkersFiles:**
+			- `AVIAN`: queries the SQLite database to generate protein-specific marker CSVs.
+			- `HUMAN`: loads marker CSVs directly from `protocols/HUMAN/v1/markers`, including EPITOP annotations.
+		- **GetDatasets:** downloads/selects Nextclade reference datasets based on detected subtypes (`H1/H3` in HUMAN; currently `H5` in AVIAN, with `H7/H9` under development).
 4. **GenotypingNextclade**  
 	Runs Nextclade genotyping for each sample using the selected datasets.
 5. **GenotypingResults**  
@@ -159,7 +194,7 @@ The workflow consists of several key stages:
 
 ## 🔢 Standardized Cross-Subtype Numbering
 
-All mutation markers stored in `flumut_db.sqlite` use a unified reference numbering based on **H5 (for HA proteins) and N1 (for NA protein)**. To enable biologically meaningful cross-subtype comparisons, FluTyper includes two positional correspondence dictionaries that translate residue positions from H5/N1 coordinates into the equivalent positions of any other detected subtype.
+Mutation markers are matched using unified reference numbering based on **H5 (for HA proteins) and N1 (for NA protein)**. To enable biologically meaningful cross-subtype comparisons, FluTyper includes two positional correspondence dictionaries that translate residue positions from H5/N1 coordinates into the equivalent positions of any other detected subtype.
 
 ### HA Dictionary (`HA_DICT.csv`)
 
@@ -197,6 +232,24 @@ During the **MutationsFinder** step, once mutations are identified against the H
 - `samples/<sample_id>/<sample_id>_MutationsReport.html`: Per-sample mutation barcode plot.
 - `samples/<sample_id>/`: Per-sample folders with intermediate and final sequence files.
 - `pipeline_errors.log`: Aggregated error log for the entire run.
+
+### Graphical outputs
+
+- `graphic_reports/CladeGraphicReport.html`
+	- Interactive subtype and clade distribution summary from final genotyping results.
+- `graphic_reports/MutationsReport.html`
+	- Interactive per-protein mutation frequency visualization.
+	- Includes a threshold slider initialized from `--threshold`; marker points are always shown.
+- `graphic_reports/MutationsTable.html`
+	- Interactive marker-focused table with effect, subtype context (`FOUND_IN`), and references.
+- `samples/<sample_id>/<sample_id>_MutationsReport.html`
+	- Per-sample mutation barcode plot for quick sample-level inspection.
+- `graphic_reports/FrequencyEvolution/**/*.html` (requires `--metadata`)
+	- Weekly and cumulative marker-frequency plots across time.
+
+Accessibility note:
+
+- Use `--colorblind true` to apply colorblind-friendly palettes across the main chart reports.
 
 ### `final_mutations_report.xlsx` columns
 
