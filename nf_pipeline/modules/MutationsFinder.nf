@@ -30,7 +30,7 @@ target_N = "${n_tag}" if "${n_tag}".startswith("N") and "${n_tag}"[1:].isdigit()
 def build_pos_lookup(dict_path, from_col, to_col, prot_filter=None):
     if not os.path.exists(dict_path):
         return {}
-    with open(dict_path, 'r') as f:
+    with open(dict_path, 'r', encoding='utf-8-sig') as f:
         reader = csv.DictReader(f) 
         # Clean up header names
         headers = [h.strip() for h in (reader.fieldnames or [])]
@@ -61,17 +61,25 @@ for aligned_prot in "${prot_files}".split():
     subtype_val = "${h_tag}${n_tag}(${pathotype})" if "${pathotype}" else "${h_tag}${n_tag}"
 
     pos_to_base = {}
-    if prot_name.startswith("HA"):
-        ref_H = ref_tag if ref_tag.startswith("H") and ref_tag[1:].isdigit() else "H5"
-        pos_to_base = build_pos_lookup(ha_dict, f"{ref_H}_numbering", "H5_numbering", prot_name)
-    elif prot_name.startswith("NA"):
-        ref_N = ref_tag if ref_tag.startswith("N") and ref_tag[1:].isdigit() else "N1"
-        pos_to_base = build_pos_lookup(na_dict, f"{ref_N}_pos", "N1_pos")
+    if "${params.protocol}" == "AVIAN":
+        if prot_name.startswith("HA"):
+            ref_H = ref_tag if ref_tag.startswith("H") and ref_tag[1:].isdigit() else "H5"
+            pos_to_base = build_pos_lookup(ha_dict, f"{ref_H}_numbering", "H5_numbering", prot_name)
+        elif prot_name.startswith("NA"):
+            ref_N = ref_tag if ref_tag.startswith("N") and ref_tag[1:].isdigit() else "N1"
+            pos_to_base = build_pos_lookup(na_dict, f"{ref_N}_pos", "N1_pos")
+    elif "${params.protocol}" == "HUMAN":
+        if prot_name.startswith("HA"):
+            ref_H = "${h_tag}" if "${h_tag}".startswith("H") else "H1"
+            pos_to_base = build_pos_lookup(ha_dict, f"{ref_H}_numbering", "H1_numbering", prot_name)
+        elif prot_name.startswith("NA"):
+            ref_N = "${n_tag}" if "${n_tag}".startswith("N") else "N1"
+            pos_to_base = build_pos_lookup(na_dict, f"{ref_N}_pos", "N1_pos")
 
     markers_by_id, marker_info = {}, {}
     m_file = markers_dir / f"{prot_name}_markers.csv"
     if m_file.exists():
-        with open(m_file) as f:
+        with open(m_file, encoding='utf-8-sig') as f:
             for row in csv.DictReader(f):
                 m_id = row['MARKER_ID'].strip()
                 # setdefault allows us to merge multiple position/AA pairs for the same marker ID
