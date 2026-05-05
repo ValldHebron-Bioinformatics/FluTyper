@@ -110,62 +110,66 @@ workflow {
 
     CladeGraphicReport(GenotypingFinal_ch)
 
-    // MUTATIONS BLOCK CONDITIONAL EXECUTION
+    // MARKERS PREPARATION
     if (params.protocol == "AVIAN") {
-        
         FluMutDB(SubtypeMerged_ch)
         ch_database = FluMutDB.out
-        
         MarkersFiles(FluMutDB.out) 
-        ch_markerfiles = MarkersFiles.out
+    } else {
+        // Pels humans, el directori base ha d'existir prèviament o s'ha de proporcionar.
+        def humanMarkersDir = file("${projectDir}/../protocols/HUMAN/v1/markers")
+        MarkersFiles(humanMarkersDir)
+    }
+    ch_markerfiles = MarkersFiles.out
 
-        CDSInput_ch = GenotypingInfo_ch
-            .join(OrganizeBySample.out.results)
-            .map { sample_id, h_tag, n_tag, pathotype, sample_dir ->
-                tuple(h_tag, n_tag, sample_id, pathotype, sample_dir)
-            }
-        
-        GetCDS(CDSInput_ch)
-        ch_cds = GetCDS.out.results.map { _id, path -> path }
-
-        TranslationInput_ch = GetCDS.out.results
-            .join(GetCDS.out.aligned)
-            .map { sample_id, cds_files, aligned_cds_files -> tuple(sample_id, cds_files, aligned_cds_files) }
-            
-        TranslateToProtein(TranslationInput_ch) 
-        ch_prot = TranslateToProtein.out.results.map { _id, path -> path }
-
-        Mutations_ch = TranslateToProtein.out.aligned
-            .join(GenotypingInfo_ch)
-            .map { sample_id, prot_files, h_tag, n_tag, pathotype ->
-                tuple(sample_id, prot_files, h_tag, n_tag, pathotype)
-            }
-            
-        MutationsFinder(Mutations_ch)
-        ch_mut = MutationsFinder.out.results.map { _id, mut_files, combined_csv -> [mut_files, combined_csv] }.flatten()
-        
-        MutationsCompiler_ch = MutationsFinder.out.results
-            .map { _sample_id, _mut_files, combined_csv -> combined_csv }
-            .collect()
-            
-        MutationsCompiler(MutationsCompiler_ch)
-        ch_mutations_report = MutationsCompiler.out.results
-
-        MutationsGraphicReport(MutationsCompiler.out.results.map { full, _filtered -> full })
-        ch_mutations_graphic_report = MutationsGraphicReport.out.report
-        
-        InteractiveMutationsTable(MutationsCompiler.out.results.map { full, _filtered -> full })
-        ch_interactive_mutations_table = InteractiveMutationsTable.out.table
-        
-        IndividualMutations_Ch = MutationsFinder.out.results.map { sample_id, _mut_files, combined_csv -> tuple(sample_id, combined_csv) }
-        IndividualGraphicReport(IndividualMutations_Ch)
-        ch_individual_graphic_report = IndividualGraphicReport.out.report
-        
-        if (params.metadata) {
-            Metadata_ch = channel.fromPath(params.metadata, checkIfExists: true)
-            DateGraphicReport(MutationsCompiler.out.results.map { full, _filtered -> full }, Metadata_ch)
-            date_report_ch = DateGraphicReport.out.metadata
+    // MUTATIONS BLOCK (ALL PROTOCOLS)
+    CDSInput_ch = GenotypingInfo_ch
+        .join(OrganizeBySample.out.results)
+        .map { sample_id, h_tag, n_tag, pathotype, sample_dir ->
+            tuple(h_tag, n_tag, sample_id, pathotype, sample_dir)
         }
+    
+    GetCDS(CDSInput_ch)
+    ch_cds = GetCDS.out.results.map { _id, path -> path }
+
+    TranslationInput_ch = GetCDS.out.results
+        .join(GetCDS.out.aligned)
+        .map { sample_id, cds_files, aligned_cds_files -> tuple(sample_id, cds_files, aligned_cds_files) }
+        
+    TranslateToProtein(TranslationInput_ch) 
+    ch_prot = TranslateToProtein.out.results.map { _id, path -> path }
+
+    Mutations_ch = TranslateToProtein.out.aligned
+        .join(GenotypingInfo_ch)
+        .map { sample_id, prot_files, h_tag, n_tag, pathotype ->
+            tuple(sample_id, prot_files, h_tag, n_tag, pathotype)
+        }
+        
+    // L'arxiu dels marcadors extret prèviament es passa de forma implícita o a la tasca
+    MutationsFinder(Mutations_ch)
+    ch_mut = MutationsFinder.out.results.map { _id, mut_files, combined_csv -> [mut_files, combined_csv] }.flatten()
+    
+    MutationsCompiler_ch = MutationsFinder.out.results
+        .map { _sample_id, _mut_files, combined_csv -> combined_csv }
+        .collect()
+        
+    MutationsCompiler(MutationsCompiler_ch)
+    ch_mutations_report = MutationsCompiler.out.results
+
+    MutationsGraphicReport(MutationsCompiler.out.results.map { full, _filtered -> full })
+    ch_mutations_graphic_report = MutationsGraphicReport.out.report
+    
+    InteractiveMutationsTable(MutationsCompiler.out.results.map { full, _filtered -> full })
+    ch_interactive_mutations_table = InteractiveMutationsTable.out.table
+    
+    IndividualMutations_Ch = MutationsFinder.out.results.map { sample_id, _mut_files, combined_csv -> tuple(sample_id, combined_csv) }
+    IndividualGraphicReport(IndividualMutations_Ch)
+    ch_individual_graphic_report = IndividualGraphicReport.out.report
+    
+    if (params.metadata) {
+        Metadata_ch = channel.fromPath(params.metadata, checkIfExists: true)
+        DateGraphicReport(MutationsCompiler.out.results.map { full, _filtered -> full }, Metadata_ch)
+        date_report_ch = DateGraphicReport.out.metadata
     }
 
     // ERROR HANDLING & COMPILATION
@@ -173,18 +177,13 @@ workflow {
         .mix(
             SubtypeDetection.out.errors,
             GenotypingNextclade.out.errors,
-            GenotypingResults.out.errors
-        )
-
-    if (params.protocol == "AVIAN") {
-        Errors_ch = BaseErrors_ch.mix(
+            GenotypingResults.out.errors,
             GetCDS.out.errors,
             TranslateToProtein.out.errors,
             MutationsFinder.out.errors
-        ).groupTuple()
-    } else {
-        Errors_ch = BaseErrors_ch.groupTuple()
-    }
+        )
+        
+    Errors_ch = BaseErrors_ch.groupTuple()
 
     CompileErrors(Errors_ch)
     
