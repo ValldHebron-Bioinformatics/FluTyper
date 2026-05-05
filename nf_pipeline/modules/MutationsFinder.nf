@@ -120,7 +120,7 @@ for aligned_prot in "${prot_files}".split():
         # Look first for exact matches, then for "X" matches only if it is a true mutation
         m_ids_exact = active_markers.get((pos_ref, q_aa), [])
         m_ids_x = active_markers.get((pos_ref, "X"), []) if is_mutation else []
-        combined_m_ids = list(dict.fromkeys(m_ids_exact + m_ids_x)) # Ajuntem i eliminem duplicats
+        combined_m_ids = list(dict.fromkeys(m_ids_exact + m_ids_x)) 
         
         is_marker = len(combined_m_ids) > 0
         
@@ -130,9 +130,10 @@ for aligned_prot in "${prot_files}".split():
         if is_marker:
             m_ids = combined_m_ids
             is_combo = " | ".join(dict.fromkeys("Yes" if len(set(m[0] for m in markers_by_id[mid])) > 1 else "No" for mid in m_ids))
-            effect = " | ".join(dict.fromkeys(eff for mid in m_ids for eff, _, _ in marker_info[mid] if eff))
-            found  = " | ".join(dict.fromkeys(fnd for mid in m_ids for _, fnd, _ in marker_info[mid] if fnd))
-            ref    = " | ".join(dict.fromkeys(r   for mid in m_ids for _, _, r   in marker_info[mid] if r))
+            # Clean and deduplicate by splitting on pipes inline
+            effect = " | ".join(dict.fromkeys(item.strip() for mid in m_ids for eff, _, _ in marker_info[mid] if eff for item in eff.split('|') if item.strip()))
+            found  = " | ".join(dict.fromkeys(item.strip() for mid in m_ids for _, fnd, _ in marker_info[mid] if fnd for item in fnd.split('|') if item.strip()))
+            ref    = " | ".join(dict.fromkeys(item.strip() for mid in m_ids for _, _, r   in marker_info[mid] if r for item in r.split('|') if item.strip()))
             mut_type = "Marker"
             aa_mut = f"{pos_raw}{q_aa}"
             events.append({"pos": pos_raw, "pos_ref": pos_ref, "r_aa": r_aa, "q_aa": q_aa,
