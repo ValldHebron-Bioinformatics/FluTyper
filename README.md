@@ -104,6 +104,7 @@ You can provide additional mutation marker data using the `--extraMarkers` flag.
 	1010,30,D,M1,Composite marker example,H5N1,PMID:11111111
 	1010,31,N,M1,Composite marker example,H5N1,PMID:11111111
 	```
+FOR HUMAN PROTOCOL MAKE SURE TO ADD FOUND_IN SINCE SAMPLES WILL ONLY BE CHECKED AGAINSTA MARKERS WITH FOUND_IN THE SAME SUBTYPE.
 
 **Valid protein names:**
 HA1, HA2, M1, M2, NA, NP, NS-1, NS-2, PA, PB1, PB1-F2, PB2
