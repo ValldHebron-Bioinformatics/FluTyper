@@ -169,6 +169,13 @@ process IndividualGraphicReport {
                 scatter_text = None
                 x_pos_array = None
                 y_pos_array = [0.5] * len(mut_df)
+            
+            if "${params.protocol}" == "AVIAN":
+                ref = "H5N1"
+            elif "${params.protocol}" == "HUMAN":
+                ref = "H1N1"
+            else:
+                ref = "Unknown"
 
             fig.add_trace(
                 go.Scatter(
@@ -184,7 +191,7 @@ process IndividualGraphicReport {
                     customdata=hover_data,
                     hovertemplate=(
                         "<b>Position:</b> %{customdata[5]}<br>"
-                        "<b>Reference Position (H5N1 numbering):</b> %{customdata[4]}<br>"
+                        "<b>Reference Position (" + ref + " numbering):</b> %{customdata[4]}<br>"
                         "<b>Mutation:</b> %{customdata[1]}<br>"
                         "<b>Effect(s):</b> %{customdata[2]}<br>"
                         "                 <b>Found in:</b>  %{customdata[3]}<br>"
