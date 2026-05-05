@@ -30,7 +30,7 @@ target_N = "${n_tag}" if "${n_tag}".startswith("N") and "${n_tag}"[1:].isdigit()
 def build_pos_lookup(dict_path, from_col, to_col, prot_filter=None):
     if not os.path.exists(dict_path):
         return {}
-    with open(dict_path, 'r') as f:
+    with open(dict_path, 'r', encoding='utf-8-sig') as f:
         reader = csv.DictReader(f) 
         # Clean up header names
         headers = [h.strip() for h in (reader.fieldnames or [])]
@@ -61,17 +61,25 @@ for aligned_prot in "${prot_files}".split():
     subtype_val = "${h_tag}${n_tag}(${pathotype})" if "${pathotype}" else "${h_tag}${n_tag}"
 
     pos_to_base = {}
-    if prot_name.startswith("HA"):
-        ref_H = ref_tag if ref_tag.startswith("H") and ref_tag[1:].isdigit() else "H5"
-        pos_to_base = build_pos_lookup(ha_dict, f"{ref_H}_numbering", "H5_numbering", prot_name)
-    elif prot_name.startswith("NA"):
-        ref_N = ref_tag if ref_tag.startswith("N") and ref_tag[1:].isdigit() else "N1"
-        pos_to_base = build_pos_lookup(na_dict, f"{ref_N}_pos", "N1_pos")
+    if "${params.protocol}" == "AVIAN":
+        if prot_name.startswith("HA"):
+            ref_H = ref_tag if ref_tag.startswith("H") and ref_tag[1:].isdigit() else "H5"
+            pos_to_base = build_pos_lookup(ha_dict, f"{ref_H}_numbering", "H5_numbering", prot_name)
+        elif prot_name.startswith("NA"):
+            ref_N = ref_tag if ref_tag.startswith("N") and ref_tag[1:].isdigit() else "N1"
+            pos_to_base = build_pos_lookup(na_dict, f"{ref_N}_pos", "N1_pos")
+    elif "${params.protocol}" == "HUMAN":
+        if prot_name.startswith("HA"):
+            ref_H = "${h_tag}" if "${h_tag}".startswith("H") else "H1"
+            pos_to_base = build_pos_lookup(ha_dict, f"{ref_H}_numbering", "H1_numbering", prot_name)
+        elif prot_name.startswith("NA"):
+            ref_N = "${n_tag}" if "${n_tag}".startswith("N") else "N1"
+            pos_to_base = build_pos_lookup(na_dict, f"{ref_N}_pos", "N1_pos")
 
     markers_by_id, marker_info = {}, {}
     m_file = markers_dir / f"{prot_name}_markers.csv"
     if m_file.exists():
-        with open(m_file) as f:
+        with open(m_file, encoding='utf-8-sig') as f:
             for row in csv.DictReader(f):
                 m_id = row['MARKER_ID'].strip()
                 # setdefault allows us to merge multiple position/AA pairs for the same marker ID
@@ -81,19 +89,24 @@ for aligned_prot in "${prot_files}".split():
                 # Avoid duplicate info entries for the same marker ID
                 if info not in marker_info.setdefault(m_id, []): marker_info[m_id].append(info)
 
-    # Add "X" mutations for all observed positions to allow marker detection of any mutation at that position
+    # Add "X" mutations for all observed positions to allow marker detection ONLY if it is an actual mutation
     observed_mutations, protein_pos = set(), 0
     for r_aa, q_aa in zip(ref_seq, query_seq):
         if r_aa != "-": protein_pos += 1
         standard_pos = pos_to_base.get(str(protein_pos), str(protein_pos))
         observed_mutations.add((standard_pos, q_aa))
-        observed_mutations.add((standard_pos, "X"))
+        
+        # X acts as a wildcard only if the amino acid changed
+        if r_aa != q_aa and "X" not in (r_aa, q_aa):
+            observed_mutations.add((standard_pos, "X"))
+            
     # Check which observed mutations are part of any marker sets
     active_markers = {}
     for m_id, mut_set in markers_by_id.items():
         if mut_set.issubset(observed_mutations):
             # Mutations can have multiple marker ids, so we append to a list for each mutation
             for mut in mut_set: active_markers.setdefault(mut, []).append(m_id)
+            
     # Build list to store indels
     events = []
     pos = 0
@@ -102,24 +115,29 @@ for aligned_prot in "${prot_files}".split():
         pos_raw = str(pos)
         pos_ref = pos_to_base.get(pos_raw, pos_raw)
 
-        # Look first for exact matches, then for "X" matches
+        is_mutation = r_aa != q_aa and "X" not in (r_aa, q_aa)
+
+        # Look first for exact matches, then for "X" matches only if it is a true mutation
         m_ids_exact = active_markers.get((pos_ref, q_aa), [])
-        m_ids_x = active_markers.get((pos_ref, "X"), [])
-        combined_m_ids = list(dict.fromkeys(m_ids_exact + m_ids_x)) # Ajuntem i eliminem duplicats
+        m_ids_x = active_markers.get((pos_ref, "X"), []) if is_mutation else []
+        combined_m_ids = list(dict.fromkeys(m_ids_exact + m_ids_x)) 
         
         is_marker = len(combined_m_ids) > 0
-        is_mutation = r_aa != q_aa and "X" not in (r_aa, q_aa)
+        
         if not (is_marker or is_mutation):
             continue
 
         if is_marker:
             m_ids = combined_m_ids
             is_combo = " | ".join(dict.fromkeys("Yes" if len(set(m[0] for m in markers_by_id[mid])) > 1 else "No" for mid in m_ids))
-            effect = " | ".join(dict.fromkeys(eff for mid in m_ids for eff, _, _ in marker_info[mid] if eff))
-            found  = " | ".join(dict.fromkeys(fnd for mid in m_ids for _, fnd, _ in marker_info[mid] if fnd))
-            ref    = " | ".join(dict.fromkeys(r   for mid in m_ids for _, _, r   in marker_info[mid] if r))
+            # Clean and deduplicate by splitting on pipes inline
+            effect = " | ".join(dict.fromkeys(item.strip() for mid in m_ids for eff, _, _ in marker_info[mid] if eff for item in eff.split('|') if item.strip()))
+            found  = " | ".join(dict.fromkeys(item.strip() for mid in m_ids for _, fnd, _ in marker_info[mid] if fnd for item in fnd.split('|') if item.strip()))
+            ref    = " | ".join(dict.fromkeys(item.strip() for mid in m_ids for _, _, r   in marker_info[mid] if r for item in r.split('|') if item.strip()))
             mut_type = "Marker"
-            aa_mut = f"{pos_raw}{q_aa}"
+            # Included the reference amino acid conditionally if a mutation actually occurred
+            aa_mut = f"{r_aa}{pos_raw}{q_aa}" if is_mutation else f"{pos_raw}{q_aa}"
+            
             events.append({"pos": pos_raw, "pos_ref": pos_ref, "r_aa": r_aa, "q_aa": q_aa,
                             "aa_mut": aa_mut, "mut_type": mut_type, "marker": "Yes",
                             "m_ids": " | ".join(m_ids), "is_combo": is_combo,

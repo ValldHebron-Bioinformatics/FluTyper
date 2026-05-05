@@ -133,6 +133,13 @@ process DateGraphicReport {
                         mut_df = plot_df[plot_df['AA_MUTATION'] == mut]
                         color = color_list[idx % len(color_list)]
                         
+                        if "${params.protocol}" == "AVIAN":
+                            ref = "H5N1"
+                        elif "${params.protocol}" == "HUMAN":
+                            ref = "H1N1"
+                        else:
+                            ref = "Unknown"
+
                         fig.add_trace(
                             go.Scatter(
                                 x=mut_df['WEEK'], y=mut_df['Freq_Weekly'],
@@ -143,7 +150,7 @@ process DateGraphicReport {
                                 customdata=mut_df[['POSITION_REF', 'EFFECT', 'FOUND_IN', 'Markers (Week)', 'Samples (Week)', 'Freq_Weekly', 'AA_MUTATION']],
                                 hovertemplate=(
                                     "<b>Week:</b> %{x|%V, %Y}<br>"
-                                    "<b>Reference Position (H5N1 numbering):</b> %{customdata[0]}<br>"
+                                    "<b>Reference Position (" + ref + " numbering):</b> %{customdata[0]}<br>"
                                     "<b>Mutation:</b> %{customdata[6]}<br>"
                                     "<b>Effect(s):</b> %{customdata[1]}<br>"
                                     "                 <b>Found in:</b>  %{customdata[2]}<br>"
@@ -163,7 +170,7 @@ process DateGraphicReport {
                                 customdata=mut_df[['POSITION_REF', 'EFFECT', 'FOUND_IN', 'Markers (Cumulative)', 'Samples (Cumulative)', 'Freq_Cum', 'AA_MUTATION']],
                                 hovertemplate=(
                                     "<b>Week:</b> %{x|%V, %Y}<br>"
-                                    "<b>Reference Position (H5N1 numbering):</b> %{customdata[0]}<br>"
+                                    "<b>Reference Position (" + ref + " numbering):</b> %{customdata[0]}<br>"
                                     "<b>Mutation:</b> %{customdata[6]}<br>"
                                     "<b>Effect(s):</b> %{customdata[1]}<br>"
                                     "                 <b>Found in:</b>  %{customdata[2]}<br>"

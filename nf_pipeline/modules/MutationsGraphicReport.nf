@@ -158,6 +158,13 @@ process MutationsGraphicReport {
                 scatter_text = None
                 text_pos_array = None
 
+            if "${params.protocol}" == "AVIAN":
+                ref = "H5N1"
+            elif "${params.protocol}" == "HUMAN":
+                ref = "H1N1"
+            else:
+                ref = "Unknown"
+
             fig.add_trace(
                 go.Scatter(
                     x=mut_df['POSITION'],
@@ -175,7 +182,7 @@ process MutationsGraphicReport {
                     customdata=hover_data,
                     hovertemplate=(
                         "<b>Position:</b> %{x}<br>"
-                        "<b>Reference Position (H5N1 numbering):</b> %{customdata[7]}<br>"
+                        "<b>Reference Position (" + ref + " numbering):</b> %{customdata[7]}<br>"
                         "<b>Mutation:</b> %{customdata[2]}<br>"
                         "<b>Effect(s):</b> %{customdata[3]}<br>"
                         "                 <b>Found in:</b>  %{customdata[6]}<br>"
