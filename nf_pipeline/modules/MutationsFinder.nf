@@ -89,19 +89,24 @@ for aligned_prot in "${prot_files}".split():
                 # Avoid duplicate info entries for the same marker ID
                 if info not in marker_info.setdefault(m_id, []): marker_info[m_id].append(info)
 
-    # Add "X" mutations for all observed positions to allow marker detection of any mutation at that position
+    # Add "X" mutations for all observed positions to allow marker detection ONLY if it is an actual mutation
     observed_mutations, protein_pos = set(), 0
     for r_aa, q_aa in zip(ref_seq, query_seq):
         if r_aa != "-": protein_pos += 1
         standard_pos = pos_to_base.get(str(protein_pos), str(protein_pos))
         observed_mutations.add((standard_pos, q_aa))
-        observed_mutations.add((standard_pos, "X"))
+        
+        # X acts as a wildcard only if the amino acid changed
+        if r_aa != q_aa and "X" not in (r_aa, q_aa):
+            observed_mutations.add((standard_pos, "X"))
+            
     # Check which observed mutations are part of any marker sets
     active_markers = {}
     for m_id, mut_set in markers_by_id.items():
         if mut_set.issubset(observed_mutations):
             # Mutations can have multiple marker ids, so we append to a list for each mutation
             for mut in mut_set: active_markers.setdefault(mut, []).append(m_id)
+            
     # Build list to store indels
     events = []
     pos = 0
@@ -110,13 +115,15 @@ for aligned_prot in "${prot_files}".split():
         pos_raw = str(pos)
         pos_ref = pos_to_base.get(pos_raw, pos_raw)
 
-        # Look first for exact matches, then for "X" matches
+        is_mutation = r_aa != q_aa and "X" not in (r_aa, q_aa)
+
+        # Look first for exact matches, then for "X" matches only if it is a true mutation
         m_ids_exact = active_markers.get((pos_ref, q_aa), [])
-        m_ids_x = active_markers.get((pos_ref, "X"), [])
+        m_ids_x = active_markers.get((pos_ref, "X"), []) if is_mutation else []
         combined_m_ids = list(dict.fromkeys(m_ids_exact + m_ids_x)) # Ajuntem i eliminem duplicats
         
         is_marker = len(combined_m_ids) > 0
-        is_mutation = r_aa != q_aa and "X" not in (r_aa, q_aa)
+        
         if not (is_marker or is_mutation):
             continue
 
