@@ -17,6 +17,7 @@ process InteractiveMutationsTable {
     import re
 
     input_excel = "${excel_file}"
+    protocol_type = "${params.protocol}"
     output_html = "MutationsTable.html"
 
     # Read the Excel file. Keep default empty values to avoid errors with the 'NA' protein
@@ -107,6 +108,15 @@ process InteractiveMutationsTable {
 
     # List to JSON string for embedding in the HTML
     json_data_string = json.dumps(output_data)
+
+    # Conditionally generate the subtitle
+    subtitle_html = ""
+    if protocol_type.lower() != "human":
+        subtitle_html = '''
+        <p class="subtitle">
+            Information about the markers used can be consulted at FluMut: 
+            <a href="https://izsvenezie-virology.github.io/FluMut/docs/markers" target="_blank">https://izsvenezie-virology.github.io/FluMut/docs/markers</a>
+        </p>'''
 
     html_template = f'''
     <!DOCTYPE html>
@@ -246,11 +256,7 @@ process InteractiveMutationsTable {
         </style>
     </head>
     <body>
-        <h2>Influenza Mutations Interactive Table</h2>
-        <p class="subtitle">
-            Information about the markers used can be consulted at FluMut: 
-            <a href="https://izsvenezie-virology.github.io/FluMut/docs/markers" target="_blank">https://izsvenezie-virology.github.io/FluMut/docs/markers</a>
-        </p>
+        <h2>Influenza Mutations Interactive Table</h2>{subtitle_html}
         <table>
             <thead>
                 <tr>
