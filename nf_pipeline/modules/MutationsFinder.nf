@@ -93,12 +93,14 @@ for aligned_prot in "${prot_files}".split():
                 # Avoid duplicate info entries for the same marker ID
                 if info not in marker_info.setdefault(m_id, []): marker_info[m_id].append(info)
 
-    # Add "X" mutations for all observed positions to allow marker detection ONLY if it is an actual mutation
     observed_mutations, protein_pos = set(), 0
     for r_aa, q_aa in zip(ref_seq, query_seq):
         if r_aa != "-": protein_pos += 1
         standard_pos = pos_to_base.get(str(protein_pos), str(protein_pos))
-        observed_mutations.add((standard_pos, q_aa))
+        
+        # Avoid treating 'X' (unknown AA from NNN codons) as a valid target to prevent false wildcard marker triggers
+        if q_aa != "X":
+            observed_mutations.add((standard_pos, q_aa))
         
         # X acts as a wildcard only if the amino acid changed
         if r_aa != q_aa and "X" not in (r_aa, q_aa):
