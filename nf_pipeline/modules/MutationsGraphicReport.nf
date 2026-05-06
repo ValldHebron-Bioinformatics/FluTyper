@@ -58,13 +58,19 @@ process MutationsGraphicReport {
         }
     df['ColorCode'] = df['Color_Category'].map(lambda x: color_map.get(x, '#aaaaaa'))
 
-    # Define plot groups, extracting from REF_SUBTYPE specifically for HA and NA
+    # Define plot groups based on the selected Nextflow protocol
     def get_plot_group(row):
         protein = str(row.get('PROTEIN', 'Unknown'))
-        if protein in ['HA1', 'HA2', 'NA']:
-            subtype = str(row.get('REF_SUBTYPE', 'Unknown'))
+        subtype = str(row.get('REF_SUBTYPE', 'Unknown'))
+        
+        if "${params.protocol}" == "HUMAN":
+            # For HUMAN, strictly separate all proteins by subtype to avoid H1N1/H3N2 mixing
             return f"{protein} - {subtype}"
-        return protein
+        else:
+            # For AVIAN, keep original behavior: only separate HA and NA surface proteins
+            if protein in ['HA1', 'HA2', 'NA']:
+                return f"{protein} - {subtype}"
+            return protein
 
     df['Plot_Group'] = df.apply(get_plot_group, axis=1).astype(str)
 

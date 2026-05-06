@@ -24,7 +24,7 @@ process DateGraphicReport {
         df_mut = pd.read_excel(mut_file, na_filter=False)
         df_meta = pd.read_csv(meta_file, skipinitialspace=True)
 
-        df_meta['DATE'] = pd.to_datetime(df_meta['DATE'], format='%d/%m/%Y')
+        df_meta['DATE'] = pd.to_datetime(df_meta['DATE'], format='%Y-%m-%d')
         df_meta['WEEK'] = df_meta['DATE'].dt.to_period('W').dt.to_timestamp()
 
         global_weeks = pd.DataFrame({'WEEK': sorted(df_meta['WEEK'].unique())})
@@ -32,12 +32,17 @@ process DateGraphicReport {
         df_all = pd.merge(df_mut, df_meta[['ID', 'WEEK']], left_on='SAMPLE_ID', right_on='ID')
         df_all['REF_SUBTYPE'] = df_all.get('REF_SUBTYPE', 'Unknown').replace('', 'Unknown').fillna('Unknown').astype(str)
         
+        # Updated logic to prevent mixing subtypes in HUMAN protocol timelines
         def get_plot_name(row):
             prot = str(row.get('PROTEIN', 'Unknown'))
-            if prot in ['HA1', 'HA2', 'NA']:
-                subtype = str(row.get('REF_SUBTYPE', 'Unknown')).replace('/', '_')
+            subtype = str(row.get('REF_SUBTYPE', 'Unknown')).replace('/', '_')
+            
+            if "${params.protocol}" == "HUMAN":
                 return f"{prot}_{subtype}"
-            return prot
+            else:
+                if prot in ['HA1', 'HA2', 'NA']:
+                    return f"{prot}_{subtype}"
+                return prot
             
         df_all['PLOT_NAME'] = df_all.apply(get_plot_name, axis=1)
         
