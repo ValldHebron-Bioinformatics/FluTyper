@@ -231,6 +231,14 @@ process MutationsGraphicReport {
         legend_html += f'<div style="display: flex; align-items: center;"><span style="display: inline-block; width: 14px; height: 14px; background-color: {color}; border-radius: 50%; margin-right: 6px; border: 1px solid #555;"></span>{mut_type}</div>'
     legend_html += '</div>'
 
+    # Determine JavaScript filtering logic and subtitle text based on protocol
+    current_protocol = "${params.protocol}".upper()
+    if current_protocol == "AVIAN":
+        subtitle_text = "Markers are always displayed."
+        js_marker_bypass = "dataSeries.name === 'Marker'"
+    else:
+        subtitle_text = "Markers are filtered by the selected frequency threshold."
+        js_marker_bypass = "false"
 
     # Create the full HTML template with embedded graph and slider
     html_template = f'''
@@ -268,7 +276,7 @@ process MutationsGraphicReport {
 
         <div class="sticky-header">
             <h2 style="margin: 0 0 5px 0;">Mutation Summary per Protein</h2>
-            <p style="color: gray; font-size: 14px; margin: 0;">Markers are always displayed.</p>
+            <p style="color: gray; font-size: 14px; margin: 0;">{subtitle_text}</p>
 
             <div class="slider-container">
                 <label><b>Minimum Frequency Threshold:</b> <span id="sliderValue">{default_val}%</span></label>
@@ -329,8 +337,8 @@ process MutationsGraphicReport {
                         continue;
                     }}
 
-                    // Ensure that any trace named 'Marker' bypasses the filter and remains fully visible
-                    if (dataSeries.name === 'Marker') {{
+                    // Apply conditional bypass logic based on the Nextflow protocol
+                    if ({js_marker_bypass}) {{
                         newVerticalCoordinates.push(baselineYValues);
                     }} else {{
                         var filteredYValues = [];
