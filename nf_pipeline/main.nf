@@ -162,9 +162,12 @@ workflow {
     InteractiveMutationsTable(MutationsCompiler.out.results.map { full, _filtered -> full })
     ch_interactive_mutations_table = InteractiveMutationsTable.out.table
     
-    IndividualMutations_Ch = MutationsFinder.out.results.map { sample_id, _mut_files, combined_csv -> tuple(sample_id, combined_csv) }
-    IndividualGraphicReport(IndividualMutations_Ch)
-    ch_individual_graphic_report = IndividualGraphicReport.out.report
+    // CONDITIONALLY RUN INDIVIDUAL GRAPHIC REPORTS
+    if (params.get('IndividualReports', false).toString().toLowerCase() == 'true') {
+        IndividualMutations_Ch = MutationsFinder.out.results.map { sample_id, _mut_files, combined_csv -> tuple(sample_id, combined_csv) }
+        IndividualGraphicReport(IndividualMutations_Ch)
+        ch_individual_graphic_report = IndividualGraphicReport.out.report
+    }
     
     if (params.metadata) {
         Metadata_ch = channel.fromPath(params.metadata, checkIfExists: true)
