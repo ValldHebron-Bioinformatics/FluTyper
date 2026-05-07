@@ -49,7 +49,10 @@ def build_pos_lookup(dict_path, from_col, to_col, prot_filter=None):
 output_files = []
 for aligned_prot in "${prot_files}".split():
     file_path = Path(aligned_prot)
-    prot_name = file_path.name.split('_')[1]
+    
+    # Bulletproof protein name extraction (strips extensions)
+    file_stem = file_path.stem 
+    prot_name = file_stem.replace("${sample_id}_", "").split("_")[0]
 
     records = list(SeqIO.parse(file_path, "fasta"))
     if len(records) < 2:
