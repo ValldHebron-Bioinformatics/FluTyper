@@ -3,7 +3,7 @@ nextflow.enable.dsl=2
 
 process GenotypingResults {
     input:
-    tuple val(sample_id), val(h_tag), val(n_tag), val(pathotype), path(csv_path)
+    tuple val(sample_id), val(h_tag), val(n_tag), val(pathotype), path(csv_path), path(genin_path)
     path("datasets/*")
 
     output:
@@ -13,8 +13,7 @@ process GenotypingResults {
     script:
     """
 #!/usr/bin/env python3
-import os, csv
-
+import os, csv, subprocess
 # Determine dataset name and version based on the H tag
 d_path = "datasets/nextclade_${h_tag}_dataset"
 d_name = "nextclade_${h_tag}_dataset" if os.path.isdir(d_path) else "-"
@@ -23,13 +22,15 @@ subtype_val = "${h_tag}${n_tag}(${pathotype})" if "${h_tag}" in ["H5", "H7", "H9
 
 # Prepare the data dictionary with default values
 data = {
-    "SampleID": "${sample_id}", 
-    "Subtype": subtype_val, 
-    "Dataset": d_name, 
-    "Version": "-", 
-    "Clade": "-", 
-    "qc.status": "-", 
-    "qc.score": "-"
+    "SampleID": "${sample_id}",
+    "Subtype": subtype_val,
+    "Dataset": d_name,
+    "Dataset Version": "-", 
+    "Clade": "-",
+    "Genin Version": "-",
+    "Genotype": "-", 
+    "Sub-genotype": "-",
+    "Notes": "-"
 }
 
 # Extract version from CHANGELOG.md if the dataset exists
@@ -39,7 +40,7 @@ if d_name != "-":
         with open(changelog_file, 'r') as f:
             first_line = f.readline()
             if first_line.startswith('##'):
-                data["Version"] = first_line.replace('##', '').strip()
+                data["Dataset Version"] = first_line.replace('##', '').strip()
     else:
         with open("GRerrors.log", 'a') as log_f:
             log_f.write(f"GenotypingResults: CHANGELOG.md not found for dataset {d_name}, cannot extract version.\\n")
@@ -62,8 +63,27 @@ if os.path.isfile("${csv_path}"):
     
     if best_row:
         data["Clade"] = best_row.get('clade', 'unclassified')
-        data["qc.status"] = best_row.get('qc.overallStatus', '-')
-        data["qc.score"] = best_row.get('qc.overallScore', '-')
+
+# Genin data extaction (if available)
+genin_str = "${genin_path}".replace("[", "").replace("]", "").strip()
+if genin_str and os.path.isfile(genin_str):
+    with open(genin_str, 'r') as f:
+        reader = csv.DictReader(f, delimiter='\\t')
+        for row in reader:
+            data["Genotype"] = row.get("Genotype", "-")
+            data["Sub-genotype"] = row.get("Sub-genotype", "-")
+            data["Notes"] = row.get("Notes", "-")
+            break # Amb la primera fila de genin ja en tenim prou
+    
+    # Only set Genin version if genotype was actually found
+    if data["Genotype"] != "-":
+        try:
+            res = subprocess.run(['genin2', '--version'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            if res.returncode == 0:
+                data["Genin Version"] = res.stdout.split(',')[1].replace('version', '').strip()
+        except Exception as e:
+            with open("GRerrors.log", 'a') as log_f:
+                log_f.write(f"GenotypingResults: Could not determine Genin2 version. Error: {e}\\n")
 
 with open("final_genotyping_results_${sample_id}.csv", 'w', newline='') as f:
     writer = csv.DictWriter(f, fieldnames=data.keys())
