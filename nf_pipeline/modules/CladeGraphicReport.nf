@@ -35,17 +35,29 @@ process CladeGraphicReport {
     # Dataframe preparation
     genotyping_df = pd.read_csv("${genotyping_file}")
     genotyping_df['H_Subtype'] = genotyping_df['Subtype'].astype(str).str.extract(r'(H\\d+)', expand=False)
-    genotyping_df['Clade'] = genotyping_df['Clade'].replace("unassigned", "Unassigned").replace("-", "No dataset available")
+
+        
+    # Standardize Clade, Genotype, and Sub-genotype columns
+    for col in ['Clade', 'Genotype', 'Sub-genotype']:
+        genotyping_df[col] = genotyping_df[col].fillna("Unassigned").astype(str).str.strip()
+        genotyping_df.loc[genotyping_df[col].str.lower().str.contains('unassigned'), col] = 'Unassigned'
+        
+    
+    genotyping_df.loc[genotyping_df['Clade'] == '-', 'Clade'] = 'No dataset available'
+
 
     # Dynamic Root Grouping Logic
-    all_clades = genotyping_df['Clade'].dropna().unique()
-    def get_root_clade(c):
-        if pd.isna(c) or c in ["Unassigned", "No dataset available"]: return c
-        parts = str(c).split('.')
-        if len(parts) > 3: return ".".join(parts[:3]) + "-like"
-        elif len(parts) == 3 and any(str(x).startswith(str(c) + ".") for x in all_clades): return str(c) + "-like"
-        return c
-    genotyping_df['Root_Clade'] = genotyping_df['Clade'].apply(get_root_clade)
+    if "${params.protocol}".upper() == "AVIAN":
+        genotyping_df['Root_Clade'] = genotyping_df['Clade']
+    else:
+        all_clades = genotyping_df['Clade'].dropna().unique()
+        def get_root_clade(c):
+            if pd.isna(c) or c in ["Unassigned", "No dataset available"]: return c
+            parts = str(c).split('.')
+            if len(parts) > 3: return ".".join(parts[:3]) + "-like"
+            elif len(parts) == 3 and any(str(x).startswith(str(c) + ".") for x in all_clades): return str(c) + "-like"
+            return c
+        genotyping_df['Root_Clade'] = genotyping_df['Clade'].apply(get_root_clade)
 
     # Inject the safely evaluated Groovy string
     metadata_param = "${meta_str}"
@@ -78,7 +90,10 @@ process CladeGraphicReport {
         if not (len(clades_for_h) == 1 and clades_for_h[0] == "No dataset available"):
             valid_h_subtypes.append(h)
             
-    total_charts = 1 + len(valid_h_subtypes)
+    # Check if there are any valid Genotypes for clade 2.3.4.4b globally
+    include_genotype_chart = genotyping_df[(genotyping_df['Clade'] == '2.3.4.4b') & (genotyping_df['Genotype'] != '-')].shape[0] > 0
+            
+    total_charts = 1 + len(valid_h_subtypes) + (1 if include_genotype_chart else 0)
 
     # Set up a dynamic grid for the subplots (1 column wide)
     cols = 1
@@ -89,6 +104,8 @@ process CladeGraphicReport {
     
     # Subplot titles in bold
     subplot_titles = ["<b>H Subtype Distribution</b>"] + [f"<b>Clade Distribution for {h}</b>" for h in valid_h_subtypes]
+    if include_genotype_chart:
+        subplot_titles.append("<b>Genotype Distribution (Clade 2.3.4.4b)</b>")
     
     # Create the subplot figure with extra vertical spacing to allow titles to shift up
     fig = make_subplots(rows=rows, cols=cols, specs=specs, subplot_titles=subplot_titles, vertical_spacing=0.15)
@@ -118,7 +135,7 @@ process CladeGraphicReport {
                     name="H Subtypes", 
                     text=h_counts['Text'],
                     texttemplate='<b>%{label}</b><br><b>%{text}</b><br><b>%{percent}</b>',
-                    textposition='auto',
+                    textposition='outside',
                     insidetextorientation='horizontal',
                     rotation=90, 
                     automargin=True,
@@ -150,7 +167,11 @@ process CladeGraphicReport {
             
             root_grouped = orig_counts.groupby('Root_Clade').agg(Root_Count=('Count', 'sum'), Root_Hover_Details=('Hover_Detail', lambda x: "<br>".join([detail for detail in x if detail])), Num_Clades=('Clade', 'nunique')).reset_index()
             root_grouped['Root_Pct'] = root_grouped['Root_Count'] / total_c
-            root_grouped['Final_Label'] = root_grouped.apply(lambda x: "Others" if x['Root_Pct'] < 0.02 else x['Root_Clade'], axis=1)
+            
+            root_grouped['Final_Label'] = root_grouped.apply(
+                lambda x: "Others" if x['Root_Pct'] < 0.02 and str(x['Root_Clade']) not in ["Unassigned", "No dataset available"] else x['Root_Clade'], 
+                axis=1
+            )
             
             final_grouped = root_grouped.groupby('Final_Label').agg(Final_Count=('Root_Count', 'sum'), Final_Hover_Details=('Root_Hover_Details', lambda x: "<br>".join([detail for detail in x if detail])), Total_Unique_Clades=('Num_Clades', 'sum')).reset_index()
             
@@ -166,7 +187,7 @@ process CladeGraphicReport {
                     name=str(h), 
                     text=final_grouped['Text'], 
                     texttemplate='<b>%{label}</b><br><b>%{text}</b><br><b>%{percent}</b>',
-                    textposition='auto',
+                    textposition='outside',
                     rotation=90,
                     automargin=True,
                     insidetextorientation='horizontal',
@@ -179,6 +200,52 @@ process CladeGraphicReport {
                 ),
                 row=r, col=1
             )
+            
+        # Genotype chart for Clade 2.3.4.4b
+        if include_genotype_chart:
+            r = total_charts
+            sub_df = season_df[(season_df['Clade'] == '2.3.4.4b') & (season_df['Genotype'] != '-')]
+            total_g = len(sub_df)
+            
+            if total_g == 0:
+                fig.add_trace(go.Pie(labels=["No Data"], values=[1], name="Genotypes", textinfo='none', hoverinfo='none', visible=is_visible, marker=dict(colors=['#f0f0f0'])), row=r, col=1)
+            else:
+                orig_counts = sub_df.groupby(['Genotype', 'Sub-genotype']).size().reset_index(name='Count')
+                orig_counts['Orig_Pct'] = orig_counts['Count'] / total_g
+                orig_counts['Hover_Detail'] = orig_counts.apply(
+                    lambda x: f"- {x['Sub-genotype']}: {x['Count']}/{total_g} ({x['Orig_Pct']:.1%})" if str(x['Sub-genotype']) not in ["-", "None", "", "nan"] else "", axis=1
+                )
+
+                root_grouped = orig_counts.groupby('Genotype').agg(
+                    Final_Count=('Count', 'sum'),
+                    Hover_Details=('Hover_Detail', lambda x: "<br>".join([d for d in x if d]))
+                ).reset_index()
+
+                root_grouped['Hover_Extra'] = root_grouped.apply(
+                    lambda x: "<br><br><b>Sub-genotypes Breakdown:</b><br>" + x['Hover_Details'] if x['Hover_Details'] else "", axis=1
+                )
+                root_grouped['Text'] = root_grouped['Final_Count'].astype(str) + '/' + str(total_g)
+
+                fig.add_trace(
+                    go.Pie(
+                        labels=root_grouped['Genotype'],
+                        values=root_grouped['Final_Count'],
+                        name="Genotypes 2.3.4.4b",
+                        text=root_grouped['Text'],
+                        texttemplate='<b>%{label}</b><br><b>%{text}</b><br><b>%{percent}</b>',
+                        textposition='outside',
+                        rotation=90,
+                        automargin=True,
+                        insidetextorientation='horizontal',
+                        hole=0.35,
+                        marker=dict(colors=color_dict, line=dict(color='#ffffff', width=2)),
+                        hoverlabel=dict(font_size=14, align='left'),
+                        customdata=root_grouped['Hover_Extra'],
+                        hovertemplate='<b>Genotype:</b> %{label}<br><b>Total Count:</b> %{text}<br><b>Percentage:</b> %{percent}%{customdata}<extra></extra>',
+                        visible=is_visible
+                    ),
+                    row=r, col=1
+                )
 
     dropdown_buttons = []
     for s_idx, season in enumerate(seasons):
@@ -204,7 +271,7 @@ process CladeGraphicReport {
         showlegend=False,
         hovermode="closest",
         margin=dict(t=220, b=80, l=120, r=120),
-        uniformtext=dict(minsize=10, mode='hide')
+        uniformtext=dict(minsize=10, mode='show') 
     )
 
     fig.write_html("CladeGraphicReport.html")
