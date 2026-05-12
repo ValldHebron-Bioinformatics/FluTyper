@@ -4,12 +4,35 @@ nextflow_process {
     script "nf_pipeline/modules/CladeGraphicReport.nf"
     process "CladeGraphicReport"
 
-    test("Should match the expected clade HTML report") {
+    test("Should match the expected clade HTML report without the metadata file") {
 
         when {
             process {
                 """
                 input[0] = file("${projectDir}/tests/data/Graphs_test/final_genotyping_results.csv")
+                input[1] = []
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def reportFiles = process.out[0]
+            assert reportFiles != null : "Output channel is null. The HTML report was not emitted."
+            assert reportFiles.size() == 1
+
+            def htmlFile = path(reportFiles[0])
+            assert htmlFile.exists()
+        }
+    }
+    test("Should match the expected clade HTML report with the metadata file") {
+
+        when {
+            process {
+                """
+                input[0] = file("${projectDir}/tests/data/Graphs_test/final_genotyping_results.csv")
+                input[1] = file("${projectDir}/tests/data/Graphs_test/metadata.csv")
                 """
             }
         }

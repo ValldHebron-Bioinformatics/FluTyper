@@ -1,2 +1,2 @@
-SampleID,Subtype,Dataset,Version,Clade,qc.status,qc.score
-19135815,H5N1(HPAI),nextclade_H5_dataset,2026-04-14T11:55:23Z,2.3.4.4b,good,1.234568
+SampleID,Subtype,Dataset,Dataset Version,Clade,Genin Version,Genotype,Sub-genotype,Notes
+19135815,H5N1(HPAI),nextclade_H5_dataset,2026-04-14T11:55:23Z,2.3.4.4b,2.1.6,EA-2020-C,,
