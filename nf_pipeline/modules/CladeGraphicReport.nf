@@ -213,7 +213,7 @@ process CladeGraphicReport {
                 orig_counts = sub_df.groupby(['Genotype', 'Sub-genotype']).size().reset_index(name='Count')
                 orig_counts['Orig_Pct'] = orig_counts['Count'] / total_g
                 orig_counts['Hover_Detail'] = orig_counts.apply(
-                    lambda x: f"- {x['Sub-genotype']}: {x['Count']}/{total_g} ({x['Orig_Pct']:.1%})" if str(x['Sub-genotype']) not in ["-", "None", "", "nan"] else "", axis=1
+                    lambda x: f"- {x['Sub-genotype']}: {x['Count']}/{total_g} ({x['Orig_Pct']:.1%})" if str(x['Sub-genotype']) not in ["-", "None", "", "nan", "Unassigned"] else "", axis=1
                 )
 
                 root_grouped = orig_counts.groupby('Genotype').agg(
