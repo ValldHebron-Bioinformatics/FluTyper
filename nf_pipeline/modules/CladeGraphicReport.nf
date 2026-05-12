@@ -75,7 +75,7 @@ process CladeGraphicReport {
     if 'DATE' in genotyping_df.columns:
         iso_cal = genotyping_df['DATE'].dt.isocalendar()
         s_year = iso_cal.year.where(iso_cal.week >= 40, iso_cal.year - 1)
-        genotyping_df['Season'] = s_year.astype(str).str[-2:] + "-" + (s_year + 1).astype(str).str[-2:]
+        genotyping_df['Season'] = s_year.astype(str) + "-" + (s_year + 1).astype(str)
         genotyping_df['Season'] = genotyping_df['Season'].fillna("Unknown Season")
     else:
         genotyping_df['Season'] = "All Time"
@@ -255,8 +255,7 @@ process CladeGraphicReport {
         for j in range(start_idx, end_idx):
             visibility_array[j] = True
             
-        dropdown_buttons.append(dict(args=[{"visible": visibility_array}, {"title": dict(text=f"<b>Subtype and Clade Report - Season {season}</b>", x=0.5, y=0.98, xanchor="center", yanchor="top")}], label=season, method="update"))
-
+        dropdown_buttons.append(dict(args=[{"visible": visibility_array}, {"title": dict(text=f"<b>Subtype and Clade Report - Season {season}</b>", x=0.5, y=0.98, xanchor="center", yanchor="top")}], label=f"Season {season}", method="update"))
     default_title = f"<b>Subtype and Clade Report - Season {seasons[0]}</b>" if seasons else "<b>Subtype and Clade Report</b>"
 
     # Push all subplot titles upward by adjusting their y coordinate

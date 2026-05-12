@@ -30,7 +30,7 @@ process DateGraphicReport {
         # Calculate Seasons
         iso_cal = df_meta['DATE'].dt.isocalendar()
         s_year = iso_cal.year.where(iso_cal.week >= 40, iso_cal.year - 1)
-        df_meta['Season'] = s_year.astype(str).str[-2:] + "-" + (s_year + 1).astype(str).str[-2:]
+        df_meta['Season'] = s_year.astype(str) + "-" + (s_year + 1).astype(str)
         df_meta['Season'] = df_meta['Season'].fillna("Unknown Season")
 
         # Determine global x-axis range
@@ -44,8 +44,8 @@ process DateGraphicReport {
             if season == "Unknown Season":
                 continue
             try:
-                y1 = int(season.split('-')[0]) + 2000
-                y2 = int(season.split('-')[1]) + 2000
+                y1 = int(season.split('-')[0])
+                y2 = int(season.split('-')[1])
                 # Start: Year1 Week 40 Monday. End: Year2 Week 39 Sunday
                 s_start = pd.to_datetime(f'{y1}-W40-1', format='%G-W%V-%u') - pd.Timedelta(days=7)
                 s_end = pd.to_datetime(f'{y2}-W39-7', format='%G-W%V-%u') + pd.Timedelta(days=7)
