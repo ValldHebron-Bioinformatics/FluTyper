@@ -24,20 +24,56 @@ process DateGraphicReport {
         df_mut = pd.read_excel(mut_file, na_filter=False)
         df_meta = pd.read_csv(meta_file, skipinitialspace=True)
 
-        df_meta['DATE'] = pd.to_datetime(df_meta['DATE'], format='%d/%m/%Y')
+        df_meta['DATE'] = pd.to_datetime(df_meta['DATE'], format='%Y-%m-%d')
         df_meta['WEEK'] = df_meta['DATE'].dt.to_period('W').dt.to_timestamp()
+
+        # Calculate Seasons
+        iso_cal = df_meta['DATE'].dt.isocalendar()
+        s_year = iso_cal.year.where(iso_cal.week >= 40, iso_cal.year - 1)
+        df_meta['Season'] = s_year.astype(str).str[-2:] + "-" + (s_year + 1).astype(str).str[-2:]
+        df_meta['Season'] = df_meta['Season'].fillna("Unknown Season")
+
+        # Determine global x-axis range
+        all_time_start = df_meta['WEEK'].min() - pd.Timedelta(days=7)
+        all_time_end = df_meta['WEEK'].max() + pd.Timedelta(days=14)
+        all_time_range = [all_time_start.strftime('%Y-%m-%d'), all_time_end.strftime('%Y-%m-%d')] if pd.notnull(all_time_start) else None
+
+        # Determine true 52-week seasonal x-axis ranges regardless of data gaps
+        season_ranges = {}
+        for season in sorted(df_meta['Season'].dropna().unique()):
+            if season == "Unknown Season":
+                continue
+            try:
+                y1 = int(season.split('-')[0]) + 2000
+                y2 = int(season.split('-')[1]) + 2000
+                # Start: Year1 Week 40 Monday. End: Year2 Week 39 Sunday
+                s_start = pd.to_datetime(f'{y1}-W40-1', format='%G-W%V-%u') - pd.Timedelta(days=7)
+                s_end = pd.to_datetime(f'{y2}-W39-7', format='%G-W%V-%u') + pd.Timedelta(days=7)
+                season_ranges[season] = [s_start.strftime('%Y-%m-%d'), s_end.strftime('%Y-%m-%d')]
+            except Exception:
+                # Fallback if season format is unexpected
+                s_data = df_meta[df_meta['Season'] == season]
+                if not s_data.empty:
+                    s_start = s_data['WEEK'].min() - pd.Timedelta(days=7)
+                    s_end = s_data['WEEK'].max() + pd.Timedelta(days=14)
+                    season_ranges[season] = [s_start.strftime('%Y-%m-%d'), s_end.strftime('%Y-%m-%d')]
 
         global_weeks = pd.DataFrame({'WEEK': sorted(df_meta['WEEK'].unique())})
 
         df_all = pd.merge(df_mut, df_meta[['ID', 'WEEK']], left_on='SAMPLE_ID', right_on='ID')
         df_all['REF_SUBTYPE'] = df_all.get('REF_SUBTYPE', 'Unknown').replace('', 'Unknown').fillna('Unknown').astype(str)
         
+        # Updated logic to prevent mixing subtypes in HUMAN protocol timelines
         def get_plot_name(row):
             prot = str(row.get('PROTEIN', 'Unknown'))
-            if prot in ['HA1', 'HA2', 'NA']:
-                subtype = str(row.get('REF_SUBTYPE', 'Unknown')).replace('/', '_')
+            subtype = str(row.get('REF_SUBTYPE', 'Unknown')).replace('/', '_')
+            
+            if "${params.protocol}" == "HUMAN":
                 return f"{prot}_{subtype}"
-            return prot
+            else:
+                if prot in ['HA1', 'HA2', 'NA']:
+                    return f"{prot}_{subtype}"
+                return prot
             
         df_all['PLOT_NAME'] = df_all.apply(get_plot_name, axis=1)
         
@@ -88,9 +124,15 @@ process DateGraphicReport {
                     
                     plot_df = pd.merge(plot_df, hover_info, on='AA_MUTATION', how='left')
 
+                    # Calculate fixed maximum bounds to lock the secondary y-axes
+                    max_weekly_samples = weekly_totals['Samples (Week)'].max()
+                    max_cum_samples = weekly_totals['Samples (Cumulative)'].max()
+                    y2_max = max_weekly_samples * 1.1 if pd.notnull(max_weekly_samples) and max_weekly_samples > 0 else 10
+                    y4_max = max_cum_samples * 1.1 if pd.notnull(max_cum_samples) and max_cum_samples > 0 else 10
+
                     display_name = plot_name.replace('_', ' - ')
                     
-                    # Add dual y-axes with shared x-axis for weekly and cumulative frequencies, and total samples as secondary y-axis
+                    # Add dual y-axes with shared x-axis
                     fig = make_subplots(
                         rows=2, cols=1,
                         subplot_titles=("<b>Weekly Frequency</b>", "<b>Cumulative Frequency</b>"),
@@ -100,7 +142,7 @@ process DateGraphicReport {
                         specs=[[{"secondary_y": True}], [{"secondary_y": True}]]
                     )
 
-                    # Bars for total samples per week on the first subplot
+                    # Bars for total samples per week
                     fig.add_trace(
                         go.Bar(
                             x=weekly_totals['WEEK'], 
@@ -180,23 +222,58 @@ process DateGraphicReport {
                             ), row=2, col=1, secondary_y=False
                         )
 
-                    fig.update_yaxes(title_text="Frequency (%)", range=[-5, 105], row=1, col=1, secondary_y=False)
-                    fig.update_yaxes(title_text="Cumulative Frequency (%)", range=[-5, 105], row=2, col=1, secondary_y=False)
-                    # Set secondary y-axes                    
-                    fig.update_yaxes(title_text="Total Samples (N)", showgrid=False, rangemode='nonnegative', fixedrange=True, row=1, col=1, secondary_y=True)
-                    fig.update_yaxes(title_text="Total Samples (N)", showgrid=False, rangemode='nonnegative', fixedrange=True, row=2, col=1, secondary_y=True)
+                    # Build dropdown buttons for zooming
+                    dropdown_buttons = []
+                    if all_time_range:
+                        dropdown_buttons.append(
+                            dict(
+                                args=[{"xaxis.range": all_time_range, "xaxis2.range": all_time_range},
+                                      {"title.text": f"<b>Frequency in Time Report: {display_name} - All Time</b>"}],
+                                label="All Time",
+                                method="relayout"
+                            )
+                        )
+                        
+                    for season, s_range in season_ranges.items():
+                        dropdown_buttons.append(
+                            dict(
+                                args=[{"xaxis.range": s_range, "xaxis2.range": s_range},
+                                      {"title.text": f"<b>Frequency in Time Report: {display_name} - Season {season}</b>"}],
+                                label=f"Season {season}",
+                                method="relayout"
+                            )
+                        )
+
+                    # Explicitly anchor both Primary (Frequency) and Secondary (Sample Count) Y-axes
+                    fig.update_yaxes(title_text="Frequency (%)", range=[-5, 105], fixedrange=True, row=1, col=1, secondary_y=False)
+                    fig.update_yaxes(title_text="Cumulative Frequency (%)", range=[-5, 105], fixedrange=True, row=2, col=1, secondary_y=False)
+                    
+                    fig.update_yaxes(title_text="Total Samples (N)", range=[0, y2_max], showgrid=False, fixedrange=True, row=1, col=1, secondary_y=True)
+                    fig.update_yaxes(title_text="Total Samples (N)", range=[0, y4_max], showgrid=False, fixedrange=True, row=2, col=1, secondary_y=True)
                     
                     fig.update_xaxes(tickformat="Week %V<br>%Y", showticklabels=True)
                     
                     fig.update_layout(
                         title=dict(
                             text=f"<b>Frequency in Time Report: {display_name}</b>",
-                            font=dict(size=22)
+                            font=dict(size=22),
+                            x=0.47, y=0.98, xanchor="center", yanchor="top"
                         ),
+                        updatemenus=[dict(
+                            active=0,
+                            buttons=dropdown_buttons,
+                            x=0.47,
+                            xanchor="center",
+                            y=1.15,
+                            yanchor="top",
+                            direction="down",
+                            showactive=True
+                        )],
                         height=900,
                         hovermode='closest',
                         template="plotly_white",
                         barmode='overlay',
+                        margin=dict(t=160, b=80, l=80, r=80),
                         legend=dict(
                             title=dict(text="<b>Markers</b>", font=dict(size=14)),
                             x=1.02, 

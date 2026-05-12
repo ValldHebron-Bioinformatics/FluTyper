@@ -18,8 +18,8 @@ nextflow_process {
                 def hTag = "H5"
                 def nTag = "N1"
                 def pathotype = "HPAI"
-
-                input[0] = [ sampleId, haFasta, hTag, nTag, pathotype, baseDatasetDir ]
+                def sampleDir = file("${projectDir}/tests/data/19135815")   
+                input[0] = [ sampleId, haFasta, hTag, nTag, pathotype, baseDatasetDir, sampleDir ]
                 """
             }
         }
@@ -36,6 +36,16 @@ nextflow_process {
             // Verify the scientific accuracy: check for the specific clade
             def csvContent = nextclade_csv.text
             assert csvContent.contains("2.3.4.4b")
+            
+            // Verify genin output exists and contains the expected genotype
+            assert process.out.genin != null
+            assert process.out.genin.size() > 0
+
+            def genin_tsv = path(process.out.genin[0][1])
+            assert genin_tsv.exists()
+
+            def geninContent = genin_tsv.text
+            assert geninContent.contains("EA-2020-C")
         }
     }
 }

@@ -49,14 +49,18 @@ def build_pos_lookup(dict_path, from_col, to_col, prot_filter=None):
 output_files = []
 for aligned_prot in "${prot_files}".split():
     file_path = Path(aligned_prot)
-    prot_name = file_path.name.split('_')[1]
+    
+    # Bulletproof protein name extraction (strips extensions)
+    file_stem = file_path.stem 
+    prot_name = file_stem.replace("${sample_id}_", "").split("_")[0]
 
     records = list(SeqIO.parse(file_path, "fasta"))
     if len(records) < 2:
         with open("MFerrors.log", 'a') as f: f.write(f"ERROR: Less than 2 sequences in ${sample_id} {prot_name}, error in the alignment\\n")
         continue
 
-    ref_seq, query_seq = str(records[0].seq), str(records[1].seq)
+    # Force UPPERCASE to prevent case-mismatch bugs between FASTA translation and CSV markers
+    ref_seq, query_seq = str(records[0].seq).upper(), str(records[1].seq).upper()
     ref_tag = str(records[0].description).split('_')[0]
     subtype_val = "${h_tag}${n_tag}(${pathotype})" if "${pathotype}" else "${h_tag}${n_tag}"
 
@@ -78,23 +82,42 @@ for aligned_prot in "${prot_files}".split():
 
     markers_by_id, marker_info = {}, {}
     m_file = markers_dir / f"{prot_name}_markers.csv"
+    
     if m_file.exists():
         with open(m_file, encoding='utf-8-sig') as f:
             for row in csv.DictReader(f):
+                # SUBTYPE FILTERING FOR HUMAN PROTOCOL
+                if "${params.protocol}" == "HUMAN":
+                    found_in = row.get('FOUND_IN', '').strip().upper()
+                    if found_in and found_in != "UNIVERSAL":
+                        h_val = "${h_tag}".upper()
+                        n_val = "${n_tag}".upper()
+                        
+                        allowed_tags = [h_val + n_val]
+                        if h_val != "HX": allowed_tags.append(h_val)
+                        if n_val != "NX": allowed_tags.append(n_val)
+                        
+                        if not any(tag in found_in for tag in allowed_tags):
+                            continue
+                            
                 m_id = row['MARKER_ID'].strip()
                 # setdefault allows us to merge multiple position/AA pairs for the same marker ID
-                markers_by_id.setdefault(m_id, set()).add((row['POSITION'].strip(), row['AA'].strip()))
+                markers_by_id.setdefault(m_id, set()).add((row['POSITION'].strip(), row['AA'].strip().upper()))
                 
                 info = (row.get('EFFECT', '').strip(), row.get('FOUND_IN', '').strip(), row.get('REFERENCE', '').strip())
                 # Avoid duplicate info entries for the same marker ID
                 if info not in marker_info.setdefault(m_id, []): marker_info[m_id].append(info)
+    else:
+        with open("MFerrors.log", 'a') as f: f.write(f"WARNING: Marker file not found for protein {prot_name}: {m_file}\\n")
 
-    # Add "X" mutations for all observed positions to allow marker detection ONLY if it is an actual mutation
     observed_mutations, protein_pos = set(), 0
     for r_aa, q_aa in zip(ref_seq, query_seq):
         if r_aa != "-": protein_pos += 1
         standard_pos = pos_to_base.get(str(protein_pos), str(protein_pos))
-        observed_mutations.add((standard_pos, q_aa))
+        
+        # Avoid treating 'X' (unknown AA from NNN codons) as a valid target to prevent false wildcard marker triggers
+        if q_aa != "X":
+            observed_mutations.add((standard_pos, q_aa))
         
         # X acts as a wildcard only if the amino acid changed
         if r_aa != q_aa and "X" not in (r_aa, q_aa):

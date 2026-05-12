@@ -91,14 +91,18 @@ workflow {
         .filter { _sample_id, _input_fasta, h_tag, _n_tag, _pathotype, dataset_dir -> 
             dataset_dir.name.contains(h_tag) 
         }
-
+        .join(OrganizeBySample.out.results)
+        .map { sample_id, ha_fasta, h_tag, n_tag, pathotype, dataset_dir, sample_dir ->
+            tuple(sample_id, ha_fasta, h_tag, n_tag, pathotype, dataset_dir, sample_dir)
+        }
     GenotypingNextclade(GenotypingNextcladeInput_ch)
     
     GenotypingResultsInput_ch = GenotypingInfo_ch
-        .join(GenotypingNextclade.out.results, remainder: true) 
-        .map { sample_id, h_tag, n_tag, pathotype, csv_file -> 
-            tuple(sample_id, h_tag, n_tag, pathotype, csv_file ?: [])
-        }
+    .join(GenotypingNextclade.out.results, remainder: true) 
+    .join(GenotypingNextclade.out.genin, remainder: true) 
+    .map { sample_id, h_tag, n_tag, pathotype, csv_file, genin_file -> 
+        tuple(sample_id, h_tag, n_tag, pathotype, csv_file ?: [], genin_file ?: [])
+    }
         
     GenotypingResults(GenotypingResultsInput_ch, GetDatasets.out.collect()) 
     
@@ -108,7 +112,9 @@ workflow {
             keepHeader: true,
         )
 
-    CladeGraphicReport(GenotypingFinal_ch)
+    // Convert the parameter to a file object, or pass an empty collection if missing
+    def clade_metadata = params.metadata ? file(params.metadata, checkIfExists: true) : []
+    CladeGraphicReport(GenotypingFinal_ch, clade_metadata)
 
     // MARKERS PREPARATION
     if (params.protocol == "AVIAN") {
@@ -162,9 +168,12 @@ workflow {
     InteractiveMutationsTable(MutationsCompiler.out.results.map { full, _filtered -> full })
     ch_interactive_mutations_table = InteractiveMutationsTable.out.table
     
-    IndividualMutations_Ch = MutationsFinder.out.results.map { sample_id, _mut_files, combined_csv -> tuple(sample_id, combined_csv) }
-    IndividualGraphicReport(IndividualMutations_Ch)
-    ch_individual_graphic_report = IndividualGraphicReport.out.report
+    // CONDITIONALLY RUN INDIVIDUAL GRAPHIC REPORTS
+    if (params.get('IndividualReports', false).toString().toLowerCase() == 'true') {
+        IndividualMutations_Ch = MutationsFinder.out.results.map { sample_id, _mut_files, combined_csv -> tuple(sample_id, combined_csv) }
+        IndividualGraphicReport(IndividualMutations_Ch)
+        ch_individual_graphic_report = IndividualGraphicReport.out.report
+    }
     
     if (params.metadata) {
         Metadata_ch = channel.fromPath(params.metadata, checkIfExists: true)
