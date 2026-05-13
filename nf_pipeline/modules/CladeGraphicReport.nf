@@ -245,7 +245,7 @@ process CladeGraphicReport {
 
         fig_evo.update_layout(
             barmode='stack',
-            title=dict(text="<b>Evolution of Subtypes and Clades</b>", x=0.45, y=0.98, xanchor="center", yanchor="top", font=dict(size=24)),
+            title=dict(text="<b>Evolution of Subtypes and Clades</b>", x=0.47, y=0.98, xanchor="center", yanchor="top", font=dict(size=24)),
             updatemenus=[dict(active=0, buttons=dropdown_buttons_evo, x=0.5, xanchor="center", y=1.07, yanchor="top", direction="down", showactive=True)],
             height=450 * total_charts,
             hovermode="closest",
