@@ -19,6 +19,7 @@ process DateGraphicReport {
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
     import os
+    import re
 
     def generate_plots(mut_file, meta_file):
         df_mut = pd.read_excel(mut_file, na_filter=False)
@@ -169,7 +170,13 @@ process DateGraphicReport {
                         ), row=2, col=1, secondary_y=True
                     )
 
-                    unique_mutations = plot_df['AA_MUTATION'].unique()
+                    # Function to extract the number from the mutation string for sorting
+                    def extract_mutation_number(mut_string):
+                        match = re.search(r'\\d+', str(mut_string))
+                        return int(match.group()) if match else float('inf')
+                    
+                    # Sort unique mutations numerically based on the extracted number
+                    unique_mutations = sorted(plot_df['AA_MUTATION'].unique(), key=extract_mutation_number)
                     
                     for idx, mut in enumerate(unique_mutations):
                         mut_df = plot_df[plot_df['AA_MUTATION'] == mut]
