@@ -23,25 +23,64 @@ process CladeGraphicReport {
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
     from plotly import colors
+    import colorsys
+    import random
 
     # Define text color (black or white) based on background color for readability
     def get_contrast_text_color(hex_str):
-        hex_str = hex_str.lstrip('#')
+        hex_str = str(hex_str).lstrip('#')
         if len(hex_str) == 6:
-            r, g, b = tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4))
-            luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-            return '#000000' if luminance > 0.55 else '#ffffff'
+            try:
+                r, g, b = tuple(int(hex_str[i:i+2], 16) for i in (0, 2, 4))
+                luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+                return '#000000' if luminance > 0.55 else '#ffffff'
+            except ValueError:
+                return '#ffffff'
         return '#ffffff'
+
+    is_colorblind = "${params.colorblind}".lower() == "true"
 
     # Okabe-Ito Colors Palette (colorblind-friendly)
     okabe_ito_colors = ['#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7', '#999999', '#000000']
-    # Cris Colors Palette (she hates Barça colors)
-    cris_colors = ['#F9DC5C', '#CD733D', '#C84630', '#94B0DA', '#676F86', '#3A2D32', '#F2B5D4', "#20AA71", "#376AAD"]
     
-    if "${params.colorblind}".lower() == "true":
-        color_dict= okabe_ito_colors
-    else:
-        color_dict = cris_colors
+    # 18 Base Colors mapping for H Subtypes
+    subtype_base_colors = {
+        'H1': '#1F77B4','H2': '#D62728','H3': '#FF7F0E','H4': '#2CA02C','H5': '#9467BD','H6': '#8C564B', 
+        'H7': '#E377C2','H8': '#7F7F7F','H9': '#BCBD22','H10': '#17BECF','H11': '#393B79','H12': '#637939',
+        'H13': '#8C6D31','H14': '#843C39','H15': '#7B4173','H16': '#5254A3','H17': '#8CA252','H18': '#BD9E39' 
+    }
+
+    # Generate a randomized monochromatic palette
+    def generate_shades(base_hex, n):
+        if n <= 0: return []
+        if n == 1: return [base_hex]
+        
+        clean_hex = str(base_hex).lstrip('#')
+        
+        try:
+            # Convert the hex string into basic Red, Green, and Blue values
+            r, g, b = [int(clean_hex[i:i+2], 16) / 255.0 for i in (0, 2, 4)]
+        except ValueError:
+            return ['#888888'] * n
+            
+        # Extract the Hue (color identity), Lightness, and Saturation (intensity)
+        hue, lightness, saturation = colorsys.rgb_to_hls(r, g, b)
+        
+        # Create an evenly spaced sequence of light to dark values between 0.1 and 0.9
+        step = 0.8 / (n - 1)
+        brightness_levels = [0.1 + (step * i) for i in range(n)]
+        
+        # Shuffle the brightness levels using the base color as a predictable seed
+        random.Random(base_hex).shuffle(brightness_levels)
+        
+        shades = []
+        for new_lightness in brightness_levels:
+            # Rebuild the color using the new lightness, and convert it back to a hex string
+            new_r, new_g, new_b = colorsys.hls_to_rgb(hue, new_lightness, saturation)
+            shades.append(f"#{int(new_r * 255):02x}{int(new_g * 255):02x}{int(new_b * 255):02x}")
+            
+        return shades
+
     # Dataframe preparation
     genotyping_df = pd.read_csv("${genotyping_file}")
     genotyping_df['H_Subtype'] = genotyping_df['Subtype'].astype(str).str.extract(r'(H\\d+)', expand=False)
@@ -115,7 +154,7 @@ process CladeGraphicReport {
         
         fig_evo = make_subplots(rows=total_charts, cols=1, shared_xaxes=True, vertical_spacing=0.08, subplot_titles=subplot_titles_evo)
 
-        def add_stacked_bars(df_subset, group_col, row_num, detail_col=None):
+        def add_stacked_bars(df_subset, group_col, row_num, detail_col=None, palette_type='clade', base_color='#888888'):
             if df_subset.empty:
                 return
                 
@@ -150,7 +189,7 @@ process CladeGraphicReport {
                 if not details:
                     return ""
                 
-                if group_col == 'Final_Label' and (val.endswith("-like") or val == "Others"):
+                if group_col == 'Final_Label' and val.endswith("-like"):
                     return "<br><br><b>Clade Breakdown:</b><br>" + details
                 elif group_col == 'Genotype':
                     return "<br><br><b>Sub-genotypes Breakdown:</b><br>" + details
@@ -159,9 +198,24 @@ process CladeGraphicReport {
             group_counts['Hover_Extra'] = group_counts.apply(make_hover_extra, axis=1)
 
             unique_groups = group_counts[group_col].unique()
+            
+            # Generate the applicable palette once for the traces
+            if palette_type == 'clade':
+                if is_colorblind:
+                    palette = okabe_ito_colors
+                else:
+                    palette = generate_shades(base_color, len(unique_groups))
+            elif palette_type == 'genotype':
+                palette = okabe_ito_colors if is_colorblind else colors.qualitative.Vivid
+
             for idx, g in enumerate(unique_groups):
                 g_df = group_counts[group_counts[group_col] == g]
-                color = color_dict[idx % len(color_dict)]
+                
+                if palette_type == 'h_subtype':
+                    color = okabe_ito_colors[idx % len(okabe_ito_colors)] if is_colorblind else subtype_base_colors.get(str(g), '#888888')
+                else:
+                    color = palette[idx % len(palette)]
+                
                 display_group_col = "Group" if group_col == "Final_Label" else group_col.replace("_", " ")
                 
                 fig_evo.add_trace(
@@ -189,28 +243,18 @@ process CladeGraphicReport {
                 )
             fig_evo.update_yaxes(title_text="Frequency (%)", range=[0, 100], row=row_num, col=1)
 
-        add_stacked_bars(df_all, 'H_Subtype', 1)
+        add_stacked_bars(df_all, 'H_Subtype', 1, palette_type='h_subtype')
 
         current_row = 2
         for h in valid_h_subtypes:
             sub_df = df_all[df_all['H_Subtype'] == h].copy()
-            
-            orig_counts = sub_df.groupby(['Clade', 'Root_Clade']).size().reset_index(name='Count')
-            total_c = len(sub_df)
-            orig_counts['Orig_Pct'] = orig_counts['Count'] / total_c if total_c > 0 else 0
-            root_grouped_evo = orig_counts.groupby('Root_Clade').agg(Root_Count=('Count', 'sum')).reset_index()
-            root_grouped_evo['Root_Pct'] = root_grouped_evo['Root_Count'] / total_c if total_c > 0 else 0
-            
-            sub_df['Final_Label'] = sub_df['Root_Clade'].apply(
-                lambda x: "Others" if x in root_grouped_evo[root_grouped_evo['Root_Pct'] < 0.02]['Root_Clade'].values and x not in ["Unassigned", "No dataset available"] else x
-            )
-            
-            add_stacked_bars(sub_df, 'Final_Label', current_row, detail_col='Clade')
+            sub_df['Final_Label'] = sub_df['Root_Clade']
+            add_stacked_bars(sub_df, 'Final_Label', current_row, detail_col='Clade', palette_type='clade', base_color=subtype_base_colors.get(str(h), '#888888'))
             current_row += 1
 
         if include_genotype_chart:
             sub_df = df_all[(df_all['Clade'] == '2.3.4.4b') & (df_all['Genotype'] != '-')].copy()
-            add_stacked_bars(sub_df, 'Genotype', current_row, detail_col='Sub-genotype')
+            add_stacked_bars(sub_df, 'Genotype', current_row, detail_col='Sub-genotype', palette_type='genotype')
 
         all_time_start = df_all['WEEK'].min() - pd.Timedelta(days=7)
         all_time_end = df_all['WEEK'].max() + pd.Timedelta(days=14)
@@ -223,7 +267,6 @@ process CladeGraphicReport {
             try:
                 y1 = int(season_val.split('-')[0])
                 y2 = int(season_val.split('-')[1])
-                # REMOVED: pd.Timedelta(days=7) padding so it zooms strictly from Week 40 to Week 39
                 s_start = pd.to_datetime(f'{y1}-W40-1', format='%G-W%V-%u')
                 s_end = pd.to_datetime(f'{y2}-W39-7', format='%G-W%V-%u')
                 season_ranges[season_val] = [s_start.strftime('%Y-%m-%d'), s_end.strftime('%Y-%m-%d')]
@@ -243,9 +286,14 @@ process CladeGraphicReport {
             season_args = {f"xaxis{i+1 if i>0 else ''}.range": s_range for i in range(total_charts)}
             dropdown_buttons_evo.append(dict(args=[season_args], label=f"Season {season_val}", method="relayout"))
 
+        if "${params.protocol}" == "AVIAN":
+            center_x = 0.45
+        else:
+            center_x = 0.465
+
         fig_evo.update_layout(
             barmode='stack',
-            title=dict(text="<b>Evolution of Subtypes and Clades</b>", x=0.47, y=0.98, xanchor="center", yanchor="top", font=dict(size=24)),
+            title=dict(text="<b>Evolution of Subtypes and Clades</b>", x=center_x, y=0.98, xanchor="center", yanchor="top", font=dict(size=24)),
             updatemenus=[dict(active=0, buttons=dropdown_buttons_evo, x=0.5, xanchor="center", y=1.07, yanchor="top", direction="down", showactive=True)],
             height=450 * total_charts,
             hovermode="closest",
@@ -289,6 +337,11 @@ process CladeGraphicReport {
             total_h = h_counts['Count'].sum()
             h_counts['Text'] = h_counts['Count'].astype(str) + '/' + str(total_h)
             
+            if is_colorblind:
+                pie_colors = [okabe_ito_colors[i % len(okabe_ito_colors)] for i in range(len(h_counts['Label']))]
+            else:
+                pie_colors = [subtype_base_colors.get(str(lbl), '#888888') for lbl in h_counts['Label']]
+
             fig.add_trace(
                 go.Pie(
                     labels=h_counts['Label'], 
@@ -301,7 +354,7 @@ process CladeGraphicReport {
                     rotation=90, 
                     automargin=True,
                     hole=0.35,
-                    marker=dict(colors=color_dict, line=dict(color='#ffffff', width=2)),
+                    marker=dict(colors=pie_colors, line=dict(color='#ffffff', width=2)),
                     hoverlabel=dict(font_size=14),
                     hovertemplate='<b>H Subtype:</b> %{label}<br><b>Count:</b> %{text}<br><b>Percentage:</b> %{percent}<extra></extra>',
                     visible=is_visible
@@ -341,6 +394,12 @@ process CladeGraphicReport {
             # Calculate the total clades for this specific subtype for the customized text
             final_grouped['Text'] = final_grouped['Final_Count'].astype(str) + '/' + str(total_c)
             
+            if is_colorblind:
+                pie_colors = okabe_ito_colors
+            else:
+                base_c = subtype_base_colors.get(str(h), '#888888')
+                pie_colors = generate_shades(base_c, len(final_grouped['Final_Label']))
+
             fig.add_trace(
                 go.Pie(
                     labels=final_grouped['Final_Label'], 
@@ -353,7 +412,7 @@ process CladeGraphicReport {
                     automargin=True,
                     insidetextorientation='horizontal',
                     hole=0.35,
-                    marker=dict(colors=color_dict, line=dict(color='#ffffff', width=2)),
+                    marker=dict(colors=pie_colors, line=dict(color='#ffffff', width=2)),
                     hoverlabel=dict(font_size=14, align='left'),
                     customdata=final_grouped['Hover_Extra'],
                     hovertemplate='<b>Group:</b> %{label}<br><b>Total Count:</b> %{text}<br><b>Group Percentage:</b> %{percent}%{customdata}<extra></extra>',
@@ -387,6 +446,11 @@ process CladeGraphicReport {
                 )
                 root_grouped['Text'] = root_grouped['Final_Count'].astype(str) + '/' + str(total_g)
 
+                if is_colorblind:
+                    pie_colors = okabe_ito_colors
+                else:
+                    pie_colors = colors.qualitative.Vivid
+
                 fig.add_trace(
                     go.Pie(
                         labels=root_grouped['Genotype'],
@@ -399,7 +463,7 @@ process CladeGraphicReport {
                         automargin=True,
                         insidetextorientation='horizontal',
                         hole=0.35,
-                        marker=dict(colors=color_dict, line=dict(color='#ffffff', width=2)),
+                        marker=dict(colors=pie_colors, line=dict(color='#ffffff', width=2)),
                         hoverlabel=dict(font_size=14, align='left'),
                         customdata=root_grouped['Hover_Extra'],
                         hovertemplate='<b>Genotype:</b> %{label}<br><b>Total Count:</b> %{text}<br><b>Percentage:</b> %{percent}%{customdata}<extra></extra>',
