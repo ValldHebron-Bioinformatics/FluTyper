@@ -47,15 +47,15 @@ process DateGraphicReport {
                 y1 = int(season.split('-')[0])
                 y2 = int(season.split('-')[1])
                 # Start: Year1 Week 40 Monday. End: Year2 Week 39 Sunday
-                s_start = pd.to_datetime(f'{y1}-W40-1', format='%G-W%V-%u') - pd.Timedelta(days=7)
-                s_end = pd.to_datetime(f'{y2}-W39-7', format='%G-W%V-%u') + pd.Timedelta(days=7)
+                s_start = pd.to_datetime(f'{y1}-W40-1', format='%G-W%V-%u')
+                s_end = pd.to_datetime(f'{y2}-W39-7', format='%G-W%V-%u')
                 season_ranges[season] = [s_start.strftime('%Y-%m-%d'), s_end.strftime('%Y-%m-%d')]
             except Exception:
                 # Fallback if season format is unexpected
                 s_data = df_meta[df_meta['Season'] == season]
                 if not s_data.empty:
-                    s_start = s_data['WEEK'].min() - pd.Timedelta(days=7)
-                    s_end = s_data['WEEK'].max() + pd.Timedelta(days=14)
+                    s_start = s_data['WEEK'].min()
+                    s_end = s_data['WEEK'].max()
                     season_ranges[season] = [s_start.strftime('%Y-%m-%d'), s_end.strftime('%Y-%m-%d')]
 
         global_weeks = pd.DataFrame({'WEEK': sorted(df_meta['WEEK'].unique())})
