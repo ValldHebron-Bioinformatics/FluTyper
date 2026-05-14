@@ -153,6 +153,8 @@ process CladeGraphicReport {
             subplot_titles_evo.append("<b>Genotype Evolution (Clade 2.3.4.4b)</b>")
         
         fig_evo = make_subplots(rows=total_charts, cols=1, shared_xaxes=True, vertical_spacing=0.08, subplot_titles=subplot_titles_evo)
+        # Registry to track which subtype/clade/genotype corresponds to which trace for visibility toggling
+        trace_registry = []
 
         def add_stacked_bars(df_subset, group_col, row_num, detail_col=None, palette_type='clade', base_color='#888888'):
             if df_subset.empty:
@@ -241,6 +243,8 @@ process CladeGraphicReport {
                     ), 
                     row=row_num, col=1
                 )
+                trace_registry.append({'col': group_col, 'val': str(g)})
+
             fig_evo.update_yaxes(title_text="Frequency (%)", range=[0, 100], row=row_num, col=1)
 
         add_stacked_bars(df_all, 'H_Subtype', 1, palette_type='h_subtype')
@@ -280,11 +284,27 @@ process CladeGraphicReport {
         dropdown_buttons_evo = []
         if all_time_range:
             all_time_args = {f"xaxis{i+1 if i>0 else ''}.range": all_time_range for i in range(total_charts)}
-            dropdown_buttons_evo.append(dict(args=[all_time_args], label="All Time", method="relayout"))
+            # For "All Time", we want all traces to be visible regardless of subtype/clade/genotype, so we set all to True
+            all_time_mask = [True] * len(trace_registry)
+            dropdown_buttons_evo.append(dict(args=[{"visible": all_time_mask}, all_time_args], label="All Time", method="update"))
             
         for season_val, s_range in season_ranges.items():
             season_args = {f"xaxis{i+1 if i>0 else ''}.range": s_range for i in range(total_charts)}
-            dropdown_buttons_evo.append(dict(args=[season_args], label=f"Season {season_val}", method="relayout"))
+            # Determine which traces should be visible for this season based on the active subtypes/clades/genotypes in the data for that season
+            s_data = df_all[df_all['Season'] == season_val]
+            active_groups = {
+                'H_Subtype': set(s_data['H_Subtype'].dropna().astype(str).unique()),
+                'Final_Label': set(s_data['Root_Clade'].dropna().astype(str).unique()) if 'Root_Clade' in s_data.columns else set(),
+                'Genotype': set(s_data['Genotype'].dropna().astype(str).unique()) if 'Genotype' in s_data.columns else set()
+            }
+            
+            # Build a True/False mask for every drawn trace by checking if its specific value exists in our active labels
+            season_visibility_mask = [
+                (trace['col'] in active_groups and trace['val'] in active_groups[trace['col']])
+                for trace in trace_registry
+            ]
+            
+            dropdown_buttons_evo.append(dict(args=[{"visible": season_visibility_mask}, season_args], label=f"Season {season_val}", method="update"))
 
         if "${params.protocol}" == "AVIAN":
             center_x = 0.45
