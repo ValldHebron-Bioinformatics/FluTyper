@@ -34,7 +34,7 @@ process SubtypeDetection {
     if [[ "\$h_tag" =~ ^(H5|H7)\$ ]]; then
         pathotype=\$(grep '^0\t' min.tsv | cut -f3 | grep -oE "HPAI|LPAI" | head -n 1 || true)
     else
-        pathotype="LPAI"
+        pathotype=""
     fi
 
     if [[ -n "\$h_tag" && -n "\$n_tag" ]]; then subtype="\$h_tag\$n_tag"

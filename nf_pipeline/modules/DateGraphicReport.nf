@@ -19,6 +19,7 @@ process DateGraphicReport {
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
     import os
+    import re
 
     def generate_plots(mut_file, meta_file):
         df_mut = pd.read_excel(mut_file, na_filter=False)
@@ -30,7 +31,7 @@ process DateGraphicReport {
         # Calculate Seasons
         iso_cal = df_meta['DATE'].dt.isocalendar()
         s_year = iso_cal.year.where(iso_cal.week >= 40, iso_cal.year - 1)
-        df_meta['Season'] = s_year.astype(str).str[-2:] + "-" + (s_year + 1).astype(str).str[-2:]
+        df_meta['Season'] = s_year.astype(str) + "-" + (s_year + 1).astype(str)
         df_meta['Season'] = df_meta['Season'].fillna("Unknown Season")
 
         # Determine global x-axis range
@@ -44,18 +45,18 @@ process DateGraphicReport {
             if season == "Unknown Season":
                 continue
             try:
-                y1 = int(season.split('-')[0]) + 2000
-                y2 = int(season.split('-')[1]) + 2000
+                y1 = int(season.split('-')[0])
+                y2 = int(season.split('-')[1])
                 # Start: Year1 Week 40 Monday. End: Year2 Week 39 Sunday
-                s_start = pd.to_datetime(f'{y1}-W40-1', format='%G-W%V-%u') - pd.Timedelta(days=7)
-                s_end = pd.to_datetime(f'{y2}-W39-7', format='%G-W%V-%u') + pd.Timedelta(days=7)
+                s_start = pd.to_datetime(f'{y1}-W40-1', format='%G-W%V-%u')
+                s_end = pd.to_datetime(f'{y2}-W39-7', format='%G-W%V-%u')
                 season_ranges[season] = [s_start.strftime('%Y-%m-%d'), s_end.strftime('%Y-%m-%d')]
             except Exception:
                 # Fallback if season format is unexpected
                 s_data = df_meta[df_meta['Season'] == season]
                 if not s_data.empty:
-                    s_start = s_data['WEEK'].min() - pd.Timedelta(days=7)
-                    s_end = s_data['WEEK'].max() + pd.Timedelta(days=14)
+                    s_start = s_data['WEEK'].min()
+                    s_end = s_data['WEEK'].max()
                     season_ranges[season] = [s_start.strftime('%Y-%m-%d'), s_end.strftime('%Y-%m-%d')]
 
         global_weeks = pd.DataFrame({'WEEK': sorted(df_meta['WEEK'].unique())})
@@ -169,7 +170,13 @@ process DateGraphicReport {
                         ), row=2, col=1, secondary_y=True
                     )
 
-                    unique_mutations = plot_df['AA_MUTATION'].unique()
+                    # Function to extract the number from the mutation string for sorting
+                    def extract_mutation_number(mut_string):
+                        match = re.search(r'\\d+', str(mut_string))
+                        return int(match.group()) if match else float('inf')
+                    
+                    # Sort unique mutations numerically based on the extracted number
+                    unique_mutations = sorted(plot_df['AA_MUTATION'].unique(), key=extract_mutation_number)
                     
                     for idx, mut in enumerate(unique_mutations):
                         mut_df = plot_df[plot_df['AA_MUTATION'] == mut]

@@ -62,7 +62,7 @@ for aligned_prot in "${prot_files}".split():
     # Force UPPERCASE to prevent case-mismatch bugs between FASTA translation and CSV markers
     ref_seq, query_seq = str(records[0].seq).upper(), str(records[1].seq).upper()
     ref_tag = str(records[0].description).split('_')[0]
-    subtype_val = "${h_tag}${n_tag}(${pathotype})" if "${pathotype}" else "${h_tag}${n_tag}"
+    subtype_val = "${h_tag}${n_tag}(${pathotype})" if "${pathotype}" != "" else "${h_tag}${n_tag}"
 
     pos_to_base = {}
     if "${params.protocol}" == "AVIAN":

@@ -19,6 +19,7 @@ include { MutationsGraphicReport    } from './modules/MutationsGraphicReport'
 include { IndividualGraphicReport   } from './modules/IndividualGraphicReport'
 include { InteractiveMutationsTable } from './modules/InteractiveMutationsTable'
 include { DateGraphicReport         } from './modules/DateGraphicReport'
+include { MergeHistoricalData       } from './modules/MergeHistoricalData'
 
 workflow {
     main:
@@ -68,6 +69,7 @@ workflow {
     ch_mutations_graphic_report = channel.empty()
     ch_interactive_mutations_table = channel.empty()
     ch_individual_graphic_report = channel.empty()
+    ch_clade_evolution_report = channel.empty()
     date_report_ch = channel.empty()
   
     // GENOTYPING ANALYSIS (NEXTCLADE)
@@ -112,17 +114,12 @@ workflow {
             keepHeader: true,
         )
 
-    // Convert the parameter to a file object, or pass an empty collection if missing
-    def clade_metadata = params.metadata ? file(params.metadata, checkIfExists: true) : []
-    CladeGraphicReport(GenotypingFinal_ch, clade_metadata)
-
     // MARKERS PREPARATION
     if (params.protocol == "AVIAN") {
         FluMutDB(SubtypeMerged_ch)
         ch_database = FluMutDB.out
         MarkersFiles(FluMutDB.out) 
     } else {
-        // Pels humans, el directori base ha d'existir prèviament o s'ha de proporcionar.
         def humanMarkersDir = file("${projectDir}/../protocols/HUMAN/v1/markers")
         MarkersFiles(humanMarkersDir)
     }
@@ -151,7 +148,6 @@ workflow {
             tuple(sample_id, prot_files, h_tag, n_tag, pathotype)
         }
         
-    // L'arxiu dels marcadors extret prèviament es passa de forma implícita o a la tasca
     MutationsFinder(Mutations_ch)
     ch_mut = MutationsFinder.out.results.map { _id, mut_files, combined_csv -> [mut_files, combined_csv] }.flatten()
     
@@ -160,25 +156,50 @@ workflow {
         .collect()
         
     MutationsCompiler(MutationsCompiler_ch)
+    ch_raw_mutations = MutationsCompiler.out.results
     ch_mutations_report = MutationsCompiler.out.results
 
-    MutationsGraphicReport(MutationsCompiler.out.results.map { full, _filtered -> full })
+    // --- APPEND LOGIC INTERCEPTION ---
+    def meta_str = params.metadata ? file(params.metadata).toAbsolutePath().toString() : ""
+
+    if (params.get('append')) {
+        append_dir_ch = file(params.append, checkIfExists: true)
+        
+        MergeHistoricalData(SubtypeMerged_ch, GenotypingFinal_ch, ch_raw_mutations, meta_str, append_dir_ch)
+        
+        final_subtypes_ch   = MergeHistoricalData.out.subtypes
+        final_genotyping_ch = MergeHistoricalData.out.genotyping
+        final_mutations_ch  = MergeHistoricalData.out.mutations
+        final_metadata_ch   = MergeHistoricalData.out.metadata
+    } else {
+        final_subtypes_ch   = SubtypeMerged_ch
+        final_genotyping_ch = GenotypingFinal_ch
+        final_mutations_ch  = ch_raw_mutations
+        final_metadata_ch   = params.metadata ? channel.fromPath(params.metadata, checkIfExists: true) : channel.of([])
+    }
+
+    // --- AGGREGATED GRAPHIC REPORTS (Using Merged Data) ---
+    CladeGraphicReport(final_genotyping_ch, final_metadata_ch)
+    ch_clade_evolution_report = CladeGraphicReport.out.evolution_report
+
+    MutationsGraphicReport(final_mutations_ch)
     ch_mutations_graphic_report = MutationsGraphicReport.out.report
     
-    InteractiveMutationsTable(MutationsCompiler.out.results.map { full, _filtered -> full })
+    InteractiveMutationsTable(final_mutations_ch)
     ch_interactive_mutations_table = InteractiveMutationsTable.out.table
     
+    if (params.metadata || params.get('append')) {
+        DateGraphicReport(final_mutations_ch, final_metadata_ch)
+        date_report_ch = DateGraphicReport.out.metadata
+    } else {
+        date_report_ch = channel.empty()
+    }
+
     // CONDITIONALLY RUN INDIVIDUAL GRAPHIC REPORTS
     if (params.get('IndividualReports', false).toString().toLowerCase() == 'true') {
         IndividualMutations_Ch = MutationsFinder.out.results.map { sample_id, _mut_files, combined_csv -> tuple(sample_id, combined_csv) }
         IndividualGraphicReport(IndividualMutations_Ch)
         ch_individual_graphic_report = IndividualGraphicReport.out.report
-    }
-    
-    if (params.metadata) {
-        Metadata_ch = channel.fromPath(params.metadata, checkIfExists: true)
-        DateGraphicReport(MutationsCompiler.out.results.map { full, _filtered -> full }, Metadata_ch)
-        date_report_ch = DateGraphicReport.out.metadata
     }
 
     // ERROR HANDLING & COMPILATION
@@ -211,20 +232,22 @@ workflow {
     // PUBLISH DECLARATIONS
     publish:
     folder = OrganizeBySample.out.results.map { _id, path -> path }
-    subtype = SubtypeMerged_ch
+    subtype = final_subtypes_ch
     datasets = GetDatasets.out
     database = ch_database
     markerfiles = ch_markerfiles
-    results = GenotypingFinal_ch
+    results = final_genotyping_ch
     CDS = ch_cds
     prot = ch_prot
     graphic_report = CladeGraphicReport.out.report
+    clade_evolution_report = ch_clade_evolution_report
     mutations_graphic_report = ch_mutations_graphic_report
     individual_graphic_report = ch_individual_graphic_report
     interactive_mutations_table = ch_interactive_mutations_table
     date_report = date_report_ch
     mut = ch_mut
-    mutations_report = ch_mutations_report
+    mutations_report = final_mutations_ch
+    merged_metadata = final_metadata_ch
     errors = CompileErrors.out.map { _id, log -> log }
     errors_merged = ErrorsMerged_ch
 }
@@ -266,11 +289,19 @@ output {
         path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
+    merged_metadata {
+        path { "${projectDir}/../${params.outDir}" }
+        mode "copy"
+    }
     mut {
         path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
     graphic_report {
+        path { "${projectDir}/../${params.outDir}/graphic_reports" }
+        mode "copy"
+    }
+    clade_evolution_report {
         path { "${projectDir}/../${params.outDir}/graphic_reports" }
         mode "copy"
     }

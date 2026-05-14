@@ -6,7 +6,7 @@ nextflow_process {
     script "nf_pipeline/modules/MutationsCompiler.nf"
     process "MutationsCompiler"
 
-    test("Should successfully compile multiple mutation CSVs into Excel reports") {
+    test("Should successfully compile multiple mutation CSVs into a single Excel report") {
 
         when {
             process {
@@ -20,11 +20,9 @@ nextflow_process {
             assert process.success
             assert process.out.results.size() > 0 : "Process results channel is empty!"
             
-            def finalReport = path(process.out.results.get(0)[0])
-            def filteredReport = path(process.out.results.get(0)[1])
+            def finalReport = path(process.out.results.get(0))
             
             assert finalReport.exists() : "final_mutations_report.xlsx was not generated"
-            assert filteredReport.exists() : "filtered_mutations.xlsx was not generated"
             
             // Define a helper to check binary files for specific text strings
         def fileContains = { reportPath, text ->
@@ -33,15 +31,12 @@ nextflow_process {
             return cmd.execute().text.contains(text)
 }
 
-        // Assert that specific mutation effects from your list are present in the final report
-
-            assert fileContains(finalReport, "Decreased virus binding to") : "Missing duck virulence marker in final report"
-            assert fileContains(finalReport, "Decreased HA stability") : "Missing mouse virulence marker in final report"
-            assert fileContains(finalReport, "Guo H. et al., 2017") : "Missing reference citation in final report"
-
-            // Perform the same check for the relevant mutations subset
-            assert fileContains(filteredReport, "Enhanced antiviral response in mice") : "Missing mouse antiviral marker in filtered report"
-            assert fileContains(filteredReport, "Fan S. et al., 2009") : "Missing reference citation in filtered report"
+        // Assert that specific mutation effects from the dataset are present in the final master report
+            assert fileContains(finalReport, "Decreased virus binding to") : "Missing duck virulence marker in report"
+            assert fileContains(finalReport, "Decreased HA stability") : "Missing mouse virulence marker in report"
+            assert fileContains(finalReport, "Guo H. et al., 2017") : "Missing reference citation in report"
+            assert fileContains(finalReport, "Enhanced antiviral response in mice") : "Missing mouse antiviral marker in report"
+            assert fileContains(finalReport, "Fan S. et al., 2009") : "Missing reference citation in report"
 
             assert finalReport.size() > 1000 : "The final report seems too small to contain data"
         }
