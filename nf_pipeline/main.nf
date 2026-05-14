@@ -20,6 +20,23 @@ include { IndividualGraphicReport   } from './modules/IndividualGraphicReport'
 include { InteractiveMutationsTable } from './modules/InteractiveMutationsTable'
 include { DateGraphicReport         } from './modules/DateGraphicReport'
 include { MergeHistoricalData       } from './modules/MergeHistoricalData'
+include { GeographicReport          } from './modules/GeographicReport'
+
+// Comprovació invisible per decidir si generem el mapa
+def check_location_column(metadata_path) {
+    if (!metadata_path) return false
+    def f = file(metadata_path)
+    if (!f.exists()) return false
+    
+    def has_loc = false
+    f.withReader { reader ->
+        def header = reader.readLine()
+        if (header && header.toUpperCase().contains("LOCATION")) {
+            has_loc = true
+        }
+    }
+    return has_loc
+}
 
 workflow {
     main:
@@ -71,6 +88,7 @@ workflow {
     ch_individual_graphic_report = channel.empty()
     ch_clade_evolution_report = channel.empty()
     date_report_ch = channel.empty()
+    ch_geo_report = channel.empty()
   
     // GENOTYPING ANALYSIS (NEXTCLADE)
     GenotypingInfo_ch = SubtypeDetection.out.results
@@ -178,7 +196,7 @@ workflow {
         final_metadata_ch   = params.metadata ? channel.fromPath(params.metadata, checkIfExists: true) : channel.of([])
     }
 
-    // --- AGGREGATED GRAPHIC REPORTS (Using Merged Data) ---
+    // AGGREGATED GRAPHIC REPORTS (Using Merged Data)
     CladeGraphicReport(final_genotyping_ch, final_metadata_ch)
     ch_clade_evolution_report = CladeGraphicReport.out.evolution_report
 
@@ -193,6 +211,13 @@ workflow {
         date_report_ch = DateGraphicReport.out.metadata
     } else {
         date_report_ch = channel.empty()
+    }
+
+    // Avaluació i crida de l'informe geogràfic
+    def run_geographic_report = check_location_column(params.metadata)
+    if (run_geographic_report && params.coordinates) {
+        GeographicReport(final_genotyping_ch, final_metadata_ch, file(params.coordinates, checkIfExists: true))
+        ch_geo_report = GeographicReport.out.geo_report
     }
 
     // CONDITIONALLY RUN INDIVIDUAL GRAPHIC REPORTS
@@ -245,6 +270,7 @@ workflow {
     individual_graphic_report = ch_individual_graphic_report
     interactive_mutations_table = ch_interactive_mutations_table
     date_report = date_report_ch
+    geo_report = ch_geo_report
     mut = ch_mut
     mutations_report = final_mutations_ch
     merged_metadata = final_metadata_ch
@@ -318,6 +344,10 @@ output {
         mode "copy"
     }
     date_report {
+        path { "${projectDir}/../${params.outDir}/graphic_reports" }
+        mode "copy"
+    }
+    geo_report {
         path { "${projectDir}/../${params.outDir}/graphic_reports" }
         mode "copy"
     }
