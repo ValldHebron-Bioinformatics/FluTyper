@@ -156,7 +156,7 @@ workflow {
         .collect()
         
     MutationsCompiler(MutationsCompiler_ch)
-    ch_raw_mutations = MutationsCompiler.out.results.map { full, _filtered -> full }
+    ch_raw_mutations = MutationsCompiler.out.results
     ch_mutations_report = MutationsCompiler.out.results
 
     // --- APPEND LOGIC INTERCEPTION ---

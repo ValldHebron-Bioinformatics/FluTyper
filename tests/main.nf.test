@@ -132,9 +132,6 @@ nextflow_pipeline {
             // Verify Excel reports are created (without checking internal content)
             def finalReport = outputDir.resolve("final_mutations_report.xlsx")
             assert finalReport.exists() : "final_mutations_report.xlsx was not published"
-            
-            def relevantReport = outputDir.resolve("filtered_mutations.xlsx")
-            assert relevantReport.exists() : "filtered_mutations.xlsx was not published"
 
             // Verify graphical HTML reports are published
             def cladeGraphicReport = outputDir.resolve("graphic_reports/CladeGraphicReport.html")
