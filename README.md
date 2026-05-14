@@ -89,7 +89,7 @@ Sample_01,YYYY-MM-DD
 ## 🔬 Advanced Configuration & Behaviors
 
 ### Threshold Parameter Behavior
-The threshold parameter establishes a baseline frequency cutoff that impacts both data export and visualization. During the generation of the `filtered_mutations.xlsx` file, mutations are retained only if they are identified as markers or if their frequency exceeds this specified cutoff. The frequency denominator used for this calculation is the number of samples containing that specific protein, rather than the total number of samples in the entire run. Additionally, this threshold value initializes the slider in the `MutationsReport.html` interactive plot, allowing users to dynamically adjust the view without needing to re-execute the pipeline. 
+The threshold parameter establishes a baseline frequency cutoff that impacts data visualization. This threshold value initializes the slider in the `MutationsReport.html` interactive plot, allowing users to dynamically adjust the view without needing to re-execute the pipeline. The frequency denominator used for this calculation is the number of samples containing that specific protein, rather than the total number of samples in the entire run.
 
 ### HUMAN Protocol Notes
 The HUMAN protocol utilizes dedicated resources located under `protocols/HUMAN/v1` and introduces marker annotations specifically tailored to human seasonal influenza. It supports genotyping for `H1` (using Nextclade dataset `flu_h1n1pdm_ha`) and `H3` (using Nextclade dataset `flu_h3n2_ha`). Marker files are read directly from the protocol's marker directory rather than querying FluMutDB. When metadata is provided, the human protocol fully supports generating time-evolution frequency reports.
@@ -123,7 +123,7 @@ MARKER_ID,POSITION,AA,PROTEIN,EFFECT,FOUND_IN,REFERENCE
 | **6** | **GetCDS** | Maps and extracts the coding sequences (CDS) using the reference alignments. |
 | **7** | **TranslateToProtein** | Translates the aligned CDS nucleotides into amino acid sequences. |
 | **8** | **MutationsFinder** | Compares samples to references, annotates mutations, and flags known marker hits. |
-| **9** | **MutationsCompiler** | Compiles all mutation data into a comprehensive Excel report and a filtered summary. |
+| **9** | **MutationsCompiler** | Compiles all mutation data into a comprehensive Excel report. |
 | **10** | **CompileErrors** | Aggregates and formats all operational error logs into a final text report. |
 | **11-15** | **Graphic Reports** | Generates interactive HTML dashboards for clades, overall mutations, markers, and timelines. |
 
@@ -149,7 +149,6 @@ Mutation markers are matched using unified reference numbering based on H5 for H
 | :--- | :--- |
 | `final_genotyping_results.csv` | Summary of subtype inference, clade assignments and genotyping for clade 2.3.4.4b.
 | `final_mutations_report.xlsx` | Exhaustive record of all detected mutations, organized by protein sheets. |
-| `filtered_mutations.xlsx` | Filtered report retaining only flagged markers and highly prevalent mutations. |
 | `pipeline_errors.log` | Aggregated error and warning log detailing any operational issues during the run. |
 | `samples/<sample_id>/` | Individual directories containing intermediate sequences, alignments, and specific data. |
 
@@ -158,7 +157,7 @@ Mutation markers are matched using unified reference numbering based on H5 for H
 | :--- | :--- |
 | `graphic_reports/CladeGraphicReport.html` | Interactive visualization of subtype and clade distributions. |
 | `graphic_reports/MutationsReport.html` | Aggregate per-protein mutation frequencies with dynamic threshold controls. |
-| `graphic_reports/MutationsTable.html` | Interactive, filterable table detailing marker effects, subtypes, and references. |
+| `graphic_reports/MutationsTable.html` | Interactive table detailing marker effects, subtypes, and references. |
 | `graphic_reports/FrequencyEvolution/**/*.html` | Time-series plots showing marker frequency over time (requires metadata). |
 | `samples/<id>/<id>_MutationsReport.html` | Per-sample mutation barcode plots for rapid visual inspection. |
 
