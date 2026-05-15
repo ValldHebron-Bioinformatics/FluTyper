@@ -14,22 +14,18 @@ process GeographicReport {
     def meta_str = metadata_file ? metadata_file.toString() : ""
     """
     #!/usr/bin/env python3
-    import os
-    import re
     import pandas as pd
-    import plotly.graph_objects as go
-    from plotly.subplots import make_subplots
-    from plotly import colors as plotly_colors
+    import folium
+    import json
+    import unicodedata
+    import re
     import colorsys
     import random
-    import unicodedata
+    from plotly.colors import qualitative
 
-    # 1. HELPERS DE COLORS I NORMALITZACIÓ EXTREMA
-    is_colorblind = "${params.colorblind}".lower() == "true"
-    okabe_ito_colors = ['#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7', '#999999', '#000000']
-    
+    # Color palette for subtypes
     subtype_base_colors = {
-        'H1': '#1F77B4','H2': '#D62728','H3': '#FF7F0E','H4': '#2CA02C','H5': '#9467BD','H6': '#8C564B', 
+        'H1': '#1F77B4', 'H1N1': '#1F77B4','H2': '#D62728','H3': '#FF7F0E', 'H3N2': '#FF7F0E', 'H4': '#2CA02C','H5': '#9467BD','H6': '#8C564B', 
         'H7': '#E377C2','H8': '#7F7F7F','H9': '#BCBD22','H10': '#17BECF','H11': '#393B79','H12': '#637939',
         'H13': '#8C6D31','H14': '#843C39','H15': '#7B4173','H16': '#5254A3','H17': '#8CA252','H18': '#BD9E39' 
     }
@@ -37,186 +33,261 @@ process GeographicReport {
     def generate_shades(base_hex, n):
         if n <= 0: return []
         if n == 1: return [base_hex]
+        
         clean_hex = str(base_hex).lstrip('#')
+        
         try:
+            # Convert the hex string into basic Red, Green, and Blue values
             r, g, b = [int(clean_hex[i:i+2], 16) / 255.0 for i in (0, 2, 4)]
-        except: return ['#888888'] * n
-        h, l, s = colorsys.rgb_to_hls(r, g, b)
-        levels = [0.1 + (0.8 / (n - 1) * i) for i in range(n)] if n > 1 else [0.5]
-        random.Random(base_hex).shuffle(levels)
-        return [f"#{int(colorsys.hls_to_rgb(h, lev, s)[0]*255):02x}{int(colorsys.hls_to_rgb(h, lev, s)[1]*255):02x}{int(colorsys.hls_to_rgb(h, lev, s)[2]*255):02x}" for lev in levels]
+        except ValueError:
+            return ['#888888'] * n
+            
+        # Extract the Hue (color identity), Lightness, and Saturation (intensity)
+        hue, lightness, saturation = colorsys.rgb_to_hls(r, g, b)
+        
+        # Create an evenly spaced sequence of light to dark values between 0.1 and 0.9
+        step = 0.8 / (n - 1)
+        brightness_levels = [0.1 + (step * i) for i in range(n)]
+        
+        # Shuffle the brightness levels using the base color as a predictable seed
+        random.Random(base_hex).shuffle(brightness_levels)
+        
+        shades = []
+        for new_lightness in brightness_levels:
+            # Rebuild the color using the new lightness, and convert it back to a hex string
+            new_r, new_g, new_b = colorsys.hls_to_rgb(hue, new_lightness, saturation)
+            shades.append(f"#{int(new_r * 255):02x}{int(new_g * 255):02x}{int(new_b * 255):02x}")
+            
+        return shades
 
     def normalize_str(s):
         if pd.isna(s): return ""
         s = str(s).strip().lower()
-        s = re.sub(r'\\s*\\([^)]*\\)', '', s).strip()
-        for art in ["el ", "la ", "els ", "les ", "l'"]:
-            if s.startswith(art): s = s[len(art):]; break
-        s = ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
-        s = s.replace('ch', 'c')
-        return re.sub(r'[^a-z0-9]', '', s)
+        s = ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn') # Delete "accents"
+        s = s.replace("l'", " ").replace("d'", " ") # Handle contractions like "L'Escala" -> "Escala"
+        s = re.sub(r'\\b(?:el|la|els|les)\\b', ' ', s) # Remove common articles
+        s = re.sub(r'[^a-z0-9]', ' ', s) # Replace non-alphanumeric with space
+        return " ".join(s.split()) # Normalize whitespace
 
-    # 2. PROCESSAMENT DE DADES
-    df_geno = pd.read_csv("${genotyping_file}")
-    df_meta = pd.read_csv("${meta_str}", skipinitialspace=True)
-    df_loc = pd.read_csv("${coordinates_file}", sep="\\\\t")
-    
-    df_meta.columns = [str(c).strip().upper() for c in df_meta.columns]
-    df_geno['H_Subtype'] = df_geno['Subtype'].astype(str).str.extract(r'(H[0-9]+)', expand=False).fillna('Unknown')
-    
-    for col in ['Clade', 'Genotype']:
-        df_geno[col] = df_geno[col].fillna("Unassigned").astype(str).str.strip()
-
-    if "${params.protocol}".upper() == "HUMAN":
-        all_clades = df_geno['Clade'].dropna().unique()
-        def get_root(c):
-            if pd.isna(c) or c in ["Unassigned", "No dataset available", "-"]: return "Unassigned"
-            parts = str(c).split('.')
-            if len(parts) > 3: return ".".join(parts[:3]) + "-like"
-            elif len(parts) == 3 and any(str(x).startswith(str(c) + ".") for x in all_clades): return str(c) + "-like"
-            return c
-        df_geno['Root_Clade'] = df_geno['Clade'].apply(get_root)
-    else:
-        df_geno['Root_Clade'] = df_geno['Clade'].fillna('Unassigned')
-
-    df_merged = pd.merge(df_geno, df_meta, left_on='SampleID', right_on='ID')
-    df_merged['Norm_Loc'] = df_merged['LOCATION'].apply(normalize_str)
+    # Data preprocessing
+    df_loc = pd.read_csv("${coordinates_file}", sep="\\t")
     df_loc['Norm_Pob'] = df_loc['Población'].apply(normalize_str)
-    
-    df = pd.merge(df_merged, df_loc, left_on='Norm_Loc', right_on='Norm_Pob', how='left')
-    df['Provincia'] = df['Provincia'].fillna('Sense dades')
-    df['Latitud'] = df['Latitud'].fillna(41.8204)
-    df['Longitud'] = df['Longitud'].fillna(1.5412)
 
+    # Create a mapping from normalized town names to provinces, sorted by length to prioritize longer matches
+    town_to_prov_raw = df_loc.set_index('Norm_Pob')['Provincia'].to_dict()
+    town_to_prov = {k: town_to_prov_raw[k] for k in sorted(town_to_prov_raw.keys(), key=len, reverse=True) if k}
+
+    # Get coordinates of provincial capitals for marker placement
+    capitals = df_loc[df_loc['Población'] == df_loc['Provincia']]
+    coord_dict = capitals.set_index('Provincia')[['Latitud', 'Longitud']].to_dict('index')
+
+    df_geno = pd.read_csv("${genotyping_file}")
+    df_meta = pd.read_csv("${meta_str}", skipinitialspace=True) if "${meta_str}" else pd.DataFrame()
+
+    if not df_meta.empty:
+        df_meta.columns = [str(c).strip().upper() for c in df_meta.columns]
+        if 'LOCATION' in df_meta.columns:
+            def extract_group(loc):
+                if pd.isna(loc): return 'Sense dades'
+                norm_spaced = f" {normalize_str(loc)} "
+                # If location contains a province name, assign to that province group
+                if ' barcelona ' in norm_spaced: return 'Barcelona'
+                if ' girona ' in norm_spaced or ' gerona ' in norm_spaced: return 'Girona'
+                if ' tarragona ' in norm_spaced: return 'Tarragona'
+                if ' lleida ' in norm_spaced or ' lerida ' in norm_spaced: return 'Lleida'
+
+                # If location contains a town name, assign to the corresponding province group
+                for town_norm, prov in town_to_prov.items():
+                    if f" {town_norm} " in norm_spaced: 
+                        return prov
+
+                return 'Sense dades'
+
+            df_meta['PROV_GROUP'] = df_meta['LOCATION'].apply(extract_group)
+
+
+    # Normalize missing values and ensure string type for key columns
+    for col in ['Clade', 'Genotype', 'Sub-genotype']:
+        df_geno[col] = df_geno[col].fillna("Unassigned").astype(str).str.strip() if col in df_geno.columns else "Unassigned"
+
+    # Logic to extract H subtype and define clade grouping based on protocol
+    if "${params.protocol}".upper() == "HUMAN":
+        df_geno['H_Subtype'] = df_geno['Subtype'].astype(str).str.extract(r'(H[0-9]+N[0-9]+)', expand=False).fillna('Unknown')
+        
+        # Filtre estricte: Si no és H1N1 o H3N2, ho marquem com a error/desconegut
+        df_geno.loc[~df_geno['H_Subtype'].isin(['H1N1', 'H3N2']), 'H_Subtype'] = 'Unknown'
+        
+        df_geno['Root_Clade'] = df_geno['Clade'].apply(lambda c: ".".join(c.split('.')[:3]) + "-like" if c.count('.') > 2 else c)
+    else:
+        df_geno['H_Subtype'] = df_geno['Subtype'].astype(str).str.extract(r'(H[0-9]+)', expand=False).fillna('Unknown')
+        df_geno['Root_Clade'] = df_geno['Clade']
+
+    df = pd.merge(df_geno, df_meta, left_on='SampleID', right_on='ID') if not df_meta.empty else df_geno.copy()
+    df['Provincia'] = df['PROV_GROUP'] if 'PROV_GROUP' in df.columns else 'Sense dades'
+
+    # Define Season based on DATE column if it exists, otherwise assign "All Time"
     if 'DATE' in df.columns:
         df['DATE'] = pd.to_datetime(df['DATE'], errors='coerce')
         iso = df['DATE'].dt.isocalendar()
-        s_year = iso.year.where(iso.week >= 40, iso.year - 1)
-        df['Season'] = s_year.astype(str) + "-" + (s_year + 1).astype(str)
+        s_year = iso.year.where(iso.week >= 40, iso.year - 1) # Assign season based on ISO week (season starts in week 40)
+        df['Season'] = s_year.astype(str) + "-" + (s_year + 1).astype(str) # Season format "2020-2021"
     else:
         df['Season'] = "All Time"
-
+    
     seasons = ["All Time"] + sorted([s for s in df['Season'].unique() if pd.notna(s) and s != "Unknown Season"])
-
-    valid_views = [{'label': 'Subtipus (H)', 'id': 'subtypes', 'col': 'H_Subtype', 'filter': None}]
+    
+    # Define valid views based on available data and protocol
+    base_label = 'Subtype' if "${params.protocol}".upper() == "HUMAN" else 'Subtype (H)'
+    valid_views = [{'label': base_label, 'id': 'subtypes', 'col': 'H_Subtype', 'filter': None}]
+    
+    # Add clade views for each H subtype
     for h in sorted([h for h in df['H_Subtype'].unique() if h != 'Unknown']):
         if not all(c == "-" for c in df[df['H_Subtype'] == h]['Clade'].unique()):
             valid_views.append({'label': f'Clades ({h})', 'id': f'clades_{h}', 'col': 'Root_Clade', 'filter': h})
-    
-    if df[(df['Clade'] == '2.3.4.4b') & (df['Genotype'] != '-')].shape[0] > 0:
-        valid_views.append({'label': 'Genotips (2.3.4.4b)', 'id': 'genotypes', 'col': 'Genotype', 'filter': '2.3.4.4b_clade'})
+            
+    # Genotypes view is exclusive to AVIAN protocol
+    if "${params.protocol}".upper() == "AVIAN":
+        if df[(df['Clade'] == '2.3.4.4b') & (df['Genotype'] != '-')].shape[0] > 0:
+            valid_views.append({'label': 'Genotypes (2.3.4.4b)', 'id': 'genotypes', 'col': 'Genotype', 'filter': '2.3.4.4b_clade'})
 
-    # 3. CONSTRUCCIÓ DEL DASHBOARD
-    fig = make_subplots(
-        rows=2, cols=1, specs=[[{"type": "mapbox"}], [{"type": "xy"}]],
-        subplot_titles=("<b>Distribució Geogràfica de Mostres</b>", "<b>Frequència Relativa per Província (%)</b>"),
-        row_heights=[0.6, 0.4], vertical_spacing=0.12
-    )
+    # MAP CREATION
+    m = folium.Map(location=[41.7, 1.8], zoom_start=8, tiles='Cartodb Positron')
+    m.get_root().html.add_child(folium.Element("<h3 align='center' style='font-family: Arial; font-weight: bold; margin-top: 15px; color: #333;'>Influenza Provincial Distribution</h3>"))
 
-    trace_registry = [] 
+    # Registry to keep track of layer names
+    trace_registry = {}
 
     for season in seasons:
         df_season = df if season == "All Time" else df[df['Season'] == season]
-        for v in valid_views:
-            if v['filter'] == '2.3.4.4b_clade':
-                df_v = df_season[df_season['Clade'] == '2.3.4.4b'].copy()
-            elif v['filter']:
-                df_v = df_season[df_season['H_Subtype'] == v['filter']].copy()
-            else:
-                df_v = df_season.copy()
+        
+        for view in valid_views:
+            season_view_id = f"{season}|{view['id']}"
+            fg = folium.FeatureGroup(name=season_view_id, show=False)
             
-            if df_v.empty: continue
-            df_v = df_v[df_v[v['col']] != "-"]
+            # Filter data based on current view
+            df_view = df_season[df_season[view['col']] != "-"].copy()
+            if view['filter'] == '2.3.4.4b_clade':
+                df_view = df_view[df_view['Clade'] == '2.3.4.4b']
+            elif view['filter']:
+                df_view = df_view[df_view['H_Subtype'] == view['filter']]
+                
+            if df_view.empty: continue
 
-            labels = sorted(df_v[v['col']].unique())
+            # Build a global color map for legend consistency
+            valid_labels = sorted([l for l in df_view[view['col']].unique() if l not in ['Unassigned', 'Unknown']])
+            color_map = {'Unassigned': '#999999', 'Unknown': '#999999'}
             
-            # Determinació del nom singular de la vista per al hover
-            view_label_singular = v['label'].split(' ')[0].rstrip('s').replace('Clades', 'Clade').replace('Genotips', 'Genotip').replace('Subtipus', 'Subtipus')
-
-            # Mapatge de colors
-            if v['id'] == 'subtypes':
-                color_map = {l: subtype_base_colors.get(l, '#888888') for l in labels}
-            elif v['id'] == 'genotypes':
-                color_map = {l: plotly_colors.qualitative.Vivid[i % len(plotly_colors.qualitative.Vivid)] for i, l in enumerate(labels)}
-            else:
-                base_c = subtype_base_colors.get(v['filter'], '#888888')
-                shades = generate_shades(base_c, len(labels))
-                color_map = {l: shades[i] for i, l in enumerate(labels)}
-
-            if is_colorblind:
-                color_map = {l: okabe_ito_colors[i % len(okabe_ito_colors)] for i, l in enumerate(labels)}
-
-            # A) Mapa
-            df_map = df_v.groupby(['LOCATION', 'Latitud', 'Longitud', v['col']]).size().reset_index(name='Count')
-            for label in labels:
-                sub = df_map[df_map[v['col']] == label]
-                
-                # Customdata per al mapa: [Població, Casos]
-                cdata_map = sub[['LOCATION', 'Count']].values
-                
-                fig.add_trace(go.Scattermapbox(
-                    lat=sub['Latitud'], lon=sub['Longitud'], mode='markers',
-                    marker=dict(size=sub['Count'] * 6 + 7, color=color_map[label], opacity=0.8),
-                    name=str(label), legendgroup=v['id'], showlegend=True,
-                    customdata=cdata_map,
-                    hovertemplate=(
-                        "<b>Població:</b> %{customdata[0]}<br>" +
-                        "<b>" + view_label_singular + ":</b> " + str(label) + "<br>" +
-                        "<b>Casos:</b> %{customdata[1]}<extra></extra>"
-                    ),
-                    visible=False
-                ), row=1, col=1)
-                trace_registry.append({'season': season, 'view': v['id']})
-
-            # B) Barres apilades al 100%
-            prov_totals = df_v.groupby('Provincia').size()
-            df_bar = df_v.groupby(['Provincia', v['col']]).size().reset_index(name='Count')
-            df_bar['Pct'] = df_bar.apply(lambda r: (r['Count'] / prov_totals[r['Provincia']]) * 100, axis=1)
+            # Pre-generate shades if this is a clade view
+            if view['id'] not in ['genotypes', 'subtypes'] and len(valid_labels) > 0:
+                base_hex = subtype_base_colors.get(view['filter'], '#888888')
+                clade_shades = generate_shades(base_hex, len(valid_labels))
             
-            for label in labels:
-                sub = df_bar[df_bar[v['col']] == label].copy()
-                # Afegim el total de la província per al hover (format x/y)
-                sub['TotalProv'] = sub['Provincia'].map(prov_totals)
+            for i, label in enumerate(valid_labels):
+                if view['id'] == 'genotypes': 
+                    color_map[label] = qualitative.Vivid[i % len(qualitative.Vivid)]
+                elif view['id'] == 'subtypes': 
+                    color_map[label] = subtype_base_colors.get(label, '#888888')
+                else: 
+                    # Apply the true hex shades generated by the function
+                    color_map[label] = clade_shades[i]
+
+            # Generate visual markers per province
+            for prov_name, coords in coord_dict.items():
+                prov_df = df_view[df_view['Provincia'] == prov_name]
+                if prov_df.empty: continue
                 
-                # Customdata per a barres: [Count, TotalProv]
-                cdata_bar = sub[['Count', 'TotalProv']].values
+                counts = prov_df[view['col']].value_counts()
+                total = int(counts.sum())
                 
-                fig.add_trace(go.Bar(
-                    x=sub['Provincia'], y=sub['Pct'], name=str(label),
-                    marker_color=color_map[label], legendgroup=v['id'], showlegend=False,
-                    text=sub['Count'].astype(str), textposition='inside',
-                    customdata=cdata_bar,
-                    hovertemplate=(
-                        "<b>" + view_label_singular + ":</b> " + str(label) + "<br>" +
-                        "<b>Occurrence:</b> %{customdata[0]}/%{customdata[1]} samples (%{y:.1f}%)<extra></extra>"
-                    ),
-                    visible=False
-                ), row=2, col=1)
-                trace_registry.append({'season': season, 'view': v['id']})
+                # Build the pie chart colors and the text that appears when you hover over the marker
+                pie_colors = []
+                hover_details = []
+                current_pct = 0
+                
+                for label, count in counts.items():
+                    pct = (count / total) * 100
+                    color = color_map.get(label, '#999999')
+                    
+                    # Add color slice to the pie chart
+                    pie_colors.append(f"{color} {current_pct:.2f}% {current_pct + pct:.2f}%")
+                    # Base string for the hover box
+                    hover_line = f"<span style='color:{color}'>&#9608;</span> <b>{label}</b>: {int(count)} / {total} ({pct:.1f}%)"
+                    
+                    # Dynamic Breakdown Logic
+                    breakdown = []
+                    
+                    # Check if we are in a clade view and the label ends with '-like'
+                    if view['col'] == 'Root_Clade' and str(label).endswith("-like") and "${params.protocol}".upper() == "HUMAN":
+                        sub_counts = prov_df[prov_df['Root_Clade'] == label]['Clade'].value_counts()
+                        for sub_label, sub_count in sub_counts.items():
+                            if str(sub_label) not in ["Unassigned", "-", "No dataset available", "nan"]:
+                                sub_pct = (sub_count / total) * 100
+                                breakdown.append(f"&nbsp;&nbsp;&nbsp;&nbsp;- <b>{sub_label}:</b> {int(sub_count)} / {total} ({sub_pct:.2f}%)")
+                                
+                    # Check if we are in the genotype view to break down sub-genotypes
+                    elif view['col'] == 'Genotype':
+                        sub_counts = prov_df[prov_df['Genotype'] == label]['Sub-genotype'].value_counts()
+                        for sub_label, sub_count in sub_counts.items():
+                            if str(sub_label) not in ["Unassigned", "-", "None", "", "nan"]:
+                                sub_pct = (sub_count / total) * 100
+                                breakdown.append(f"&nbsp;&nbsp;&nbsp;&nbsp;- <b>{sub_label}:</b> {int(sub_count)} / {total} ({sub_pct:.2f}%)")
+                    
+                    # If we found valid sub-details, append them to the hover line
+                    if breakdown:
+                        hover_line += "<br>" + "<br>".join(breakdown)
+                        
+                    # Add the finished line (and a trailing break) to our hover box list
+                    hover_details.append(hover_line + "<br>")
+                    current_pct += pct
+                
+                icon_size = int(55 + min(45, total * 2.5))
+                
+                # Create a pie chart using CSS conic-gradient for the marker icon
+                pie_html = f'''<div style="width:{icon_size}px; height:{icon_size}px; border-radius:50%; 
+                               background:conic-gradient({", ".join(pie_colors)}); 
+                               border:2px solid white; box-shadow:0 0 5px rgba(0,0,0,0.3);"></div>'''
+                               
+                # The hover
+                hover_box_html = f"<div style='font-family:Arial; min-width:150px;'><b>{prov_name}</b><hr style='margin: 4px 0;'><b>Occurrences:</b> {total}<br><br>{''.join(hover_details)}</div>"                
+                folium.Marker(
+                    location=[float(coords['Latitud']), float(coords['Longitud'])],
+                    icon=folium.DivIcon(html=pie_html, icon_anchor=(icon_size/2, icon_size/2)),
+                    tooltip=folium.Tooltip(hover_box_html)
+                ).add_to(fg)
+            
+            fg.add_to(m)
+            trace_registry[season_view_id] = fg.get_name()
 
-    # 4. MENÚS NATIUS I LAYOUT
-    def get_vis_mask(s, v_id):
-        return [True if (r['season'] == s and r['view'] == v_id) else False for r in trace_registry]
+    # HTML controls for season and view selection
+    season_options = "".join([f'<option value="{season}">{"All Seasons" if season=="All Time" else "Season "+season}</option>' for season in seasons])
+    view_options = "".join([f'<option value="{view["id"]}">{view["label"]}</option>' for view in valid_views])
 
-    initial_vis = get_vis_mask(seasons[0], 'subtypes')
-    for i, vis in enumerate(initial_vis):
-        fig.data[i].visible = vis
-
-    s_btns = [dict(label=s, method="update", args=[{"visible": get_vis_mask(s, 'subtypes')}]) for s in seasons]
-    v_btns = [dict(label=v['label'], method="update", args=[{"visible": get_vis_mask(seasons[0], v['id'])}]) for v in valid_views]
-
-    fig.update_layout(
-        mapbox_style="carto-positron", mapbox=dict(center=dict(lat=41.7, lon=1.8), zoom=6.8),
-        barmode='stack', height=1000,
-        title=dict(text="<b>Monitoratge Geolocalitzat de FluTyper</b>", x=0.5, font=dict(size=22)),
-        updatemenus=[
-            dict(buttons=s_btns, x=0.1, y=1.12, xanchor="left", direction="down"),
-            dict(buttons=v_btns, x=0.9, y=1.12, xanchor="right", direction="down")
-        ],
-        margin=dict(t=150, b=50, l=80, r=80)
-    )
-    fig.update_yaxes(title_text="Freqüència (%)", range=[0, 100], row=2, col=1)
-
-    fig.write_html("GeographicReport.html")
+    control_html = f'''
+    <div style="position:fixed; top:20px; left:60px; z-index:9999; background:white; padding:15px; border-radius:8px; display:flex; gap:20px; box-shadow:0 4px 15px rgba(0,0,0,0.1); font-family:Arial;">
+        <div><label style="font-size:10px; font-weight:bold; color:#666;">SEASON</label><br><select id="seasonSel" style="padding:5px; border-radius:4px;">{season_options}</select></div>
+        <div><label style="font-size:10px; font-weight:bold; color:#666;">VIEW</label><br><select id="viewSel" style="padding:5px; border-radius:4px;">{view_options}</select></div>
+    </div>
+    <script>
+        // Registry of layer names to manage visibility based on user selection
+        const REGISTRY = {json.dumps(trace_registry)};
+        // Function to update map layers based on selected season and view
+        function update() {{
+            const key = document.getElementById('seasonSel').value + "|" + document.getElementById('viewSel').value;
+            for (const k in REGISTRY) {{
+                const layer = window[REGISTRY[k]];
+                if (layer) k === key ? layer.addTo(window.map_instance) : window.map_instance.removeLayer(layer);
+            }}
+        }}
+        // Event listeners for dropdown changes
+        document.getElementById('seasonSel').addEventListener('change', update);
+        document.getElementById('viewSel').addEventListener('change', update);
+        // Initialize map with default selections
+        window.addEventListener('load', () => {{
+            for (let o in window) if (o.startsWith('map_')) {{ window.map_instance = window[o]; update(); break; }}
+        }});
+    </script>
+    '''
+    m.get_root().html.add_child(folium.Element(control_html))
+    m.save("GeographicReport.html")
     """
 }
