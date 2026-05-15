@@ -38,9 +38,17 @@ process SubtypeDetection {
     fi
 
     if [[ -n "\$h_tag" && -n "\$n_tag" ]]; then subtype="\$h_tag\$n_tag"
-    elif [[ -n "\$h_tag" ]]; then subtype="\${h_tag}Nx"; echo "Missing N for ${sample_id}" > SDerrors.log
-    elif [[ -n "\$n_tag" ]]; then subtype="Hx\${n_tag}"; echo "Missing H for ${sample_id}" > SDerrors.log
+    elif [[ -n "\$h_tag" ]]; then subtype="\${h_tag}Nx"; echo "SubtypeDetection: Missing N for ${sample_id}" > SDerrors.log
+    elif [[ -n "\$n_tag" ]]; then subtype="Hx\${n_tag}"; echo "SubtypeDetection: Missing H for ${sample_id}" > SDerrors.log
     else subtype="Incomplete"; fi
+
+    if [[ "${params.protocol.toUpperCase()}" == "HUMAN" ]]; then
+        # Check if subtype matches any of the valid human combinations using regex
+        if [[ ! "\$subtype" =~ ^(H1N1|H3N2|H1Nx|H3Nx|HxN1|HxN2|Incomplete)\$ ]]; then
+            echo "SubtypeDetection: Unrecognized subtype \${subtype} for ${sample_id}. Reclassified as Unknown." >> SDerrors.log
+            subtype="Unknown"
+        fi
+    fi
 
     echo "${sample_id},\${subtype},\${pathotype}" > inferred_subtypes_${sample_id}.csv
     """
