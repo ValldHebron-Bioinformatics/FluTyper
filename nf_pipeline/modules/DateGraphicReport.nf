@@ -92,7 +92,7 @@ process DateGraphicReport {
         if "${params.colorblind}".lower() == "true":
             color_list = ['#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7', '#999999', '#000000']
         else:
-            color_list = ['#F9DC5C', '#CD733D', '#C84630', '#94B0DA', '#676F86', '#3A2D32']
+            color_list = ['#F9DC5C', '#DCF763','#D9D65A', '#CD733D', '#C84630','#A196B0', '#94B0DA', '#676F86', '#3A2D32']
 
         for segment, proteins in prot_dict.items():
             os.makedirs(f"FrequencyEvolution/{segment}", exist_ok=True)
