@@ -19,6 +19,15 @@ process InteractiveMutationsTable {
     input_excel = "${excel_file}"
     protocol_type = "${params.protocol}"
     output_html = "MutationsTable.html"
+    is_colorblind = "${params.colorblind}".lower() == "true"
+
+    # Define color palette for mutation tags
+    if is_colorblind:
+        PALETTE = {'green': '#5DADE2', 'yellow': '#F39C12', 'red': '#ABB2B9'}
+        BORDER = {'green': '#2874A6', 'yellow': '#A04000', 'red': '#566573'}
+    else:
+        PALETTE = {'green': '#d4edda', 'yellow': '#fff3cd', 'red': '#f8d7da'}
+        BORDER = {'green': '#c3e6cb', 'yellow': '#ffeeba', 'red': '#f5c6cb'}  
 
     # Read the Excel file. Keep default empty values to avoid errors with the 'NA' protein
     df = pd.read_excel(input_excel, sheet_name=0, keep_default_na=False)
@@ -167,19 +176,19 @@ process InteractiveMutationsTable {
                 color: #0d47a1;
             }}
             .mutation-tag.green {{
-                background-color: #d4edda;
-                color: #155724;
-                border-color: #c3e6cb;
+                background-color: {PALETTE['green']};
+                color: {'#ffffff' if is_colorblind else '#155724'};
+                border-color: {BORDER['green']};
             }}
             .mutation-tag.yellow {{
-                background-color: #fff3cd;
-                color: #856404;
-                border-color: #ffeeba;
+                background-color: {PALETTE['yellow']};
+                color: {'#ffffff' if is_colorblind else '#856404'};
+                border-color: {BORDER['yellow']};
             }}
             .mutation-tag.red {{
-                background-color: #f8d7da;
-                color: #721c24;
-                border-color: #f5c6cb;
+                background-color: {PALETTE['red']};
+                color: {'#ffffff' if is_colorblind else '#721c24'};
+                border-color: {BORDER['red']};
             }}
             .tooltip {{
                 position: relative;
@@ -279,10 +288,10 @@ process InteractiveMutationsTable {
             <div class="legend-item"><strong>FOUND IN:</strong> In which subtypes those effects were found.</div>
             <div class="legend-item"><strong>REFERENCE:</strong> Articles where those effects are mentioned.</div>
             
-            <div class="legend-title" style="margin-top: 15px;">Mutation Colors (FOUND IN vs Sample Subtype)</div>
-            <div class="legend-item"><span class="mutation-tag green" style="cursor:default; padding: 2px 6px;">Green</span> Full match: Both H and N match (PB2), only H matches (HA1/HA2), or only N matches (NA).</div>
-            <div class="legend-item"><span class="mutation-tag yellow" style="cursor:default; padding: 2px 6px;">Yellow</span> Partial match: Only H or only N matches (applicable to internal proteins like PB2).</div>
-            <div class="legend-item"><span class="mutation-tag red" style="cursor:default; padding: 2px 6px;">Red</span> No match: The mutation was originally found in a completely different subtype.</div>
+            <div class="legend-title" style="margin-top: 15px;">Mutation Match Definitions</div>
+            <div class="legend-item"><span class="mutation-tag green" style="cursor:default; padding: 2px 6px;">Full Match</span> Both H and N match (PB2), only H matches (HA1/HA2), or only N matches (NA).</div>
+            <div class="legend-item"><span class="mutation-tag yellow" style="cursor:default; padding: 2px 6px;">Partial Match</span> Only H or only N matches (applicable to internal proteins like PB2).</div>
+            <div class="legend-item"><span class="mutation-tag red" style="cursor:default; padding: 2px 6px;">No Match</span> The mutation was originally found in a completely different subtype.</div>
         </div>
 
         <script>
