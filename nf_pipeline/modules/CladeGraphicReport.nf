@@ -122,12 +122,33 @@ process CladeGraphicReport {
 
     # Calculate Season based on the merged DATE column
     if 'DATE' in genotyping_df.columns:
+        # Force conversion to datetime to catch any empty strings or garbage as pure nulls
+        genotyping_df['DATE'] = pd.to_datetime(genotyping_df['DATE'], errors='coerce')
+        
         iso_cal = genotyping_df['DATE'].dt.isocalendar()
         s_year = iso_cal.year.where(iso_cal.week >= 40, iso_cal.year - 1)
-        genotyping_df['Season'] = s_year.astype(str) + "-" + (s_year + 1).astype(str)
-        genotyping_df['Season'] = genotyping_df['Season'].fillna("Unknown Season")
+        valid_dates = s_year.notna()
+        
+        if valid_dates.any():
+            # If we have some valid dates, initialize with pd.NA so the missing ones vanish
+            genotyping_df['Season'] = pd.NA
+            genotyping_df.loc[valid_dates, 'Season'] = (
+                s_year[valid_dates].astype(int).astype(str) + "-" + 
+                (s_year[valid_dates].astype(int) + 1).astype(str)
+            )
+        else:
+            # The column exists but absolutely zero valid dates were found
+            genotyping_df['Season'] = "All Time"
     else:
         genotyping_df['Season'] = "All Time"
+
+    # Extract unique seasons, automatically wiping out the pd.NA nulls
+    seasons = sorted(genotyping_df['Season'].dropna().unique())
+    
+    # Ultimate failsafe: if the list is totally empty, default the view to All Time
+    if len(seasons) == 0:
+        genotyping_df['Season'] = "All Time"
+        seasons = ["All Time"]
 
     seasons = sorted(genotyping_df['Season'].dropna().unique())
     unique_h_subtypes = sorted(genotyping_df['H_Subtype'].dropna().unique())
@@ -138,9 +159,45 @@ process CladeGraphicReport {
         clades_for_h = genotyping_df[genotyping_df['H_Subtype'] == h]['Clade'].unique()
         if not (len(clades_for_h) == 1 and clades_for_h[0] == "No dataset available"):
             valid_h_subtypes.append(h)
-            
+    
     # Check if there are any valid Genotypes for clade 2.3.4.4b globally
     include_genotype_chart = genotyping_df[(genotyping_df['Clade'] == '2.3.4.4b') & (genotyping_df['Genotype'] != '-')].shape[0] > 0
+    
+    # Consistent color mapping across all seasons
+    global_color_map = {}
+    
+    # H Subtype colors
+    h_labels = sorted([h for h in genotyping_df['H_Subtype'].dropna().unique() if h != '-'])
+    h_color_map = {}
+    for h in h_labels:
+        h_color_map[h] = okabe_ito_colors[len(h_color_map) % len(okabe_ito_colors)] if is_colorblind else subtype_base_colors.get(str(h), '#888888')
+    global_color_map['h_subtypes'] = h_color_map
+    
+    # Clade colors for each H subtype
+    for h in valid_h_subtypes:
+        base_c = subtype_base_colors.get(str(h), '#888888')
+        h_clades = sorted([c for c in genotyping_df[genotyping_df['H_Subtype'] == h]['Root_Clade'].dropna().unique() if c not in ["Unassigned", "No dataset available", "-"]])
+        
+        if is_colorblind:
+            clade_palette = okabe_ito_colors
+        else:
+            clade_palette = generate_shades(base_c, len(h_clades) + 2)
+        
+        clade_map = {}
+        for idx, clade in enumerate(h_clades):
+            clade_map[clade] = clade_palette[idx % len(clade_palette)]
+        clade_map["Unassigned"] = clade_palette[-2] if len(clade_palette) > 1 else '#888888'
+        clade_map["Others"] = clade_palette[-1]
+        global_color_map[f'clades_{h}'] = clade_map
+    
+    # Genotype colors for 2.3.4.4b
+    if include_genotype_chart:
+        g_labels = sorted([g for g in genotyping_df[genotyping_df['Clade'] == '2.3.4.4b']['Genotype'].dropna().unique() if g not in ["-", "None", "", "nan", "Unassigned"]])
+        genotype_palette = okabe_ito_colors if is_colorblind else colors.qualitative.Vivid
+        genotype_map = {}
+        for idx, genotype in enumerate(g_labels):
+            genotype_map[genotype] = genotype_palette[idx % len(genotype_palette)]
+        global_color_map['genotypes'] = genotype_map
             
     total_charts = 1 + len(valid_h_subtypes) + (1 if include_genotype_chart else 0)
 
@@ -156,7 +213,7 @@ process CladeGraphicReport {
         # Registry to track which subtype/clade/genotype corresponds to which trace for visibility toggling
         trace_registry = []
 
-        def add_stacked_bars(df_subset, group_col, row_num, detail_col=None, palette_type='clade', base_color='#888888'):
+        def add_stacked_bars(df_subset, group_col, row_num, detail_col=None, palette_type='clade', base_color='#888888', color_key=''):
             if df_subset.empty:
                 return
                 
@@ -201,22 +258,21 @@ process CladeGraphicReport {
 
             unique_groups = group_counts[group_col].unique()
             
-            # Generate the applicable palette once for the traces
-            if palette_type == 'clade':
-                if is_colorblind:
-                    palette = okabe_ito_colors
-                else:
-                    palette = generate_shades(base_color, len(unique_groups))
-            elif palette_type == 'genotype':
-                palette = okabe_ito_colors if is_colorblind else colors.qualitative.Vivid
+            # Get color mapping from global_color_map
+            if color_key:
+                color_map = global_color_map.get(color_key, {})
+            else:
+                color_map = {}
 
             for idx, g in enumerate(unique_groups):
                 g_df = group_counts[group_counts[group_col] == g]
                 
-                if palette_type == 'h_subtype':
+                if color_key:
+                    color = color_map.get(str(g), '#888888')
+                elif palette_type == 'h_subtype':
                     color = okabe_ito_colors[idx % len(okabe_ito_colors)] if is_colorblind else subtype_base_colors.get(str(g), '#888888')
                 else:
-                    color = palette[idx % len(palette)]
+                    color = '#888888'
                 
                 display_group_col = "Group" if group_col == "Final_Label" else group_col.replace("_", " ")
                 
@@ -247,18 +303,18 @@ process CladeGraphicReport {
 
             fig_evo.update_yaxes(title_text="Frequency (%)", range=[0, 100], row=row_num, col=1)
 
-        add_stacked_bars(df_all, 'H_Subtype', 1, palette_type='h_subtype')
+        add_stacked_bars(df_all, 'H_Subtype', 1, palette_type='h_subtype', color_key='h_subtypes')
 
         current_row = 2
         for h in valid_h_subtypes:
             sub_df = df_all[df_all['H_Subtype'] == h].copy()
             sub_df['Final_Label'] = sub_df['Root_Clade']
-            add_stacked_bars(sub_df, 'Final_Label', current_row, detail_col='Clade', palette_type='clade', base_color=subtype_base_colors.get(str(h), '#888888'))
+            add_stacked_bars(sub_df, 'Final_Label', current_row, detail_col='Clade', palette_type='clade', base_color=subtype_base_colors.get(str(h), '#888888'), color_key=f'clades_{h}')
             current_row += 1
 
         if include_genotype_chart:
             sub_df = df_all[(df_all['Clade'] == '2.3.4.4b') & (df_all['Genotype'] != '-')].copy()
-            add_stacked_bars(sub_df, 'Genotype', current_row, detail_col='Sub-genotype', palette_type='genotype')
+            add_stacked_bars(sub_df, 'Genotype', current_row, detail_col='Sub-genotype', palette_type='genotype', color_key='genotypes')
 
         all_time_start = df_all['WEEK'].min() - pd.Timedelta(days=7)
         all_time_end = df_all['WEEK'].max() + pd.Timedelta(days=14)
@@ -357,10 +413,8 @@ process CladeGraphicReport {
             total_h = h_counts['Count'].sum()
             h_counts['Text'] = h_counts['Count'].astype(str) + '/' + str(total_h)
             
-            if is_colorblind:
-                pie_colors = [okabe_ito_colors[i % len(okabe_ito_colors)] for i in range(len(h_counts['Label']))]
-            else:
-                pie_colors = [subtype_base_colors.get(str(lbl), '#888888') for lbl in h_counts['Label']]
+            h_color_map = global_color_map['h_subtypes']
+            pie_colors = [h_color_map.get(str(lbl), '#888888') for lbl in h_counts['Label']]
 
             fig.add_trace(
                 go.Pie(
@@ -414,11 +468,8 @@ process CladeGraphicReport {
             # Calculate the total clades for this specific subtype for the customized text
             final_grouped['Text'] = final_grouped['Final_Count'].astype(str) + '/' + str(total_c)
             
-            if is_colorblind:
-                pie_colors = okabe_ito_colors
-            else:
-                base_c = subtype_base_colors.get(str(h), '#888888')
-                pie_colors = generate_shades(base_c, len(final_grouped['Final_Label']))
+            clade_color_map = global_color_map[f'clades_{h}']
+            pie_colors = [clade_color_map.get(str(lbl), '#888888') for lbl in final_grouped['Final_Label']]
 
             fig.add_trace(
                 go.Pie(
@@ -466,10 +517,8 @@ process CladeGraphicReport {
                 )
                 root_grouped['Text'] = root_grouped['Final_Count'].astype(str) + '/' + str(total_g)
 
-                if is_colorblind:
-                    pie_colors = okabe_ito_colors
-                else:
-                    pie_colors = colors.qualitative.Vivid
+                genotype_color_map = global_color_map['genotypes']
+                pie_colors = [genotype_color_map.get(str(lbl), '#888888') for lbl in root_grouped['Genotype']]
 
                 fig.add_trace(
                     go.Pie(
@@ -500,8 +549,20 @@ process CladeGraphicReport {
         for j in range(start_idx, end_idx):
             visibility_array[j] = True
             
-        dropdown_buttons.append(dict(args=[{"visible": visibility_array}, {"title": dict(text=f"<b>Subtype and Clade Report - Season {season}</b>", x=0.5, y=0.98, xanchor="center", yanchor="top")}], label=f"Season {season}", method="update"))
-    default_title = f"<b>Subtype and Clade Report - Season {seasons[0]}</b>" if seasons else "<b>Subtype and Clade Report</b>"
+        # Prevent the word 'Season' from attaching to 'All Time'
+        display_label = season if season == "All Time" else f"Season {season}"
+            
+        dropdown_buttons.append(dict(
+            args=[
+                {"visible": visibility_array}, 
+                {"title": dict(text=f"<b>Subtype and Clade Report - {display_label}</b>", x=0.5, y=0.98, xanchor="center", yanchor="top")}
+            ], 
+            label=display_label, 
+            method="update"
+        ))
+        
+    first_lbl = seasons[0] if seasons[0] == "All Time" else f"Season {seasons[0]}"
+    default_title = f"<b>Subtype and Clade Report - {first_lbl}</b>"
 
     # Push all subplot titles upward by adjusting their y coordinate
     for annotation in fig['layout']['annotations']:
