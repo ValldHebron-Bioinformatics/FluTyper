@@ -113,15 +113,19 @@ for aligned_prot in "${prot_files}".split():
     observed_mutations, protein_pos = set(), 0
     for r_aa, q_aa in zip(ref_seq, query_seq):
         if r_aa != "-": protein_pos += 1
-        standard_pos = pos_to_base.get(str(protein_pos), str(protein_pos))
+        pos_raw = str(protein_pos)
+        pos_ref = pos_to_base.get(pos_raw, pos_raw)
+        
+        # Decide which position to use for marker lookup based on the protocol
+        marker_pos = pos_ref if "${params.protocol}" == "AVIAN" else pos_raw
         
         # Avoid treating 'X' (unknown AA from NNN codons) as a valid target to prevent false wildcard marker triggers
         if q_aa != "X":
-            observed_mutations.add((standard_pos, q_aa))
+            observed_mutations.add((marker_pos, q_aa))
         
         # X acts as a wildcard only if the amino acid changed
         if r_aa != q_aa and "X" not in (r_aa, q_aa):
-            observed_mutations.add((standard_pos, "X"))
+            observed_mutations.add((marker_pos, "X"))
             
     # Check which observed mutations are part of any marker sets
     active_markers = {}
@@ -137,12 +141,15 @@ for aligned_prot in "${prot_files}".split():
         if r_aa != "-": pos += 1
         pos_raw = str(pos)
         pos_ref = pos_to_base.get(pos_raw, pos_raw)
+        
+        # Decide which position to use for marker lookup based on the protocol
+        marker_pos = pos_ref if "${params.protocol}" == "AVIAN" else pos_raw
 
         is_mutation = r_aa != q_aa and "X" not in (r_aa, q_aa)
 
         # Look first for exact matches, then for "X" matches only if it is a true mutation
-        m_ids_exact = active_markers.get((pos_ref, q_aa), [])
-        m_ids_x = active_markers.get((pos_ref, "X"), []) if is_mutation else []
+        m_ids_exact = active_markers.get((marker_pos, q_aa), [])
+        m_ids_x = active_markers.get((marker_pos, "X"), []) if is_mutation else []
         combined_m_ids = list(dict.fromkeys(m_ids_exact + m_ids_x)) 
         
         is_marker = len(combined_m_ids) > 0
