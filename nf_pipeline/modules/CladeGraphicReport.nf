@@ -92,7 +92,7 @@ process CladeGraphicReport {
         genotyping_df.loc[genotyping_df[col].str.lower().str.contains('unassigned'), col] = 'Unassigned'
         
     
-    genotyping_df.loc[genotyping_df['Clade'] == '-', 'Clade'] = 'No dataset available'
+    genotyping_df = genotyping_df[genotyping_df['Clade'] != '-'].copy()
 
 
     # Dynamic Root Grouping Logic
@@ -143,14 +143,14 @@ process CladeGraphicReport {
         genotyping_df['Season'] = "All Time"
 
     # Extract unique seasons, automatically wiping out the pd.NA nulls
-    seasons = sorted(genotyping_df['Season'].dropna().unique())
+    seasons = sorted(genotyping_df['Season'].dropna().unique(), reverse=True)
     
     # Ultimate failsafe: if the list is totally empty, default the view to All Time
     if len(seasons) == 0:
         genotyping_df['Season'] = "All Time"
         seasons = ["All Time"]
 
-    seasons = sorted(genotyping_df['Season'].dropna().unique())
+    seasons = sorted(genotyping_df['Season'].dropna().unique(), reverse=True)
     unique_h_subtypes = sorted(genotyping_df['H_Subtype'].dropna().unique())
     
     # Filter out subtypes 
@@ -159,7 +159,7 @@ process CladeGraphicReport {
         clades_for_h = genotyping_df[genotyping_df['H_Subtype'] == h]['Clade'].unique()
         if not (len(clades_for_h) == 1 and clades_for_h[0] == "No dataset available"):
             valid_h_subtypes.append(h)
-    
+            
     # Check if there are any valid Genotypes for clade 2.3.4.4b globally
     include_genotype_chart = genotyping_df[(genotyping_df['Clade'] == '2.3.4.4b') & (genotyping_df['Genotype'] != '-')].shape[0] > 0
     
@@ -457,7 +457,7 @@ process CladeGraphicReport {
             root_grouped['Root_Pct'] = root_grouped['Root_Count'] / total_c
             
             root_grouped['Final_Label'] = root_grouped.apply(
-                lambda x: "Others" if x['Root_Pct'] < 0.02 and str(x['Root_Clade']) not in ["Unassigned", "No dataset available"] else x['Root_Clade'], 
+                lambda x: "Others" if x['Root_Pct'] < 0.01 and str(x['Root_Clade']) not in ["Unassigned", "No dataset available"] else x['Root_Clade'], 
                 axis=1
             )
             
