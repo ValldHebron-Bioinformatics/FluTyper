@@ -91,6 +91,41 @@ Sample_01,YYYY-MM-DD
 ### Threshold Parameter Behavior
 The threshold parameter establishes a baseline frequency cutoff that impacts data visualization. This threshold value initializes the slider in the `MutationsReport.html` interactive plot, allowing users to dynamically adjust the view without needing to re-execute the pipeline. The frequency denominator used for this calculation is the number of samples containing that specific protein, rather than the total number of samples in the entire run.
 
+### H Subtype Threshold Summary
+
+| H subtype | HA1 threshold (%) | HA2 threshold (%) | Samples (n) |
+| :--- | ---: | ---: | ---: |
+| 1 | 68.46 | 76.57 | 17 |
+| 2 | 78.83 | 83.15 | 21 |
+| 3 | 73.89 | 80.53 | 18 |
+| 4 | 76.91 | 81.13 | 24 |
+| 5 | 73.59 | 79.86 | 49 |
+| 6 | 72.40 | 79.86 | 27 |
+| 7 | 70.77 | 77.44 | 50 |
+| 8 | 79.97 | 83.45 | 8 |
+| 9 | 77.71 | 81.53 | 30 |
+| 10 | 76.00 | 80.08 | 34 |
+| 11 | 75.82 | 77.86 | 29 |
+| 12 | 78.63 | 80.76 | 18 |
+| 13 | 72.50 | 78.01 | 9 |
+| 14 | 85.48 | 87.14 | 6 |
+| 15 | 86.22 | 88.18 | 4 |
+| 16 | 89.04 | 92.59 | 3 |
+
+### N Subtype Threshold Summary
+
+| N subtype | NA threshold (%) | Samples (n) |
+| :--- | ---: | ---: |
+| 1 | 75.87 | 41 |
+| 2 | 77.36 | 78 |
+| 3 | 70.20 | 34 |
+| 4 | 80.59 | 19 |
+| 5 | 76.57 | 21 |
+| 6 | 76.06 | 31 |
+| 7 | 72.32 | 30 |
+| 8 | 74.36 | 31 |
+| 9 | 79.05 | 62 |
+
 ### HUMAN Protocol Notes
 The HUMAN protocol utilizes dedicated resources located under `protocols/HUMAN/v1` and introduces marker annotations specifically tailored to human seasonal influenza. It supports genotyping for `H1` (using Nextclade dataset `flu_h1n1pdm_ha`) and `H3` (using Nextclade dataset `flu_h3n2_ha`). Marker files are read directly from the protocol's marker directory rather than querying FluMutDB. When metadata is provided, the human protocol fully supports generating time-evolution frequency reports.
 
