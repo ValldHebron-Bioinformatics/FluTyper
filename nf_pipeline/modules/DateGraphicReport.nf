@@ -92,7 +92,7 @@ process DateGraphicReport {
         if "${params.colorblind}".lower() == "true":
             color_list = ['#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7', '#999999', '#000000']
         else:
-            color_list = ['#F9DC5C', '#DCF763','#D9D65A', '#CD733D', '#C84630','#A196B0', '#94B0DA', '#676F86', '#3A2D32']
+            color_list = ['#a0850c', '#CD733D', '#C84630','#A196B0', '#3561a3', '#676F86', '#3A2D32', '#381983', '#009E73' ]
 
         for segment, proteins in prot_dict.items():
             os.makedirs(f"FrequencyEvolution/{segment}", exist_ok=True)
@@ -124,7 +124,105 @@ process DateGraphicReport {
                     plot_df['Freq_Cum'] = (plot_df['Markers (Cumulative)'] / plot_df['Samples (Cumulative)'].replace(0, np.nan)) * 100
                     
                     plot_df = pd.merge(plot_df, hover_info, on='AA_MUTATION', how='left')
+                    
+                    # Build season-specific recalculated datasets
 
+                    season_plot_data = {}
+
+                    # All-time data
+                    season_plot_data["All Time"] = (
+                        plot_df.copy(),
+                        weekly_totals.copy()
+                    )
+
+                    # Seasonal recalculated data
+                    for season, s_range in season_ranges.items():
+
+                        s_start = pd.to_datetime(s_range[0])
+                        s_end = pd.to_datetime(s_range[1])
+
+                        # Seasonal totals
+                        season_totals = weekly_totals[
+                            (weekly_totals['WEEK'] >= s_start) &
+                            (weekly_totals['WEEK'] <= s_end)
+                        ].copy()
+
+                        # RESET cumulative sample counts
+                        season_totals['Samples (Cumulative)'] = \
+                            season_totals['Samples (Week)'].cumsum()
+
+                        # Seasonal mutation data
+                        season_mut = df_prot[
+                            (df_prot['WEEK'] >= s_start) &
+                            (df_prot['WEEK'] <= s_end)
+                        ]
+
+                        season_week_counts = (
+                            season_mut
+                            .groupby(['WEEK','AA_MUTATION'])
+                            .size()
+                            .unstack(fill_value=0)
+                        )
+
+                        season_week_counts = season_week_counts.reindex(
+                            season_totals['WEEK'],
+                            fill_value=0
+                        )
+
+                        # RESET mutation cumulative counts
+                        season_cum_counts = season_week_counts.cumsum()
+
+                        season_cum_long = (
+                            season_cum_counts
+                            .reset_index()
+                            .melt(
+                                id_vars='WEEK',
+                                value_name='Markers (Cumulative)'
+                            )
+                        )
+
+                        season_week_long = (
+                            season_week_counts
+                            .reset_index()
+                            .melt(
+                                id_vars='WEEK',
+                                value_name='Markers (Week)'
+                            )
+                        )
+
+                        season_df = pd.merge(
+                            season_cum_long,
+                            season_week_long,
+                            on=['WEEK','AA_MUTATION']
+                        )
+
+                        season_df = pd.merge(
+                            season_df,
+                            season_totals,
+                            on='WEEK'
+                        )
+
+                        season_df['Freq_Weekly'] = (
+                            season_df['Markers (Week)'] /
+                            season_df['Samples (Week)'].replace(0,np.nan)
+                        ) * 100
+
+                        season_df['Freq_Cum'] = (
+                            season_df['Markers (Cumulative)'] /
+                            season_df['Samples (Cumulative)'].replace(0,np.nan)
+                        ) * 100
+
+                        season_df = pd.merge(
+                            season_df,
+                            hover_info,
+                            on='AA_MUTATION',
+                            how='left'
+                        )
+
+                        season_plot_data[season] = (
+                            season_df,
+                            season_totals
+                        )
                     # Calculate fixed maximum bounds to lock the secondary y-axes
                     max_weekly_samples = weekly_totals['Samples (Week)'].max()
                     max_cum_samples = weekly_totals['Samples (Cumulative)'].max()
@@ -196,7 +294,7 @@ process DateGraphicReport {
                                 connectgaps=True,
                                 line=dict(color=color),
                                 legendgroup=mut,
-                                customdata=mut_df[['POSITION_REF', 'EFFECT', 'FOUND_IN', 'Markers (Week)', 'Samples (Week)', 'Freq_Weekly', 'AA_MUTATION']],
+                                customdata=mut_df[['POSITION_REF', 'EFFECT', 'FOUND_IN', 'Markers (Week)', 'Samples (Week)', 'Freq_Weekly', 'AA_MUTATION']].to_numpy().tolist(),
                                 hovertemplate=(
                                     "<b>Week:</b> %{x|%V, %Y}<br>"
                                     "<b>Reference Position (" + ref + " numbering):</b> %{customdata[0]}<br>"
@@ -216,7 +314,7 @@ process DateGraphicReport {
                                 connectgaps=True,
                                 line=dict(color=color),
                                 legendgroup=mut, showlegend=False,
-                                customdata=mut_df[['POSITION_REF', 'EFFECT', 'FOUND_IN', 'Markers (Cumulative)', 'Samples (Cumulative)', 'Freq_Cum', 'AA_MUTATION']],
+                                customdata=mut_df[['POSITION_REF', 'EFFECT', 'FOUND_IN', 'Markers (Cumulative)', 'Samples (Cumulative)', 'Freq_Cum', 'AA_MUTATION']].to_numpy().tolist(),
                                 hovertemplate=(
                                     "<b>Week:</b> %{x|%V, %Y}<br>"
                                     "<b>Reference Position (" + ref + " numbering):</b> %{customdata[0]}<br>"
@@ -229,25 +327,116 @@ process DateGraphicReport {
                             ), row=2, col=1, secondary_y=False
                         )
 
-                    # Build dropdown buttons for zooming
+                    # Dropdown with FULL seasonal recalculation
+
                     dropdown_buttons = []
-                    if all_time_range:
-                        dropdown_buttons.append(
-                            dict(
-                                args=[{"xaxis.range": all_time_range, "xaxis2.range": all_time_range},
-                                      {"title.text": f"<b>Frequency in Time Report: {display_name} - All Time</b>"}],
-                                label="All Time",
-                                method="relayout"
-                            )
+
+                    for season_name, (s_plot_df, s_totals) in season_plot_data.items():
+
+                        if season_name == "All Time":
+                            label = "All Time"
+                            x_range = all_time_range
+                        else:
+                            label = f"Season {season_name}"
+                            x_range = season_ranges[season_name]
+
+                        # Seasonal y-axis scaling
+                        s_week_max = s_totals['Samples (Week)'].max()
+                        s_cum_max = s_totals['Samples (Cumulative)'].max()
+
+                        s_y2 = (
+                            s_week_max * 1.1
+                            if pd.notnull(s_week_max) and s_week_max > 0
+                            else 10
                         )
-                        
-                    for season, s_range in season_ranges.items():
+
+                        s_y4 = (
+                            s_cum_max * 1.1
+                            if pd.notnull(s_cum_max) and s_cum_max > 0
+                            else 10
+                        )
+
+                        visible = [True, True]
+                        x_updates = [
+                            s_totals['WEEK'],
+                            s_totals['WEEK']
+                        ]
+
+                        y_updates = [
+                            s_totals['Samples (Week)'],
+                            s_totals['Samples (Cumulative)']
+                        ]
+
+                        custom_updates = [
+                            None,
+                            None
+                        ]
+
+                        for mut in unique_mutations:
+
+                            mut_df = s_plot_df[
+                                s_plot_df['AA_MUTATION'] == mut
+                            ]
+
+                            present = (
+                                mut_df['Markers (Week)'].sum() > 0 or
+                                mut_df['Markers (Cumulative)'].sum() > 0
+                            )
+
+                            visible.extend([present, present])
+
+                            x_updates.extend([
+                                mut_df['WEEK'],
+                                mut_df['WEEK']
+                            ])
+
+                            y_updates.extend([
+                                mut_df['Freq_Weekly'],
+                                mut_df['Freq_Cum']
+                            ])
+
+                            custom_updates.extend([
+                                mut_df[[
+                                    'POSITION_REF',
+                                    'EFFECT',
+                                    'FOUND_IN',
+                                    'Markers (Week)',
+                                    'Samples (Week)',
+                                    'Freq_Weekly',
+                                    'AA_MUTATION'
+                                ]].to_numpy().tolist(),
+
+                                mut_df[[
+                                    'POSITION_REF',
+                                    'EFFECT',
+                                    'FOUND_IN',
+                                    'Markers (Cumulative)',
+                                    'Samples (Cumulative)',
+                                    'Freq_Cum',
+                                    'AA_MUTATION'
+                                ]].to_numpy().tolist()
+                            ])
+
                         dropdown_buttons.append(
                             dict(
-                                args=[{"xaxis.range": s_range, "xaxis2.range": s_range},
-                                      {"title.text": f"<b>Frequency in Time Report: {display_name} - Season {season}</b>"}],
-                                label=f"Season {season}",
-                                method="relayout"
+                                label=label,
+                                method="update",
+                                args=[
+                                    {
+                                        "visible": visible,
+                                        "x": x_updates,
+                                        "y": y_updates,
+                                        "customdata": custom_updates
+                                    },
+                                    {
+                                        "title.text":
+                                            f"<b>Frequency in Time Report: {display_name} - {label}</b>",
+                                        "xaxis.range": x_range,
+                                        "xaxis2.range": x_range,
+                                        "yaxis2.range": [0, s_y2],
+                                        "yaxis4.range": [0, s_y4]
+                                    }
+                                ]
                             )
                         )
 
