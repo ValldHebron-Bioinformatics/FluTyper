@@ -1,3 +1,6 @@
+#!/usr/bin/env nextflow
+nextflow.enable.dsl=2
+
 process GeographicReport {
     errorStrategy 'ignore'
     debug true
@@ -129,16 +132,17 @@ process GeographicReport {
     df['Poblacion'] = df['TOWN_GROUP'] if 'TOWN_GROUP' in df.columns else 'Sense dades'
     df['Provincia'] = df['PROV_GROUP'] if 'PROV_GROUP' in df.columns else 'Sense dades'
 
-    # Define Season based on DATE column if it exists, otherwise assign "All Time"
+    # Define Season based on DATE column if it exists, otherwise assign a default
     if 'DATE' in df.columns:
         df['DATE'] = pd.to_datetime(df['DATE'], errors='coerce')
         iso = df['DATE'].dt.isocalendar()
         s_year = iso.year.where(iso.week >= 40, iso.year - 1) # Assign season based on ISO week (season starts in week 40)
         df['Season'] = s_year.astype(str) + "-" + (s_year + 1).astype(str) # Season format "2020-2021"
     else:
-        df['Season'] = "All Time"
+        df['Season'] = "Unknown Season"
     
-    seasons = ["All Time"] + sorted([s for s in df['Season'].unique() if pd.notna(s) and s != "Unknown Season"])
+    # Sort seasons in reverse order to automatically put the newest season at the top
+    seasons = sorted([s for s in df['Season'].unique() if pd.notna(s) and s != "Unknown Season"], reverse=True)
     geo_levels = ['Province', 'Town']
     
     # Define valid views based on available data and protocol
@@ -181,7 +185,7 @@ process GeographicReport {
     all_view_colors = {}
 
     for season in seasons:
-        df_season = df if season == "All Time" else df[df['Season'] == season]
+        df_season = df[df['Season'] == season]
         
         for level in geo_levels:
             for classification in valid_classifications:
@@ -263,7 +267,7 @@ process GeographicReport {
                 trace_registry[layer_id] = fg.get_name()
 
     # HTML controls
-    season_options = "".join([f'<option value="{s}">{"All Seasons" if s=="All Time" else "Season "+s}</option>' for s in seasons])
+    season_options = "".join([f'<option value="{s}">Season {s}</option>' for s in seasons])
     level_options = '<option value="Province">Province</option><option value="Town">City/Town</option>'
     class_options = "".join([f'<option value="{v["id"]}">{v["label"]}</option>' for v in valid_classifications])
 
