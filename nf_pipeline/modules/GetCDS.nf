@@ -94,7 +94,25 @@ for seg, prots in prot_dict.items():
     for prot in prots:
         # Different pattern for protocol
         if protocol == "HUMAN":
-            pattern = f"^${h_tag}${n_tag}_{prot}_"
+            h_val = "${h_tag}"
+            n_val = "${n_tag}"
+            
+            if seg == "NA":
+                if n_val == "N1":
+                    ref_subtype = "H1N1"
+                elif n_val == "N2":
+                    ref_subtype = "H3N2"
+                else:
+                    ref_subtype = "H1N1" # Default fallback
+            else:
+                if h_val == "H1":
+                    ref_subtype = "H1N1"
+                elif h_val == "H3":
+                    ref_subtype = "H3N2"
+                else:
+                    ref_subtype = "H1N1" # Default fallback
+                    
+            pattern = f"^{ref_subtype}_{prot}_"
         else:
             pattern = f"^{ref_tag}_{prot}_.*{ref_patho}"
         

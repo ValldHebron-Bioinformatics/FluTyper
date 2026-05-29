@@ -62,7 +62,21 @@ for aligned_prot in "${prot_files}".split():
     # Force UPPERCASE to prevent case-mismatch bugs between FASTA translation and CSV markers
     ref_seq, query_seq = str(records[0].seq).upper(), str(records[1].seq).upper()
     ref_tag = str(records[0].description).split('_')[0]
+    if "${params.protocol}" == "HUMAN" :
+        if ref_tag == "H1N1": ref_tag = "A(H1N1)pdm09"
+        elif ref_tag == "H3N2": ref_tag = "A(H3N2)"
+    
+    # --- SUBTYPE STRING FORMATTING ---
     subtype_val = "${h_tag}${n_tag}(${pathotype})" if "${pathotype}" != "" else "${h_tag}${n_tag}"
+    
+    if "${params.protocol}" == "HUMAN":
+        raw_sub = "${h_tag}${n_tag}"
+        if raw_sub == "H1N1":
+            subtype_val = "A(H1N1)pdm09"
+        elif raw_sub == "H3N2":
+            subtype_val = "A(H3N2)"
+        elif raw_sub.startswith("H") and "N" in raw_sub:
+            subtype_val = f"A({raw_sub})"
 
     pos_to_base = {}
     if "${params.protocol}" == "AVIAN":
@@ -92,10 +106,20 @@ for aligned_prot in "${prot_files}".split():
                     if found_in and found_in != "UNIVERSAL":
                         h_val = "${h_tag}".upper()
                         n_val = "${n_tag}".upper()
+                        raw_combo = h_val + n_val
                         
-                        allowed_tags = [h_val + n_val]
+                        allowed_tags = [raw_combo]
                         if h_val != "HX": allowed_tags.append(h_val)
                         if n_val != "NX": allowed_tags.append(n_val)
+                        
+                        # Support for human specific formatting in the marker files
+                        if raw_combo == "H1N1": allowed_tags.append("A(H1N1)pdm09")
+                        elif raw_combo == "H3N2": allowed_tags.append("A(H3N2)")
+                        elif "X" in raw_combo: allowed_tags.append(f"A({raw_combo})")
+                        elif raw_combo.startswith("H") and "N" in raw_combo: allowed_tags.append(f"A({raw_combo})")
+                        
+                        if h_val == "H1": allowed_tags.append("A(H1)pdm09")
+                        elif h_val == "H3": allowed_tags.append("A(H3)")
                         
                         if not any(tag in found_in for tag in allowed_tags):
                             continue

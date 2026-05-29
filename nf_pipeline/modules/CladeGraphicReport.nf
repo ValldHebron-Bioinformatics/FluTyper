@@ -43,9 +43,12 @@ process CladeGraphicReport {
     # Okabe-Ito Colors Palette (colorblind-friendly)
     okabe_ito_colors = ['#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7', '#999999', '#000000']
     
-    # 18 Base Colors mapping for H Subtypes
+    # Base Colors mapping for H Subtypes including new Human labels
     subtype_base_colors = {
-        'H1': '#1F77B4','H2': '#D62728','H3': '#FF7F0E','H4': '#2CA02C','H5': '#9467BD','H6': '#8C564B', 
+        'H1': '#1F77B4', 'A(H1)pdm09': '#1F77B4',
+        'H2': '#D62728', 
+        'H3': '#FF7F0E', 'A(H3)': '#FF7F0E',
+        'H4': '#2CA02C','H5': '#9467BD','H6': '#8C564B', 
         'H7': '#E377C2','H8': '#7F7F7F','H9': '#BCBD22','H10': '#17BECF','H11': '#393B79','H12': '#637939',
         'H13': '#8C6D31','H14': '#843C39','H15': '#7B4173','H16': '#5254A3','H17': '#8CA252','H18': '#BD9E39' 
     }
@@ -84,16 +87,19 @@ process CladeGraphicReport {
     # Dataframe preparation
     genotyping_df = pd.read_csv("${genotyping_file}")
     genotyping_df['H_Subtype'] = genotyping_df['Subtype'].astype(str).str.extract(r'(H\\d+)', expand=False)
+    
+    if "${params.protocol}".upper() == "HUMAN":
+        genotyping_df['H_Subtype'] = genotyping_df['H_Subtype'].replace({
+            'H1': 'A(H1)pdm09',
+            'H3': 'A(H3)'
+        })
 
-        
     # Standardize Clade, Genotype, and Sub-genotype columns
     for col in ['Clade', 'Genotype', 'Sub-genotype']:
         genotyping_df[col] = genotyping_df[col].fillna("Unassigned").astype(str).str.strip()
         genotyping_df.loc[genotyping_df[col].str.lower().str.contains('unassigned'), col] = 'Unassigned'
         
-    
     genotyping_df = genotyping_df[genotyping_df['Clade'] != '-'].copy()
-
 
     # Dynamic Root Grouping Logic
     if "${params.protocol}".upper() == "AVIAN":
@@ -142,15 +148,12 @@ process CladeGraphicReport {
     else:
         genotyping_df['Season'] = "All Time"
 
-    # Extract unique seasons, automatically wiping out the pd.NA nulls
-    seasons = sorted(genotyping_df['Season'].dropna().unique(), reverse=True)
-    
-    # Ultimate failsafe: if the list is totally empty, default the view to All Time
-    if len(seasons) == 0:
-        genotyping_df['Season'] = "All Time"
-        seasons = ["All Time"]
+    # Extract unique seasons, ensuring most recent is first and "All Time" is strictly last
+    raw_seasons = genotyping_df['Season'].dropna().unique()
+    seasons = sorted([s for s in raw_seasons if s != "All Time"], reverse=True)
+    if "All Time" in raw_seasons or len(seasons) == 0:
+        seasons.append("All Time")
 
-    seasons = sorted(genotyping_df['Season'].dropna().unique(), reverse=True)
     unique_h_subtypes = sorted(genotyping_df['H_Subtype'].dropna().unique())
     
     # Filter out subtypes 
@@ -287,8 +290,7 @@ process CladeGraphicReport {
                         textangle=0,
                         textfont=dict(color=get_contrast_text_color(color), size=14, family='Arial'),
                         marker_color=color,
-                        legendgroup=f"row_{row_num}",
-                        legendgrouptitle_text=subplot_titles_evo[row_num-1].replace("<b>","").replace("</b>",""),
+                        legend=f"legend{row_num}" if row_num > 1 else "legend",
                         customdata=g_df[['Count', 'TotalWeek', 'Pct', 'Hover_Extra']],
                         hovertemplate=(
                             "<b>Week:</b> %{x|%V, %Y}<br>"
@@ -338,15 +340,14 @@ process CladeGraphicReport {
                     season_ranges[season_val] = [s_start.strftime('%Y-%m-%d'), s_end.strftime('%Y-%m-%d')]
 
         dropdown_buttons_evo = []
-        if all_time_range:
-            all_time_args = {f"xaxis{i+1 if i>0 else ''}.range": all_time_range for i in range(total_charts)}
-            # For "All Time", we want all traces to be visible regardless of subtype/clade/genotype, so we set all to True
-            all_time_mask = [True] * len(trace_registry)
-            dropdown_buttons_evo.append(dict(args=[{"visible": all_time_mask}, all_time_args], label="All Time", method="update"))
-            
-        for season_val, s_range in season_ranges.items():
+        
+        # Loop through distinct actual seasons first
+        for season_val in [s for s in seasons if s != "All Time"]:
+            s_range = season_ranges.get(season_val)
+            if not s_range:
+                continue
+
             season_args = {f"xaxis{i+1 if i>0 else ''}.range": s_range for i in range(total_charts)}
-            # Determine which traces should be visible for this season based on the active subtypes/clades/genotypes in the data for that season
             s_data = df_all[df_all['Season'] == season_val]
             active_groups = {
                 'H_Subtype': set(s_data['H_Subtype'].dropna().astype(str).unique()),
@@ -354,7 +355,6 @@ process CladeGraphicReport {
                 'Genotype': set(s_data['Genotype'].dropna().astype(str).unique()) if 'Genotype' in s_data.columns else set()
             }
             
-            # Build a True/False mask for every drawn trace by checking if its specific value exists in our active labels
             season_visibility_mask = [
                 (trace['col'] in active_groups and trace['val'] in active_groups[trace['col']])
                 for trace in trace_registry
@@ -362,10 +362,34 @@ process CladeGraphicReport {
             
             dropdown_buttons_evo.append(dict(args=[{"visible": season_visibility_mask}, season_args], label=f"Season {season_val}", method="update"))
 
+        # Explicitly append All Time as the final selection item
+        if all_time_range:
+            all_time_args = {f"xaxis{i+1 if i>0 else ''}.range": all_time_range for i in range(total_charts)}
+        else:
+            all_time_args = {f"xaxis{i+1 if i>0 else ''}.autorange": True for i in range(total_charts)}
+            
+        all_time_mask = [True] * len(trace_registry)
+        dropdown_buttons_evo.append(dict(args=[{"visible": all_time_mask}, all_time_args], label="All Time", method="update"))
+
         if "${params.protocol}" == "AVIAN":
             center_x = 0.45
         else:
             center_x = 0.465
+
+        # Configure independent legends perfectly aligned with the top of each subplot row
+        h_domain = (1.0 - (total_charts - 1) * 0.08) / total_charts
+        legends_layout = {}
+        for i in range(1, total_charts + 1):
+            y_pos = 1.0 - (i - 1) * (h_domain + 0.08)
+            leg_key = f"legend{i}" if i > 1 else "legend"
+            legends_layout[leg_key] = dict(
+                y=y_pos, 
+                yanchor="top", 
+                x=1.02, 
+                xanchor="left", 
+                title_text=subplot_titles_evo[i-1].replace("<b>","").replace("</b>",""),
+                tracegroupgap=0
+            )
 
         fig_evo.update_layout(
             barmode='stack',
@@ -374,26 +398,33 @@ process CladeGraphicReport {
             height=450 * total_charts,
             hovermode="closest",
             margin=dict(t=160, b=80, l=80, r=200),
-            legend=dict(tracegroupgap=30, y=1, yanchor="top")
+            **legends_layout
         )
+        
+        # Apply the initial state based on the first button (most recent season)
+        if dropdown_buttons_evo:
+            initial_mask = dropdown_buttons_evo[0]['args'][0]['visible']
+            initial_axes = dropdown_buttons_evo[0]['args'][1]
+            for idx, trace in enumerate(fig_evo.data):
+                trace.visible = initial_mask[idx]
+            fig_evo.update_layout(**initial_axes)
         
         fig_evo.update_xaxes(tickformat="Week %V<br>%Y", showticklabels=True)
         fig_evo.write_html("CladeEvolutionReport.html")
 
-    # Set up a dynamic grid for the subplots (1 column wide)
-    cols = 1
-    rows = total_charts
+    # Set up a dynamic grid for the subplots (horizontal layout)
+    cols = total_charts
+    rows = 1
     
-    # Define the subplot type as 'domain' for pie charts
-    specs = [[{"type": "domain"}] for _ in range(rows)]
+    specs = [[{"type": "domain"} for _ in range(cols)]]
     
     # Subplot titles in bold
     subplot_titles = ["<b>H Subtype Distribution</b>"] + [f"<b>Clade Distribution for {h}</b>" for h in valid_h_subtypes]
     if include_genotype_chart:
         subplot_titles.append("<b>Genotype Distribution (Clade 2.3.4.4b)</b>")
     
-    # Create the subplot figure with extra vertical spacing to allow titles to shift up
-    fig = make_subplots(rows=rows, cols=cols, specs=specs, subplot_titles=subplot_titles, vertical_spacing=0.15)
+    # Create the subplot figure with horizontal spacing
+    fig = make_subplots(rows=rows, cols=cols, specs=specs, subplot_titles=subplot_titles, horizontal_spacing=0.05)
 
     traces_per_season = total_charts
     total_traces = len(seasons) * traces_per_season
@@ -438,15 +469,14 @@ process CladeGraphicReport {
 
         # Clade pie chart for each valid specific H Subtype
         for i, h in enumerate(valid_h_subtypes):
-            # Calculate the proper row placement (adding 2 because row 1 is the overall chart)
-            r = i + 2
+            c_col = i + 2
             
             # Filter the dataframe for the specific subtype and get clade counts
             sub_df = season_df[season_df['H_Subtype'] == h]
             total_c = len(sub_df)
             
             if total_c == 0:
-                fig.add_trace(go.Pie(labels=["No Data"], values=[1], name=str(h), textinfo='none', hoverinfo='none', visible=is_visible, marker=dict(colors=['#f0f0f0'])), row=r, col=1)
+                fig.add_trace(go.Pie(labels=["No Data"], values=[1], name=str(h), textinfo='none', hoverinfo='none', visible=is_visible, marker=dict(colors=['#f0f0f0'])), row=1, col=c_col)
                 continue
 
             orig_counts = sub_df.groupby(['Clade', 'Root_Clade']).size().reset_index(name='Count')
@@ -489,17 +519,17 @@ process CladeGraphicReport {
                     hovertemplate='<b>Group:</b> %{label}<br><b>Total Count:</b> %{text}<br><b>Group Percentage:</b> %{percent}%{customdata}<extra></extra>',
                     visible=is_visible
                 ),
-                row=r, col=1
+                row=1, col=c_col
             )
             
         # Genotype chart for Clade 2.3.4.4b
         if include_genotype_chart:
-            r = total_charts
+            c_col = total_charts
             sub_df = season_df[(season_df['Clade'] == '2.3.4.4b') & (season_df['Genotype'] != '-')]
             total_g = len(sub_df)
             
             if total_g == 0:
-                fig.add_trace(go.Pie(labels=["No Data"], values=[1], name="Genotypes", textinfo='none', hoverinfo='none', visible=is_visible, marker=dict(colors=['#f0f0f0'])), row=r, col=1)
+                fig.add_trace(go.Pie(labels=["No Data"], values=[1], name="Genotypes", textinfo='none', hoverinfo='none', visible=is_visible, marker=dict(colors=['#f0f0f0'])), row=1, col=c_col)
             else:
                 orig_counts = sub_df.groupby(['Genotype', 'Sub-genotype']).size().reset_index(name='Count')
                 orig_counts['Orig_Pct'] = orig_counts['Count'] / total_g
@@ -538,7 +568,7 @@ process CladeGraphicReport {
                         hovertemplate='<b>Genotype:</b> %{label}<br><b>Total Count:</b> %{text}<br><b>Percentage:</b> %{percent}%{customdata}<extra></extra>',
                         visible=is_visible
                     ),
-                    row=r, col=1
+                    row=1, col=c_col
                 )
 
     dropdown_buttons = []
@@ -568,14 +598,14 @@ process CladeGraphicReport {
     for annotation in fig['layout']['annotations']:
         annotation['y'] += 0.02
 
-    # Final layout adjustments
+    # Final layout adjustments for horizontal display
     fig.update_layout(
         title=dict(text=default_title, x=0.5, y=0.98, xanchor="center", yanchor="top", font=dict(size=24)),
-        updatemenus=[dict(active=0, buttons=dropdown_buttons, x=0.5, xanchor="center", y=1.07, yanchor="top", direction="down", showactive=True)],
-        height=750 * rows,
+        updatemenus=[dict(active=0, buttons=dropdown_buttons, x=0.5, xanchor="center", y=1.50, yanchor="top", direction="down", showactive=True)],
+        height=600,
         showlegend=False,
         hovermode="closest",
-        margin=dict(t=220, b=80, l=120, r=120),
+        margin=dict(t=220, b=80, l=40, r=40),
         uniformtext=dict(minsize=10, mode='show') 
     )
 

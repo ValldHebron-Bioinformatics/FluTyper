@@ -26,9 +26,12 @@ process GeographicReport {
     import random
     from plotly.colors import qualitative
 
-    # Color palette for subtypes
+    # Color palette for subtypes including human specific labels
     subtype_base_colors = {
-        'H1': '#1F77B4', 'H1N1': '#1F77B4','H2': '#D62728','H3': '#FF7F0E', 'H3N2': '#FF7F0E', 'H4': '#2CA02C','H5': '#9467BD','H6': '#8C564B', 
+        'H1': '#1F77B4', 'A(H1)pdm09': '#1F77B4',
+        'H2': '#D62728',
+        'H3': '#FF7F0E', 'A(H3)': '#FF7F0E', 
+        'H4': '#2CA02C','H5': '#9467BD','H6': '#8C564B', 
         'H7': '#E377C2','H8': '#7F7F7F','H9': '#BCBD22','H10': '#17BECF','H11': '#393B79','H12': '#637939',
         'H13': '#8C6D31','H14': '#843C39','H15': '#7B4173','H16': '#5254A3','H17': '#8CA252','H18': '#BD9E39' 
     }
@@ -118,12 +121,15 @@ process GeographicReport {
         df_geno[col] = df_geno[col].fillna("Unassigned").astype(str).str.strip() if col in df_geno.columns else "Unassigned"
 
     # Logic to extract H subtype and define clade grouping based on protocol
+    df_geno['H_Subtype'] = df_geno['Subtype'].astype(str).str.extract(r'(H[0-9]+)', expand=False).fillna('Unknown')
+    
     if "${params.protocol}".upper() == "HUMAN":
-        df_geno['H_Subtype'] = df_geno['Subtype'].astype(str).str.extract(r'(H[0-9]+N[0-9]+)', expand=False).fillna('Unknown')
-        
-        df_geno['Root_Clade'] = df_geno['Clade'].apply(lambda c: ".".join(c.split('.')[:3]) + "-like" if c.count('.') > 2 else c)
+        df_geno['H_Subtype'] = df_geno['H_Subtype'].replace({
+            'H1': 'A(H1)pdm09',
+            'H3': 'A(H3)'
+        })
+        df_geno['Root_Clade'] = df_geno['Clade'].apply(lambda c: ".".join(str(c).split('.')[:3]) + "-like" if str(c).count('.') > 2 else c)
     else:
-        df_geno['H_Subtype'] = df_geno['Subtype'].astype(str).str.extract(r'(H[0-9]+)', expand=False).fillna('Unknown')
         df_geno['Root_Clade'] = df_geno['Clade']
 
     df = pd.merge(df_geno, df_meta, left_on='SampleID', right_on='ID') if not df_meta.empty else df_geno.copy()
