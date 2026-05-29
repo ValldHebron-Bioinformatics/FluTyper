@@ -185,9 +185,15 @@ process MutationsGraphicReport {
         ]
     }
 
-    # Make scatter plots for each group, iterating through available seasons
+    # Determine unique valid seasons and sort to ensure the newest season is default
     available_seasons = df_expanded['Season'].unique()
+    valid_seasons = [str(s) for s in available_seasons if str(s) not in ['All Time', 'Unknown Season', 'nan']]
+    sorted_seasons = sorted(valid_seasons, reverse=True)
+    sorted_seasons.append('All Time')
+    
+    default_season = sorted_seasons[0]
 
+    # Make scatter plots for each group, iterating through available seasons
     for i, group in enumerate(groups, start=1):
         
         # Add epitope backgrounds as native Bar charts to avoid background z-index hiding and JS failures
@@ -264,8 +270,8 @@ process MutationsGraphicReport {
                         "<extra></extra>"
                     )
 
-                # Traces are initially hidden unless they belong to 'All Time'
-                trace_visibility = True if season == 'All Time' else False
+                # Traces are initially hidden unless they belong to the default season
+                trace_visibility = True if str(season) == default_season else False
 
                 fig.add_trace(
                     go.Scatter(
@@ -350,8 +356,6 @@ process MutationsGraphicReport {
         js_marker_bypass = "false"
 
     # Gather clean season names for the dropdown
-    valid_seasons = [s for s in available_seasons if s not in ['All Time', 'Unknown Season', 'nan']]
-    sorted_seasons = ['All Time'] + sorted(valid_seasons)
     season_options = "".join([f'<option value="{s}">{s}</option>' for s in sorted_seasons])
 
     html_template = f'''

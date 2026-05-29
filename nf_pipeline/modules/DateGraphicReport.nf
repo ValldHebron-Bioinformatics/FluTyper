@@ -41,9 +41,10 @@ process DateGraphicReport {
 
         # Determine true 52-week seasonal x-axis ranges regardless of data gaps
         season_ranges = {}
-        for season in sorted(df_meta['Season'].dropna().unique()):
-            if season == "Unknown Season":
-                continue
+        raw_seasons = df_meta['Season'].dropna().unique()
+        seasons = sorted([s for s in raw_seasons if s != "Unknown Season"], reverse=True)
+        
+        for season in seasons:
             try:
                 y1 = int(season.split('-')[0])
                 y2 = int(season.split('-')[1])
@@ -126,17 +127,13 @@ process DateGraphicReport {
                     plot_df = pd.merge(plot_df, hover_info, on='AA_MUTATION', how='left')
                     
                     # Build season-specific recalculated datasets
-
                     season_plot_data = {}
 
-                    # All-time data
-                    season_plot_data["All Time"] = (
-                        plot_df.copy(),
-                        weekly_totals.copy()
-                    )
-
                     # Seasonal recalculated data
-                    for season, s_range in season_ranges.items():
+                    for season in seasons:
+                        s_range = season_ranges.get(season)
+                        if not s_range:
+                            continue
 
                         s_start = pd.to_datetime(s_range[0])
                         s_end = pd.to_datetime(s_range[1])
@@ -148,8 +145,7 @@ process DateGraphicReport {
                         ].copy()
 
                         # RESET cumulative sample counts
-                        season_totals['Samples (Cumulative)'] = \
-                            season_totals['Samples (Week)'].cumsum()
+                        season_totals['Samples (Cumulative)'] = season_totals['Samples (Week)'].cumsum()
 
                         # Seasonal mutation data
                         season_mut = df_prot[
@@ -223,6 +219,13 @@ process DateGraphicReport {
                             season_df,
                             season_totals
                         )
+
+                    # All-time data explicitly appended last
+                    season_plot_data["All Time"] = (
+                        plot_df.copy(),
+                        weekly_totals.copy()
+                    )
+
                     # Calculate fixed maximum bounds to lock the secondary y-axes
                     max_weekly_samples = weekly_totals['Samples (Week)'].max()
                     max_cum_samples = weekly_totals['Samples (Cumulative)'].max()
@@ -486,6 +489,20 @@ process DateGraphicReport {
                             yanchor="top",
                         )
                     )
+
+                    # Apply the initial state based on the first button (most recent season)
+                    if dropdown_buttons:
+                        initial_data = dropdown_buttons[0]['args'][0]
+                        initial_layout = dropdown_buttons[0]['args'][1]
+                        
+                        for idx, trace in enumerate(fig.data):
+                            trace.visible = initial_data['visible'][idx]
+                            trace.x = initial_data['x'][idx]
+                            trace.y = initial_data['y'][idx]
+                            if initial_data['customdata'][idx] is not None:
+                                trace.customdata = initial_data['customdata'][idx]
+                        
+                        fig.update_layout(initial_layout)
 
                     fig.write_html(f"FrequencyEvolution/{segment}/evolution_{plot_name}.html")
 
