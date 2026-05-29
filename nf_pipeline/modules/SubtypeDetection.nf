@@ -43,10 +43,12 @@ process SubtypeDetection {
     else subtype="Incomplete"; fi
 
     if [[ "${params.protocol.toUpperCase()}" == "HUMAN" ]]; then
-        # Check if subtype matches any of the valid human combinations using regex
-        if [[ ! "\$subtype" =~ ^(H1N1|H3N2|H1Nx|H3Nx|HxN1|HxN2|Incomplete)\$ ]]; then
-            echo "SubtypeDetection: Unrecognized subtype for the human protocol: \${subtype} for ${sample_id}. Reclassified as Unknown." >> SDerrors.log
-            subtype="Unknown"
+        if [[ "\$subtype" == "H1N1" ]]; then
+            subtype="A(H1N1)pdm09"
+        elif [[ "\$subtype" == "H3N2" ]]; then
+            subtype="A(H3N2)"
+        else
+            subtype="A(\${subtype})"
         fi
     fi
 
