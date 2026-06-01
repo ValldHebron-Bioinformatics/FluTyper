@@ -15,24 +15,15 @@ process GetCDS {
     script:
     """
 #!/usr/bin/env python3
-import os, subprocess, io, csv
+import os, subprocess, io
 from Bio import SeqIO
 
 ref_fasta = "${params.protocols[params.protocol].resources}/CDS_references.fasta"
-threshold_csv = "${params.protocols[params.protocol].resources}/Identity_thresholds.csv"
 cds_dir = "samples/${sample_id}/CDS"
 os.makedirs(cds_dir, exist_ok=True)
 log_file = "CDSerrors.log"
 
 protocol = "${params.protocol}"
-
-# Load identity thresholds from CSV into a dictionary
-identity_thresholds = {}
-if os.path.isfile(threshold_csv):
-    with open(threshold_csv, 'r', encoding='utf-8-sig') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            identity_thresholds[row['Target_Group']] = float(row['Calculated_Threshold']) / 100.0
 
 prot_dict = {
     "HA":  ["HA1", "HA2"], "NA":  ["NA"], "PB2": ["PB2"],
@@ -116,16 +107,12 @@ for seg, prots in prot_dict.items():
         else:
             pattern = f"^{ref_tag}_{prot}_.*{ref_patho}"
         
-        # Determine the target group for identity threshold lookup
-        if seg == "HA":
-            target_group = f"{prot}_${h_tag}"
-        elif seg == "NA":
-            target_group = f"{prot}_${n_tag}"
+        # Determine the identity threshold based on protein and protocol
+        if protocol == "AVIAN" and prot in ["HA1", "HA2"]:
+            min_identity = 0.40
         else:
-            target_group = prot
+            min_identity = 0.60
             
-        # Obtain the specific threshold for AVIAN (or 60% by default if something fails)
-        min_identity = identity_thresholds.get(target_group, 0.60) if protocol == "AVIAN" else 0.60
         min_coverage = 0.5
         max_n_ratio = 0.5
         
