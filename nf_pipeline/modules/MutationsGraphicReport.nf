@@ -164,7 +164,7 @@ process MutationsGraphicReport {
     fig = make_subplots(rows=rows_count, cols=1, subplot_titles=groups, vertical_spacing=spacing)
 
     epitope_definitions = {
-        'HA1 - H3N2': [
+        'HA1 - A(H3N2)': [
             {'name': 'RBD', 'positions': [98, 152, 153, 154, 155, 156], 'color': '#E41A1C'},
             {'name': 'RBD-130LOOP', 'positions': [131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148], 'color': '#377EB8'},
             {'name': 'RBD-180LOOP', 'positions': [183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195], 'color': '#4DAF4A'},
@@ -175,7 +175,7 @@ process MutationsGraphicReport {
             {'name': 'D site', 'positions': [96, 102, 103, 117, 121, 167, 170, 171, 172, 173, 174, 175, 176, 177, 179, 182, 201, 203, 207, 208, 209, 212, 213, 214, 215, 216, 217, 218, 219, 226, 227, 228, 229, 230, 238, 240, 242, 244, 246, 247, 248], 'color': '#FFFF33'},
             {'name': 'E site', 'positions': [57, 59, 62, 63, 67, 75, 78, 80, 81, 82, 83, 86, 87, 88, 91, 92, 94, 109, 260, 261, 262, 265], 'color': '#00CED1'},
         ],
-        'HA1 - H1N1': [
+        'HA1 - A(H1N1)pdm09': [
             {'name': 'Cb', 'positions': [70, 71, 72, 73, 74, 75], 'color': '#E41A1C'},
             {'name': 'Sa', 'positions': [124, 125, 153, 154, 155, 156, 157, 159, 160, 161, 162, 163, 164], 'color': '#377EB8'},
             {'name': 'RBD', 'positions': [91, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 143, 144, 145, 149, 150, 151, 152, 180, 181, 182, 183, 215, 216, 217, 218, 219, 220, 223, 224, 225, 226, 227], 'color': '#4DAF4A'},
@@ -331,17 +331,17 @@ process MutationsGraphicReport {
         
         # H1N1 Epitopes
         legend_html += '<div style="display: flex; flex-direction: column; align-items: center;">'
-        legend_html += '<div style="font-weight: bold; font-size: 13px; margin-bottom: 5px; color: #444;">Epítops H1N1</div>'
+        legend_html += '<div style="font-weight: bold; font-size: 13px; margin-bottom: 5px; color: #444;">Epítops A(H1N1)pdm09</div>'
         legend_html += '<div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; font-size: 11px; color: #333; max-width: 300px;">'
-        for ep in epitope_definitions.get('HA1 - H1N1', []):
+        for ep in epitope_definitions.get('HA1 - A(H1N1)pdm09', []):
             legend_html += f'<div style="display: flex; align-items: center;"><span style="display: inline-block; width: 12px; height: 12px; background-color: {ep["color"]}; opacity: 0.7; margin-right: 4px; border: 1px solid #999;"></span>{ep["name"]}</div>'
         legend_html += '</div></div>'
         
         # H3N2 Epitopes
         legend_html += '<div style="display: flex; flex-direction: column; align-items: center;">'
-        legend_html += '<div style="font-weight: bold; font-size: 13px; margin-bottom: 5px; color: #444;">Epítops H3N2</div>'
+        legend_html += '<div style="font-weight: bold; font-size: 13px; margin-bottom: 5px; color: #444;">Epítops A(H3N2)</div>'
         legend_html += '<div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; font-size: 11px; color: #333; max-width: 400px;">'
-        for ep in epitope_definitions.get('HA1 - H3N2', []):
+        for ep in epitope_definitions.get('HA1 - A(H3N2)', []):
             legend_html += f'<div style="display: flex; align-items: center;"><span style="display: inline-block; width: 12px; height: 12px; background-color: {ep["color"]}; opacity: 0.7; margin-right: 4px; border: 1px solid #999;"></span>{ep["name"]}</div>'
         legend_html += '</div></div>'
         
