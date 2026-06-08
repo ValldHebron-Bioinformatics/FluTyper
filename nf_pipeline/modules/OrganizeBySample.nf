@@ -2,7 +2,8 @@
 nextflow.enable.dsl=2
 
 process OrganizeBySample {
-    errorStrategy 'ignore' 
+    errorStrategy 'ignore'
+    debug true 
     
     input:
     val(sample_id)
@@ -53,17 +54,26 @@ process OrganizeBySample {
         # Check the orientation score
         if grep -F "rev_\$seq_name" "${sample_id}_orientation.tsv" | cut -f 4 | grep -q "[0-9]"; then
             # The reverse complement is correct: extract it and remove the '_rev' tag
-            seqkit grep -p "rev_\$seq_name" "\$combined_fasta" | sed 's/^>rev_/>/' > "\$target_file"
+            seqkit grep -p "rev_\$seq_name" "\$combined_fasta" | sed 's/^>rev_/>/' >> "\$target_file"
         else
             # The original orientation is correct
-            seqkit grep -p "\$seq_name" "\$combined_fasta" > "\$target_file"
+            seqkit grep -p "\$seq_name" "\$combined_fasta" >> "\$target_file"
         fi
     done < <(grep "^>" "\$raw_sample" | tr -d '>')
 
-    # Missing segment logging
+    # Missing and Duplicate segment logging
     for seg in ${params.segments.join(' ')}; do
-        if [ ! -s "samples/${sample_id}/segments/${sample_id}_\${seg}.fasta" ]; then
+        target_fasta="samples/${sample_id}/segments/${sample_id}_\${seg}.fasta"
+        
+        if [ ! -s "\$target_fasta" ]; then
             echo "OrganizeBySample: No records found for sample ${sample_id} segment \${seg}, skipping." >> "OSerrors.log"
+        else
+            # Count the fasta headers to determine the number of sequences
+            seq_count=\$(grep -c "^>" "\$target_fasta")
+            
+            if [ "\$seq_count" -gt 1 ]; then
+                echo "OrganizeBySample: Multiple records (\$seq_count) found for sample ${sample_id} segment \${seg}. Check \$target_fasta for possible coinfection."
+            fi
         fi
     done
     """
