@@ -30,6 +30,7 @@ for csv_file in csv_list:
 
 # Combine all individual CSV dataframes into one master dataframe
 master_df = pd.concat(all_data, ignore_index=True)
+master_df['PROTEIN'] = master_df['PROTEIN'].replace('NA', "NA ")  # Ensure 'NA' is treated as a string, not as NaN
 
 # Write the Full Report with a sheet for each protein, plus a combined sheet
 with pd.ExcelWriter("final_mutations_report.xlsx") as writer:
