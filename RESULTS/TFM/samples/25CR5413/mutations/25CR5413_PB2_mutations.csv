@@ -1,0 +1,20 @@
+SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,POSITION_REF,REFERENCE_AA,QUERY_AA,AA_MUTATION,MUTATION_TYPE,MARKER,MARKER_ID,IS_COMBINATION,EFFECT,FOUND_IN,REFERENCE
+25CR5413,H6N8,PB2,H5,60,60,D,E,D60E,Substitution,No,,No,,,
+25CR5413,H6N8,PB2,H5,79,79,G,S,G79S,Substitution,No,,No,,,
+25CR5413,H6N8,PB2,H5,89,89,V,V,89V,Marker,Yes,84 | 85,Yes,Increased polymerase activity in mammalian cells | Increased virulence in mice,H5N1,"Li J. et al., 2009 | Suttie A. et al., 2019"
+25CR5413,H6N8,PB2,H5,195,195,N,D,N195D,Substitution,No,,No,,,
+25CR5413,H6N8,PB2,H5,197,197,K,N,K197N,Substitution,No,,No,,,
+25CR5413,H6N8,PB2,H5,255,255,V,I,V255I,Substitution,No,,No,,,
+25CR5413,H6N8,PB2,H5,309,309,D,D,309D,Marker,Yes,84 | 85,Yes,Increased polymerase activity in mammalian cells | Increased virulence in mice,H5N1,"Li J. et al., 2009 | Suttie A. et al., 2019"
+25CR5413,H6N8,PB2,H5,339,339,K,K,339K,Marker,Yes,85,Yes,Increased polymerase activity in mammalian cells | Increased virulence in mice,H5N1,"Li J. et al., 2009 | Suttie A. et al., 2019"
+25CR5413,H6N8,PB2,H5,344,344,V,L,V344L,Substitution,No,,No,,,
+25CR5413,H6N8,PB2,H5,389,389,R,K,R389K,Substitution,No,,No,,,
+25CR5413,H6N8,PB2,H5,477,477,G,G,477G,Marker,Yes,85,Yes,Increased polymerase activity in mammalian cells | Increased virulence in mice,H5N1,"Li J. et al., 2009 | Suttie A. et al., 2019"
+25CR5413,H6N8,PB2,H5,495,495,V,V,495V,Marker,Yes,85,Yes,Increased polymerase activity in mammalian cells | Increased virulence in mice,H5N1,"Li J. et al., 2009 | Suttie A. et al., 2019"
+25CR5413,H6N8,PB2,H5,598,598,T,T,598T,Marker,Yes,65,No,Increased polymerase activity in mammalian cells | Increased replication in mammalian cells | Increased virulence in mice,H7N9,"Hu M. et al., 2017b | Suttie A. et al., 2019"
+25CR5413,H6N8,PB2,H5,607,607,L,M,L607M,Substitution,No,,No,,,
+25CR5413,H6N8,PB2,H5,627,627,E,E,627E,Marker,Yes,85,Yes,Increased polymerase activity in mammalian cells | Increased virulence in mice,H5N1,"Li J. et al., 2009 | Suttie A. et al., 2019"
+25CR5413,H6N8,PB2,H5,661,661,A,T,A661T,Substitution,No,,No,,,
+25CR5413,H6N8,PB2,H5,676,676,T,T,676T,Marker,Yes,85,Yes,Increased polymerase activity in mammalian cells | Increased virulence in mice,H5N1,"Li J. et al., 2009 | Suttie A. et al., 2019"
+25CR5413,H6N8,PB2,H5,697,697,I,L,I697L,Substitution,No,,No,,,
+25CR5413,H6N8,PB2,H5,715,715,S,N,S715N,Marker,Yes,82,No,Decreased virulence in mice,H5N1,"Sun H. et al., 2015 | Suttie A. et al., 2019"
