@@ -1,0 +1,7 @@
+GetCDS: No homologous sequence found in 25CR5865 for protein NA. Skipping.
+GetCDS: 25CR5865 PB2 ignored. Bad read with >50.0% Ns.
+GetCDS: 25CR5865 PB1 ignored. Bad read with >50.0% Ns.
+GetCDS: 25CR5865 PB1-F2 ignored. Bad read with >50.0% Ns.
+GetCDS: 25CR5865 NP ignored. Bad read with >50.0% Ns.
+GenotypingResults: CHANGELOG.md not found for dataset nextclade_H7_dataset, cannot extract version.
+WARNING: Marker file not found for protein PA-X: PA-X_markers.csv
