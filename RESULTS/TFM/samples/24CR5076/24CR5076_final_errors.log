@@ -1,0 +1,9 @@
+OrganizeBySample: No records found for sample 24CR5076 segment NA, skipping.
+OrganizeBySample: No records found for sample 24CR5076 segment PA, skipping.
+OrganizeBySample: No records found for sample 24CR5076 segment MP, skipping.
+SubtypeDetection: Missing N for 24CR5076
+GetCDS: No valid FASTA found for sample 24CR5076 segment NA. Skipping all proteins for this segment.
+GetCDS: 24CR5076 PB1 ignored. No real homology (Coverage: 41.3%, Identity: 85.2%).
+GetCDS: 24CR5076 PB1-F2 ignored. No real homology (Coverage: 96.7%, Identity: 48.1%).
+GetCDS: No valid FASTA found for sample 24CR5076 segment PA. Skipping all proteins for this segment.
+GetCDS: No valid FASTA found for sample 24CR5076 segment MP. Skipping all proteins for this segment.
