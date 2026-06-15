@@ -1,0 +1,14 @@
+SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,POSITION_REF,REFERENCE_AA,QUERY_AA,AA_MUTATION,MUTATION_TYPE,MARKER,MARKER_ID,IS_COMBINATION,EFFECT,FOUND_IN,REFERENCE
+25CR5363,H4N6,PB1,H5,3,3,V,V,3V,Marker,Yes,94,No,Increased polymerase activity in avian cells | Increased polymerase activity in mammalian cells | Increased replication in avian cells | Increased replication in mammalian cells,H5N1,"Elgendy E. et al., 2017 | Suttie A. et al., 2019"
+25CR5363,H4N6,PB1,H5,104,104,G,E,G104E,Substitution,No,,No,,,
+25CR5363,H4N6,PB1,H5,115,115,Q,Q,115Q,Marker,Yes,417,No,Transmitted via aerosol among guinea pigs,H7N9,"Zhang C. et al., 2021"
+25CR5363,H4N6,PB1,H5,172,172,D,E,D172E,Substitution,No,,No,,,
+25CR5363,H4N6,PB1,H5,176,176,T,K,T176K,Substitution,No,,No,,,
+25CR5363,H4N6,PB1,H5,179,179,M,I,M179I,Substitution,No,,No,,,
+25CR5363,H4N6,PB1,H5,182,182,T,I,T182I,Substitution,No,,No,,,
+25CR5363,H4N6,PB1,H5,215,215,R,K,R215K,Substitution,No,,No,,,
+25CR5363,H4N6,PB1,H5,372,372,I,M,I372M,Substitution,No,,No,,,
+25CR5363,H4N6,PB1,H5,622,622,G,G,622G,Marker,Yes,101,No,Increased polymerase activity in mammalian cells | Increased polymerase activity in mice | Increased virulence in mice,H5N1,"Feng X. et al., 2016 | Suttie A. et al., 2019"
+25CR5363,H4N6,PB1,H5,660,660,I,V,I660V,Substitution,No,,No,,,
+25CR5363,H4N6,PB1,H5,738,738,G,E,G738E,Substitution,No,,No,,,
+25CR5363,H4N6,PB1,H5,741,741,S,A,S741A,Substitution,No,,No,,,
