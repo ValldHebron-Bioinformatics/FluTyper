@@ -1,0 +1,9 @@
+GetCDS: No homologous sequence found in 25CR5865 for protein NA. Skipping.
+GetCDS: 25CR5865 PB2 ignored. Bad read with >50.0% Ns.
+GetCDS: 25CR5865 PB1 ignored. Bad read with >50.0% Ns.
+GetCDS: 25CR5865 PB1-F2 ignored. Bad read with >50.0% Ns.
+GetCDS: 25CR5865 NP ignored. Bad read with >50.0% Ns.
+WARNING: Marker file not found for protein NS1: /home/vhir/Desktop/FluTyper/nf_pipeline/../protocols/AVIAN/v1/markers/NS1_markers.csv
+WARNING: Marker file not found for protein NS2: /home/vhir/Desktop/FluTyper/nf_pipeline/../protocols/AVIAN/v1/markers/NS2_markers.csv
+WARNING: Marker file not found for protein PA-X: /home/vhir/Desktop/FluTyper/nf_pipeline/../protocols/AVIAN/v1/markers/PA-X_markers.csv
+GenotypingResults: CHANGELOG.md not found for dataset nextclade_H7_dataset, cannot extract version.

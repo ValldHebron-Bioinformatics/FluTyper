@@ -1,0 +1,18 @@
+SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,POSITION_REF,REFERENCE_AA,QUERY_AA,AA_MUTATION,MUTATION_TYPE,MARKER,MARKER_ID,IS_COMBINATION,EFFECT,FOUND_IN,REFERENCE
+25CR6193,H9Nx,M1,H9,15,15,I,V,I15V,Substitution,No,,No,,,
+25CR6193,H9Nx,M1,H9,30,30,D,D,30D,Marker,Yes,1,No,Increased virulence in mice,H5N1,"Fan S. et al., 2009 | Suttie A. et al., 2019"
+25CR6193,H9Nx,M1,H9,43,43,M,M,43M,Marker,Yes,3,No,Increased virulence in chickens | Increased virulence in ducks | Increased virulence in mice,H5N1,"Nao N. et al., 2015 | Suttie A. et al., 2019"
+25CR6193,H9Nx,M1,H9,46,46,I,L,I46L,Substitution,No,,No,,,
+25CR6193,H9Nx,M1,H9,101,101,K,R,K101R,Substitution,No,,No,,,
+25CR6193,H9Nx,M1,H9,107,107,M,I,M107I,Substitution,No,,No,,,
+25CR6193,H9Nx,M1,H9,140,140,A,T,A140T,Substitution,No,,No,,,
+25CR6193,H9Nx,M1,H9,141,141,G,E,G141E,Substitution,No,,No,,,
+25CR6193,H9Nx,M1,H9,142,142,G,V,G142V,Substitution,No,,No,,,
+25CR6193,H9Nx,M1,H9,144,144,L,F,L144F,Substitution,No,,No,,,
+25CR6193,H9Nx,M1,H9,157,157,A,S,A157S,Substitution,No,,No,,,
+25CR6193,H9Nx,M1,H9,166,166,A,V,A166V,Substitution,No,,No,,,
+25CR6193,H9Nx,M1,H9,215,215,A,A,215A,Marker,Yes,2,No,Increased virulence in mice,H5N1,"Fan S. et al., 2009 | Suttie A. et al., 2019"
+25CR6193,H9Nx,M1,H9,219,219,V,I,V219I,Substitution,No,,No,,,
+25CR6193,H9Nx,M1,H9,227,227,T,A,T227A,Substitution,No,,No,,,
+25CR6193,H9Nx,M1,H9,234,234,I,L,I234L,Substitution,No,,No,,,
+25CR6193,H9Nx,M1,H9,248,248,L,M,L248M,Substitution,No,,No,,,

@@ -1,0 +1,3 @@
+OrganizeBySample: No records found for sample 24CR5247 segment NS, skipping.
+GetCDS: No valid FASTA found for sample 24CR5247 segment NS. Skipping all proteins for this segment.
+WARNING: Marker file not found for protein PA-X: /home/vhir/Desktop/FluTyper/nf_pipeline/../protocols/AVIAN/v1/markers/PA-X_markers.csv

@@ -1,0 +1,22 @@
+SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,POSITION_REF,REFERENCE_AA,QUERY_AA,AA_MUTATION,MUTATION_TYPE,MARKER,MARKER_ID,IS_COMBINATION,EFFECT,FOUND_IN,REFERENCE
+25CR5865,H7N7(LPAI),HA1,H7,38,38,I,V,I38V,Substitution,No,,No,,,
+25CR5865,H7N7(LPAI),HA1,H7,95,98,E,D,E95D,Substitution,No,,No,,,
+25CR5865,H7N7(LPAI),HA1,H7,112,115,A,T,A112T,Substitution,No,,No,,,
+25CR5865,H7N7(LPAI),HA1,H7,128,134,A,A,128A,Marker,Yes,391,No,Increased viral replication in mice lungs | Increased virus thermostability,H9N2,"Zhang J. et al., 2023"
+25CR5865,H7N7(LPAI),HA1,H7,130,136,R,S,R130S,Substitution,No,,No,,,
+25CR5865,H7N7(LPAI),HA1,H7,149,154,N,N,149N,Marker,Yes,139,No,Increased virus binding to α2-6,H5N1,"Suttie A. et al., 2019 | Wang W. et al., 2010"
+25CR5865,H7N7(LPAI),HA1,H7,151,156,A,A,151A,Marker,Yes,142,No,Increased transmission in guinea pigs | Increased virus binding to α2-6,H5N1,"Gao Y. et al., 2009 | Suttie A. et al., 2019 | Wang W. et al., 2010"
+25CR5865,H7N7(LPAI),HA1,H7,165,170,S,D,S165D,Substitution,No,,No,,,
+25CR5865,H7N7(LPAI),HA1,H7,170,175,V,I,V170I,Substitution,No,,No,,,
+25CR5865,H7N7(LPAI),HA1,H7,177,182,V,G,V177G,Substitution,No,,No,,,
+25CR5865,H7N7(LPAI),HA1,H7,180,185,A,T,A180T,Substitution,No,,No,,,
+25CR5865,H7N7(LPAI),HA1,H7,193,198,V,I,V193I,Substitution,No,,No,,,
+25CR5865,H7N7(LPAI),HA1,H7,200,205,Y,Y,200Y,Marker,Yes,404,No,Increased virus binding to α2-6,H3N1,"Suzuki Y. et al., 1989"
+25CR5865,H7N7(LPAI),HA1,H7,217,222,L,Q,L217Q,Substitution,No,,No,,,
+25CR5865,H7N7(LPAI),HA1,H7,264,271,V,I,V264I,Substitution,No,,No,,,
+25CR5865,H7N7(LPAI),HA1,H7,267,273,N,S,N267S,Substitution,No,,No,,,
+25CR5865,H7N7(LPAI),HA1,H7,275,281,S,N,S275N,Substitution,No,,No,,,
+25CR5865,H7N7(LPAI),HA1,H7,289,295,D,N,D289N,Substitution,No,,No,,,
+25CR5865,H7N7(LPAI),HA1,H7,290,296,N,S,N290S,Substitution,No,,No,,,
+25CR5865,H7N7(LPAI),HA1,H7,303,309,R,E,R303E,Substitution,No,,No,,,
+25CR5865,H7N7(LPAI),HA1,H7,306,312,L,M,L306M,Substitution,No,,No,,,
