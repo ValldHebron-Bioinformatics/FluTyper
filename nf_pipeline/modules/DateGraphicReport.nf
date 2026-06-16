@@ -2,6 +2,10 @@
 nextflow.enable.dsl=2
 
 process DateGraphicReport {
+    // This process generates a frequency evolution report for each protein and subtype combination over time, 
+    // based on the provided Excel mutation data and metadata CSV file. It creates interactive HTML plots using Plotly, 
+    // showing both weekly and cumulative frequencies of mutations, along with total sample counts. 
+    // The report includes dropdowns for selecting different time ranges (all time or specific seasons).
     errorStrategy 'ignore'
     debug true
     input:
@@ -22,6 +26,11 @@ process DateGraphicReport {
     import re
 
     def generate_plots(mut_file, meta_file):
+        '''
+        Generates frequency evolution plots for each protein and subtype combination over time.
+        The function reads mutation data from an Excel file and metadata from a CSV file, 
+        processes the data, and creates interactive HTML plots using Plotly.
+        '''
         df_mut = pd.read_excel(mut_file, na_filter=False)
         df_meta = pd.read_csv(meta_file, skipinitialspace=True)
 
@@ -39,7 +48,7 @@ process DateGraphicReport {
         all_time_end = df_meta['WEEK'].max() + pd.Timedelta(days=14)
         all_time_range = [all_time_start.strftime('%Y-%m-%d'), all_time_end.strftime('%Y-%m-%d')] if pd.notnull(all_time_start) else None
 
-        # Determine true 52-week seasonal x-axis ranges regardless of data gaps
+        # Determine true 52-week seasonal x-axis ranges
         season_ranges = {}
         for season in sorted(df_meta['Season'].dropna().unique()):
             if season == "Unknown Season":
@@ -66,6 +75,11 @@ process DateGraphicReport {
         
         # Updated logic to prevent mixing subtypes in HUMAN protocol timelines
         def get_plot_name(row):
+            '''
+            Determines the plot name based on the protein and reference subtype.
+            For HUMAN protocol, combines protein and subtype to avoid mixing timelines.
+            For AVIAN protocol, combines protein and subtype for HA1, HA2, and NA, otherwise uses protein only.
+            '''
             prot = str(row.get('PROTEIN', 'Unknown'))
             subtype = str(row.get('REF_SUBTYPE', 'Unknown')).replace('/', '_')
             
@@ -94,6 +108,7 @@ process DateGraphicReport {
         else:
             color_list = ['#F9DC5C', '#CD733D', '#C84630', '#94B0DA', '#676F86', '#3A2D32']
 
+        # Main loop to generate plots for each protein and subtype combination
         for segment, proteins in prot_dict.items():
             os.makedirs(f"FrequencyEvolution/{segment}", exist_ok=True)
             
@@ -103,7 +118,7 @@ process DateGraphicReport {
 
                 for plot_name in df_base_markers['PLOT_NAME'].unique():
                     df_prot = df_base_markers[df_base_markers['PLOT_NAME'] == plot_name]
-                    
+                    # Calculate weekly totals and cumulative counts
                     df_plot_all = df_all[df_all['PLOT_NAME'] == plot_name]
                     weekly_totals = df_plot_all.groupby('WEEK')['SAMPLE_ID'].nunique().reset_index(name='Samples (Week)')
                     
@@ -189,6 +204,7 @@ process DateGraphicReport {
                         else:
                             ref = "Unknown"
 
+                        # Add traces for weekly and cumulative frequencies with hover information with plotly
                         fig.add_trace(
                             go.Scatter(
                                 x=mut_df['WEEK'], y=mut_df['Freq_Weekly'],
@@ -229,7 +245,7 @@ process DateGraphicReport {
                             ), row=2, col=1, secondary_y=False
                         )
 
-                    # Build dropdown buttons for zooming
+                    # Build dropdown menus for time range selection
                     dropdown_buttons = []
                     if all_time_range:
                         dropdown_buttons.append(
@@ -259,7 +275,7 @@ process DateGraphicReport {
                     fig.update_yaxes(title_text="Total Samples (N)", range=[0, y4_max], showgrid=False, fixedrange=True, row=2, col=1, secondary_y=True)
                     
                     fig.update_xaxes(tickformat="Week %V<br>%Y", showticklabels=True)
-                    
+                    # Final layout adjustments for aesthetics and interactivity
                     fig.update_layout(
                         title=dict(
                             text=f"<b>Frequency in Time Report: {display_name}</b>",
