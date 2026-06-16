@@ -151,7 +151,7 @@ workflow {
             tuple(sample_id, prot_files, h_tag, n_tag, pathotype)
         }
         
-    MutationsFinder(Mutations_ch)
+    MutationsFinder(Mutations_ch, ch_markerfiles.collect()) // Markers are collected into a list for the process to use
     ch_mut = MutationsFinder.out.results.map { _id, mut_files, combined_csv -> [mut_files, combined_csv] }.flatten() // Flatten the channel to emit individual mutation files and the combined CSV for downstream processing
     
     MutationsCompiler_ch = MutationsFinder.out.results
