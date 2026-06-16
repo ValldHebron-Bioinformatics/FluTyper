@@ -2,11 +2,16 @@
 nextflow.enable.dsl=2
 
 process MutationsFinder {
+    // This process identifies mutations in the translated protein sequences based on the 
+    // aligned protein FASTA files and the provided marker files.
+    // It generates a CSV file for each protein containing the detected mutations, their types, and 
+    // associated marker information.
     errorStrategy 'ignore'
     debug true
 
     input:
     tuple val(sample_id), path(prot_files), val(h_tag), val(n_tag), val(pathotype)
+    path markers
 
     output:
     tuple val(sample_id), path("samples/${sample_id}/mutations/${sample_id}_*_mutations.csv"), path("samples/${sample_id}/${sample_id}_mutations.csv"), emit: results
@@ -18,7 +23,8 @@ import os, csv
 from pathlib import Path
 from Bio import SeqIO
 
-markers_dir = Path("${params.protocols[params.protocol].resources}/markers")
+# Set up paths and directories
+markers_dir = Path(".")
 ha_dict = "${params.protocols[params.protocol].resources}/HA_DICT.csv"
 na_dict = "${params.protocols[params.protocol].resources}/NA_DICT.csv"
 out_dir = Path("samples/${sample_id}/mutations")
@@ -28,6 +34,9 @@ target_H = "${h_tag}" if "${h_tag}".startswith("H") and "${h_tag}"[1:].isdigit()
 target_N = "${n_tag}" if "${n_tag}".startswith("N") and "${n_tag}"[1:].isdigit() else "N1"
 
 def build_pos_lookup(dict_path, from_col, to_col, prot_filter=None):
+    '''
+    Build a position lookup dictionary from a CSV file, filtering by protein if specified.
+    '''
     if not os.path.exists(dict_path):
         return {}
     with open(dict_path, 'r', encoding='utf-8-sig') as f:
@@ -50,7 +59,7 @@ output_files = []
 for aligned_prot in "${prot_files}".split():
     file_path = Path(aligned_prot)
     
-    # Bulletproof protein name extraction (strips extensions)
+    # Protein name extraction from the file name
     file_stem = file_path.stem 
     prot_name = file_stem.replace("${sample_id}_", "").split("_")[0]
 
@@ -62,8 +71,22 @@ for aligned_prot in "${prot_files}".split():
     # Force UPPERCASE to prevent case-mismatch bugs between FASTA translation and CSV markers
     ref_seq, query_seq = str(records[0].seq).upper(), str(records[1].seq).upper()
     ref_tag = str(records[0].description).split('_')[0]
+     if "${params.protocol}" == "HUMAN" :
+        if ref_tag == "H1N1": ref_tag = "A(H1N1)pdm09"
+        elif ref_tag == "H3N2": ref_tag = "A(H3N2)"
+    # Determine the subtype value
     subtype_val = "${h_tag}${n_tag}(${pathotype})" if "${pathotype}" != "" else "${h_tag}${n_tag}"
 
+    if "${params.protocol}" == "HUMAN":
+        raw_sub = "${h_tag}${n_tag}"
+        if raw_sub == "H1N1":
+            subtype_val = "A(H1N1)pdm09"
+        elif raw_sub == "H3N2":
+            subtype_val = "A(H3N2)"
+        elif raw_sub.startswith("H") and "N" in raw_sub:
+            subtype_val = f"A({raw_sub})"
+
+    # Build position lookup dictionaries for HA and NA based on the protocol and protein   
     pos_to_base = {}
     if "${params.protocol}" == "AVIAN":
         if prot_name.startswith("HA"):
@@ -80,22 +103,33 @@ for aligned_prot in "${prot_files}".split():
             ref_N = "${n_tag}" if "${n_tag}".startswith("N") else "N1"
             pos_to_base = build_pos_lookup(na_dict, f"{ref_N}_pos", "N1_pos")
 
+    # Markers information is stored in a dictionary keyed by marker ID, with values being sets of (position, amino acid) tuples
     markers_by_id, marker_info = {}, {}
     m_file = markers_dir / f"{prot_name}_markers.csv"
-    
+
     if m_file.exists():
         with open(m_file, encoding='utf-8-sig') as f:
             for row in csv.DictReader(f):
                 # SUBTYPE FILTERING FOR HUMAN PROTOCOL
                 if "${params.protocol}" == "HUMAN":
                     found_in = row.get('FOUND_IN', '').strip().upper()
-                    if found_in and found_in != "UNIVERSAL":
+                     if found_in and found_in != "UNIVERSAL":
                         h_val = "${h_tag}".upper()
                         n_val = "${n_tag}".upper()
+                        raw_combo = h_val + n_val
                         
-                        allowed_tags = [h_val + n_val]
+                        allowed_tags = [raw_combo]
                         if h_val != "HX": allowed_tags.append(h_val)
                         if n_val != "NX": allowed_tags.append(n_val)
+                        
+                        # Support for human specific formatting in the marker files
+                        if raw_combo == "H1N1": allowed_tags.append("A(H1N1)pdm09")
+                        elif raw_combo == "H3N2": allowed_tags.append("A(H3N2)")
+                        elif "X" in raw_combo: allowed_tags.append(f"A({raw_combo})")
+                        elif raw_combo.startswith("H") and "N" in raw_combo: allowed_tags.append(f"A({raw_combo})")
+                        
+                        if h_val == "H1": allowed_tags.append("A(H1)pdm09")
+                        elif h_val == "H3": allowed_tags.append("A(H3)")
                         
                         if not any(tag in found_in for tag in allowed_tags):
                             continue
@@ -108,11 +142,13 @@ for aligned_prot in "${prot_files}".split():
                 # Avoid duplicate info entries for the same marker ID
                 if info not in marker_info.setdefault(m_id, []): marker_info[m_id].append(info)
     else:
-        with open("MFerrors.log", 'a') as f: f.write(f"WARNING: Marker file not found for protein {prot_name}: {m_file}\\n")
-
+        if "${params.protocol}" == "AVIAN":
+                    with open("MFerrors.log", 'a') as f: f.write(f"WARNING: Marker file not found for protein {prot_name}: {m_file}\\n")
+    
+    # Build a set of observed mutations and their corresponding positions, using the reference and query sequences
     observed_mutations, protein_pos = set(), 0
     for r_aa, q_aa in zip(ref_seq, query_seq):
-        if r_aa != "-": protein_pos += 1
+        if r_aa != "-": protein_pos += 1 # Increment position only when the reference amino acid is not a gap
         standard_pos = pos_to_base.get(str(protein_pos), str(protein_pos))
         
         # Avoid treating 'X' (unknown AA from NNN codons) as a valid target to prevent false wildcard marker triggers
@@ -137,7 +173,10 @@ for aligned_prot in "${prot_files}".split():
         if r_aa != "-": pos += 1
         pos_raw = str(pos)
         pos_ref = pos_to_base.get(pos_raw, pos_raw)
-
+        
+        # Decide which position to use for marker lookup based on the protocol
+        marker_pos = pos_ref if "${params.protocol}" == "AVIAN" else pos_raw
+        
         is_mutation = r_aa != q_aa and "X" not in (r_aa, q_aa)
 
         # Look first for exact matches, then for "X" matches only if it is a true mutation
@@ -149,7 +188,8 @@ for aligned_prot in "${prot_files}".split():
         
         if not (is_marker or is_mutation):
             continue
-
+        
+        # If the mutation is part of a marker, we record it with all relevant marker information; otherwise, we classify it as an insertion, deletion, or substitution
         if is_marker:
             m_ids = combined_m_ids
             is_combo = " | ".join(dict.fromkeys("Yes" if len(set(m[0] for m in markers_by_id[mid])) > 1 else "No" for mid in m_ids))
@@ -211,7 +251,7 @@ for aligned_prot in "${prot_files}".split():
 
     events = collapse_indels(events)
 
-    # --- Write output CSV ---
+    # Write output CSV
     out_csv = out_dir / f"${sample_id}_{prot_name}_mutations.csv"
     output_files.append(out_csv)
 
