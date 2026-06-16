@@ -35,12 +35,13 @@ workflow {
     SampleInput_ch = channel
         .fromPath(params.inputFasta, checkIfExists: true)
         .splitFasta(record: [id: true])
-        .map { rec -> rec.id.tokenize('[|_]')[0] } 
+        .map { rec -> rec.id.tokenize('[|_]')[0] } // Extract sample ID from FASTA header using the first token before '|' or '_'
         .unique()
  
     OrganizeBySample(SampleInput_ch)
 
     // SUBTYPE DETECTION
+    // Prepare channel for subtype detection by mapping sample IDs to their corresponding HA and NA FASTA files
     SubtypeInput_ch = OrganizeBySample.out.results.map { sample_id, sample_dir ->
         def ha_fasta = file("${sample_dir}/segments/${sample_id}_HA.fasta")
         def na_fasta = file("${sample_dir}/segments/${sample_id}_NA.fasta")
@@ -49,11 +50,12 @@ workflow {
 
     SubtypeDetection(SubtypeInput_ch)
 
+    // Collect inferred subtypes into a single CSV file for downstream processing
     SubtypeMerged_ch = SubtypeDetection.out.results
         .map { tup -> tup[1] }
         .collectFile(
             name: 'inferred_subtypes.csv',
-            seed: 'seqName,inferred_subtype,pathotype\n' 
+            seed: 'Sample_ID,inferred_subtype,pathotype\n' 
         )
 
     // DATASET PREPARATION
@@ -78,11 +80,11 @@ workflow {
         .map { sample_id, row ->
             def subtype = row[1]
             def pathotype = row[2]
-            def h_tag = subtype.find(/H\d+/) ?: "Hx" 
-            def n_tag = subtype.find(/N\d+/) ?: "Nx"
+            def h_tag = subtype.find(/H\d+/) ?: "Hx" // Extract H subtype or default to "Hx" if not found
+            def n_tag = subtype.find(/N\d+/) ?: "Nx" // Extract N subtype or default to "Nx" if not found
             tuple(sample_id, h_tag, n_tag, pathotype)
         }
-        
+    
     GenotypingHfile_ch = SubtypeInput_ch.map { sample_id, ha_fasta, _na_fasta -> 
         tuple(sample_id, ha_fasta) 
     }
@@ -103,11 +105,11 @@ workflow {
     .join(GenotypingNextclade.out.results, remainder: true) 
     .join(GenotypingNextclade.out.genin, remainder: true) 
     .map { sample_id, h_tag, n_tag, pathotype, csv_file, genin_file -> 
-        tuple(sample_id, h_tag, n_tag, pathotype, csv_file ?: [], genin_file ?: [])
+        tuple(sample_id, h_tag, n_tag, pathotype, csv_file ?: [], genin_file ?: []) // Ensure that missing files are represented as empty lists
     }
         
     GenotypingResults(GenotypingResultsInput_ch, GetDatasets.out.collect()) 
-    
+    // Use .collectFile to gather all genotyping results into a single CSV file for downstream processing
     GenotypingFinal_ch = GenotypingResults.out.results.map { tup -> tup[1] }
         .collectFile(
             name: 'final_genotyping_results.csv',
@@ -115,6 +117,7 @@ workflow {
         )
 
     // MARKERS PREPARATION
+    // Depending on the protocol, either use FluMutDB for Avian or the predefined markers directory for Human
     if (params.protocol == "AVIAN") {
         FluMutDB(SubtypeMerged_ch)
         ch_database = FluMutDB.out
@@ -149,7 +152,7 @@ workflow {
         }
         
     MutationsFinder(Mutations_ch)
-    ch_mut = MutationsFinder.out.results.map { _id, mut_files, combined_csv -> [mut_files, combined_csv] }.flatten()
+    ch_mut = MutationsFinder.out.results.map { _id, mut_files, combined_csv -> [mut_files, combined_csv] }.flatten() // Flatten the channel to emit individual mutation files and the combined CSV for downstream processing
     
     MutationsCompiler_ch = MutationsFinder.out.results
         .map { _sample_id, _mut_files, combined_csv -> combined_csv }
@@ -159,8 +162,8 @@ workflow {
     ch_raw_mutations = MutationsCompiler.out.results
     ch_mutations_report = MutationsCompiler.out.results
 
-    // --- APPEND LOGIC INTERCEPTION ---
-    def meta_str = params.metadata ? file(params.metadata).toAbsolutePath().toString() : ""
+    // APPEND LOGIC INTERCEPTION
+    def meta_str = params.metadata ? file(params.metadata).toAbsolutePath().toString() : "" // Resolve the absolute path for metadata if provided
 
     if (params.get('append')) {
         append_dir_ch = file(params.append, checkIfExists: true)
@@ -175,10 +178,10 @@ workflow {
         final_subtypes_ch   = SubtypeMerged_ch
         final_genotyping_ch = GenotypingFinal_ch
         final_mutations_ch  = ch_raw_mutations
-        final_metadata_ch   = params.metadata ? channel.fromPath(params.metadata, checkIfExists: true) : channel.of([])
+        final_metadata_ch   = params.metadata ? channel.fromPath(params.metadata, checkIfExists: true) : channel.of([]) // Create an empty channel if no metadata is provided
     }
 
-    // --- AGGREGATED GRAPHIC REPORTS (Using Merged Data) ---
+    // AGGREGATED GRAPHIC REPORTS (Using Merged Data)
     CladeGraphicReport(final_genotyping_ch, final_metadata_ch)
     ch_clade_evolution_report = CladeGraphicReport.out.evolution_report
 
