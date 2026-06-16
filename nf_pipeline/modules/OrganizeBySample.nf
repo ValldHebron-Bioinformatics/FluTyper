@@ -2,6 +2,8 @@
 nextflow.enable.dsl=2
 
 process OrganizeBySample {
+    // This process is designed to organize sequences by sample ID, generate reverse complements, 
+    // and perform orientation checks using Nextclade. It also handles logging for missing segments and errors.
     errorStrategy 'ignore' 
     
     input:
@@ -20,7 +22,7 @@ process OrganizeBySample {
     
     raw_sample="samples/${sample_id}/${sample_id}.fasta"
     combined_fasta="${sample_id}_combined.fasta"
-
+    # Use seqkit to extract sequences for the given sample ID from the staged FASTA file
     seqkit grep -r -p "^${sample_id}" "${staged_fasta}" > "\$raw_sample"
 
     if [ ! -s "\$raw_sample" ]; then
@@ -32,14 +34,14 @@ process OrganizeBySample {
     seqkit seq --reverse --complement --validate-seq "\$raw_sample" | sed 's/^>/>rev_/' > rev_comp.fasta
     cat "\$raw_sample" rev_comp.fasta > "\$combined_fasta"
 
-    # Nextclade Orientation Check
+    # Orientation check using Nextclade with the appropriate minimizer index based on the protocol
     minimizer_index="${params.protocols[params.protocol].resources}/Segments_minimizers.json"
     nextclade sort -m "\${minimizer_index}" -r "${sample_id}_orientation.tsv" "\$combined_fasta"
 
     # Rescue and Split segments based on the orientation check results
     while read -r seq_name; do
         
-        # Identify which segment this sequence belongs to
+        # Identify which segment each sequence belongs to
         seg_type=""
         for s in ${params.segments.join(' ')}; do
             if [[ "\$seq_name" =~ [_|]\${s}([_|]|\$) ]]; then
