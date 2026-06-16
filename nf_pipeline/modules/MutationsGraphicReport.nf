@@ -2,6 +2,9 @@
 nextflow.enable.dsl=2
 
 process MutationsGraphicReport {
+    // This process generates a comprehensive HTML report visualizing mutation data using Plotly.
+    // It reads mutation data from an Excel file, processes it, and creates interactive scatter 
+    // plots for each protein group.
     errorStrategy 'ignore'
     debug true
 
@@ -34,12 +37,16 @@ process MutationsGraphicReport {
 
     # Define the coloring logic based on mutation type or marker status
     def get_mutation_category(row):
+        '''
+        Categorizes each mutation based on its type or marker status.
+        '''
         if str(row.get('MARKER', 'No')) == 'Yes':
             return 'Marker'
         return str(row.get('MUTATION_TYPE', 'Unknown'))
 
     df['Color_Category'] = df.apply(get_mutation_category, axis=1)
 
+    # Define color mapping 
     if "${params.colorblind}".lower() == "true":
         # Colorblind-friendly palette
         color_map = {
@@ -60,6 +67,11 @@ process MutationsGraphicReport {
 
     # Define plot groups based on the selected Nextflow protocol
     def get_plot_group(row):
+        '''
+        Determines the plot group for each mutation based on the protein and subtype.
+        For HUMAN protocol, all proteins are strictly separated by subtype to avoid mixing.
+        For AVIAN protocol, only HA and NA surface proteins are separated by subtype.
+        '''
         protein = str(row.get('PROTEIN', 'Unknown'))
         subtype = str(row.get('REF_SUBTYPE', 'Unknown'))
         
@@ -81,8 +93,11 @@ process MutationsGraphicReport {
     # Define the relevant columns for grouping and aggregation
     group_cols = ['Plot_Group', 'POSITION', 'POSITION_REF', 'AA_MUTATION', 'Color_Category', 'ColorCode']
     
-    # Function to list unique items in a column
+
     def list_unique_items(data_column, joiner=', '):
+        '''
+        Returns a string of unique, non-empty items from a pandas Series.
+        '''
         valid_items = []
         for item in data_column.unique():
             if str(item).strip() != '':
@@ -123,6 +138,9 @@ process MutationsGraphicReport {
     }
 
     def custom_sort_key(group_name):
+        '''
+        Custom sorting key for plot groups based on biological segment order.
+        '''
         base_protein = group_name.split(' - ')[0]
         segment_num = segment_mapping.get(base_protein, 99)
         return (segment_num, group_name)
@@ -153,7 +171,7 @@ process MutationsGraphicReport {
             # Pack aggregated data
             hover_data = mut_df[['Sample_IDs', 'Subtypes', 'AA_MUTATION', 'EFFECT', 'Sample_Count', 'Percentage', 'FOUND_IN', 'POSITION_REF', 'Total_Group_Samples']].values
             
-            # Set mode and text for Markers only
+            # Set mode and text for Markers only to add labels above/below the points
             if mut_type == 'Marker':
                 scatter_mode = 'markers+text'
                 scatter_text = ["<b>" + str(x) + "</b>" for x in mut_df['AA_MUTATION']]
@@ -171,6 +189,7 @@ process MutationsGraphicReport {
             else:
                 ref = "Unknown"
 
+            # Plotly scatter trace for the mutation type
             fig.add_trace(
                 go.Scatter(
                     x=mut_df['POSITION'],
@@ -212,7 +231,7 @@ process MutationsGraphicReport {
             
         fig.update_yaxes(range=[0, 115], title_text="Frequency (%)", row=i, col=1)
     
-    # Graph layout adjustments (showlegend=False because we now use an html sticky legend)
+    # Graph layout adjustments (showlegend=False because we use an html sticky legend)
     fig.update_layout(
         height=total_figure_height, 
         showlegend=False, 
@@ -248,21 +267,24 @@ process MutationsGraphicReport {
         <meta charset="utf-8">
         <title>Mutations Summary</title>
         <style>
+            /* CSS handles the visual presentation. The sticky-header keeps the controls visible when scrolling down a large graph. */
             body {{
                 font-family: arial; 
                 text-align: center; 
                 margin: 0; 
                 padding: 0;
             }}
-            .sticky-header {{
+            // This class makes the header with the slider and legend stick to the top
+            .sticky-header {{ 
                 position: sticky;
                 top: 0;
                 background-color: rgba(255, 255, 255, 0.96); 
                 padding: 15px 20px;
-                z-index: 1000; 
+                z-index: 1000; /* Ensures the header stays on top of the graph elements */
                 box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); 
                 border-bottom: 1px solid #eaeaea;
             }}
+            // This class centers the slider
             .slider-container {{
                 margin: 15px auto 5px auto; 
                 max-width: 600px;
@@ -273,11 +295,11 @@ process MutationsGraphicReport {
         </style>
     </head>
     <body>
-
+        // The sticky header contains the title, subtitle, slider for frequency threshold, and the legend.
         <div class="sticky-header">
             <h2 style="margin: 0 0 5px 0;">Mutation Summary per Protein</h2>
             <p style="color: gray; font-size: 14px; margin: 0;">{subtitle_text}</p>
-
+            // The slider allows users to filter mutations based on their frequency in the dataset.
             <div class="slider-container">
                 <label><b>Minimum Frequency Threshold:</b> <span id="sliderValue">{default_val}%</span></label>
                 <br><br>
@@ -296,12 +318,13 @@ process MutationsGraphicReport {
         </div>
 
         <script>
+            // setInterval creates a loop that checks every 200ms if the Plotly graph has been rendered and contains data.
             var checkGraphReady = setInterval(function() {{
                 var graphContainer = document.getElementById('plotly-graphs');
                 
                 // If the graph is loaded and has data, we can store the original Y values.
                 if (graphContainer && graphContainer.data && graphContainer.data.length > 0) {{
-                    clearInterval(checkGraphReady); 
+                    clearInterval(checkGraphReady); // Stop the checking loop once we confirm the graph exists
                     
                     // Save the original Y values to a custom property so we don't lose them when filtering
                     graphContainer.originalYValues = [];
@@ -320,10 +343,11 @@ process MutationsGraphicReport {
             }}, 200);
 
             function applyFrequencyFilter(minimumFrequency) {{
+                // Update the text label next to the slider to show the current number
                 document.getElementById('sliderValue').innerText = minimumFrequency + '%';
                 var graphContainer = document.getElementById('plotly-graphs');
                 
-                // If the graph hasn't been properly saved to memory yet, exit silently to avoid errors
+                // If the graph hasn't been properly saved to memory yet, exit silently to avoid browser errors
                 if (!graphContainer || !graphContainer.originalYValues) return;
                 
                 var newVerticalCoordinates = [];
@@ -337,19 +361,21 @@ process MutationsGraphicReport {
                         continue;
                     }}
 
-                    // Apply conditional bypass logic based on the Nextflow protocol
+                    // Apply conditional bypass logic based on the Nextflow protocol injection
                     if ({js_marker_bypass}) {{
+                        // If bypass is true, just push the original data back without filtering
                         newVerticalCoordinates.push(baselineYValues);
                     }} else {{
                         var filteredYValues = [];
                         for(var pointIndex = 0; pointIndex < baselineYValues.length; pointIndex++) {{
-                            // Safely check that the extra custom data exists before trying to read the percentage
+                            // Safely check that the extra custom data (injected by Python) exists before trying to read the percentage
                             if (dataSeries.customdata && dataSeries.customdata[pointIndex]) {{
+                                // Index [5] corresponds to the exact column where you stored the percentage in your Python dataframe logic
                                 var pointPercentage = dataSeries.customdata[pointIndex][5];
                                 if (pointPercentage >= minimumFrequency) {{
-                                    filteredYValues.push(baselineYValues[pointIndex]);
+                                    filteredYValues.push(baselineYValues[pointIndex]); // Keep the point
                                 }} else {{
-                                    filteredYValues.push(null);
+                                    filteredYValues.push(null); // Setting it to null tells Plotly to visually hide this specific point
                                 }}
                             }} else {{
                                 filteredYValues.push(null);
@@ -359,7 +385,7 @@ process MutationsGraphicReport {
                     }}
                 }}
                 
-                // Send all Y-coordinate updates to the graph at once for a smooth visual transition
+                // Send all Y-coordinate updates to the graph at once for a smooth visual transition.
                 Plotly.restyle(graphContainer, {{y: newVerticalCoordinates}});
             }}
         </script>
