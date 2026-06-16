@@ -66,7 +66,7 @@ else:
 
 
 # Extra Markers Integration
-target_prots = ["HA1", "HA2", "M1", "M2", "NA", "NP", "NS-1", "NS-2", "PA", "PA-X"," "PB1", "PB1-F2", "PB2"]
+target_prots = ["HA1", "HA2", "M1", "M2", "NA", "NP", "NS-1", "NS-2", "PA", "PA-X", "PB1", "PB1-F2", "PB2"]
 extra_file_path = "${extra_markers_abs}"
 
 # Check if the path points to a file
