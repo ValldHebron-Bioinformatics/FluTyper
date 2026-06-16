@@ -2,6 +2,7 @@
 nextflow.enable.dsl=2
 
 process CompileErrors {
+    // This process compiles all error logs into a single log file for each sample
     errorStrategy 'ignore'
     input:
     tuple val(sample_id), path(logs)
