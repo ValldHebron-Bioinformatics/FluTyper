@@ -109,7 +109,7 @@ workflow {
     }
         
     GenotypingResults(GenotypingResultsInput_ch, GetDatasets.out.collect()) 
-    // Use .collectFile to gather all genotyping results into a single CSV file for downstream processing
+    // Use .collectFile to gather all genotyping results into a single CSV file
     GenotypingFinal_ch = GenotypingResults.out.results.map { tup -> tup[1] }
         .collectFile(
             name: 'final_genotyping_results.csv',
