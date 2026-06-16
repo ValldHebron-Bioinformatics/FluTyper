@@ -2,6 +2,8 @@
 nextflow.enable.dsl=2
 
 process FluMutDB {
+    // This process checks for the latest release of the FluMutDB database from the public GitHub repository.
+    // If the local database is outdated or missing, it downloads and compiles the latest version into a SQLite database.
     errorStrategy 'ignore'
     debug true
     
