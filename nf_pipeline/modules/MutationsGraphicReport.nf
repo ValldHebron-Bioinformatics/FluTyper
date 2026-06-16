@@ -344,15 +344,13 @@ process MutationsGraphicReport {
         </style>
     </head>
     <body>
-        // The sticky header contains the title, subtitle, slider for frequency threshold, and the legend.
         <div class="sticky-header">
             <h2 style="margin: 0 0 5px 0;">Mutation Summary per Protein</h2>
             <p style="color: gray; font-size: 14px; margin: 0;">{subtitle_text}</p>
-            // The slider allows users to filter mutations based on their frequency in the dataset.
             <div class="slider-container">
-                <label><b>Minimum Frequency Threshold:</b> <span id="sliderValue">{{default_val}}%</span></label>
+                <label><b>Minimum Frequency Threshold:</b> <span id="sliderValue">{default_val}%</span></label>
                 <br><br>
-                <input type="range" id="freqSlider" min="0" max="100" value="{{default_val}}" oninput="applyFrequencyFilter(this.value)" style="width: 80%;">
+                <input type="range" id="freqSlider" min="0" max="100" value="{default_val}" oninput="applyFrequencyFilter(this.value)" style="width: 80%;">
                 
                 <p style="color: gray; font-size: 12px; margin-top: 8px; margin-bottom: 0;">
                     Percentage of frequency of mutations in the sequences assessed
