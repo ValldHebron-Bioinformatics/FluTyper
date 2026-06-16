@@ -2,6 +2,8 @@
 nextflow.enable.dsl=2
 
 process GenotypingNextclade {
+    // This process performs genotyping of influenza samples using Nextclade and
+    // if clade 2.3.4.4b is detected, it also runs genin2 for further genotyping.
     errorStrategy 'ignore'
     debug true
     
