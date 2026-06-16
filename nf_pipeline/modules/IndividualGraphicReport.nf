@@ -2,6 +2,9 @@
 nextflow.enable.dsl=2
 
 process IndividualGraphicReport {
+    // This process generates an interactive HTML genomic barcode profile for a given sample based on its mutations data. 
+    // It uses Plotly to create a multi-panel figure where each panel corresponds to a specific protein or protein-subtype
+    // combination, displaying the positions of mutations and their effects.
     errorStrategy 'ignore'
     debug true
 
