@@ -2,6 +2,7 @@
 nextflow.enable.dsl=2
 
 process MergeHistoricalData {
+    // This process is activated with the --append flag and merges new data with historical data from the append_dir.
     errorStrategy 'ignore'
     
     input:
