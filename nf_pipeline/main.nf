@@ -20,6 +20,23 @@ include { IndividualGraphicReport   } from './modules/IndividualGraphicReport'
 include { InteractiveMutationsTable } from './modules/InteractiveMutationsTable'
 include { DateGraphicReport         } from './modules/DateGraphicReport'
 include { MergeHistoricalData       } from './modules/MergeHistoricalData'
+include { GeographicReport          } from './modules/GeographicReport'
+
+// Function to check if the metadata file contains a "LOCATION" column
+def check_location_column(metadata_path) {
+    if (!metadata_path) return false
+    def f = file(metadata_path)
+    if (!f.exists()) return false
+    
+    def has_loc = false
+    f.withReader { reader ->
+        def header = reader.readLine()
+        if (header && header.toUpperCase().contains("LOCATION")) {
+            has_loc = true
+        }
+    }
+    return has_loc
+}
 
 workflow {
     main:
@@ -73,6 +90,7 @@ workflow {
     ch_individual_graphic_report = channel.empty()
     ch_clade_evolution_report = channel.empty()
     date_report_ch = channel.empty()
+    ch_geo_report = channel.empty()
   
     // GENOTYPING ANALYSIS (NEXTCLADE)
     GenotypingInfo_ch = SubtypeDetection.out.results
@@ -198,6 +216,12 @@ workflow {
         date_report_ch = channel.empty()
     }
 
+    // Conditionally generate the Geographic Report if metadata location is provided or if appending to existing data
+    def run_geographic_report = check_location_column(params.metadata)
+    if (run_geographic_report && params.coordinates) {
+        GeographicReport(final_genotyping_ch, final_metadata_ch, file(params.coordinates, checkIfExists: true))
+        ch_geo_report = GeographicReport.out.geo_report
+    }
     // CONDITIONALLY RUN INDIVIDUAL GRAPHIC REPORTS
     if (params.get('IndividualReports', false).toString().toLowerCase() == 'true') {
         IndividualMutations_Ch = MutationsFinder.out.results.map { sample_id, _mut_files, combined_csv -> tuple(sample_id, combined_csv) }
@@ -248,6 +272,7 @@ workflow {
     individual_graphic_report = ch_individual_graphic_report
     interactive_mutations_table = ch_interactive_mutations_table
     date_report = date_report_ch
+    geo_report = ch_geo_report
     mut = ch_mut
     mutations_report = final_mutations_ch
     merged_metadata = final_metadata_ch
@@ -321,6 +346,10 @@ output {
         mode "copy"
     }
     date_report {
+        path { "${projectDir}/../${params.outDir}/graphic_reports" }
+        mode "copy"
+    }
+    geo_report {
         path { "${projectDir}/../${params.outDir}/graphic_reports" }
         mode "copy"
     }
