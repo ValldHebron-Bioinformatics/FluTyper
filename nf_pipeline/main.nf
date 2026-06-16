@@ -219,7 +219,7 @@ workflow {
     Errors_ch = BaseErrors_ch.groupTuple()
 
     CompileErrors(Errors_ch)
-    
+    // Merge all individual error logs into a single comprehensive log file
     ErrorsMerged_ch = CompileErrors.out
         .map { sample_id, log_file ->
             def content = log_file.text
