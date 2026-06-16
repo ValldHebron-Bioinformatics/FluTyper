@@ -24,7 +24,7 @@ from pathlib import Path
 from Bio import SeqIO
 
 # Set up paths and directories
-markers_dir = Path(".")
+markers_dir = Path("${markers}")
 ha_dict = "${params.protocols[params.protocol].resources}/HA_DICT.csv"
 na_dict = "${params.protocols[params.protocol].resources}/NA_DICT.csv"
 out_dir = Path("samples/${sample_id}/mutations")
