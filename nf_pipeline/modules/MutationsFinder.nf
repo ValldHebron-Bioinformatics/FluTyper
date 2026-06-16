@@ -71,7 +71,7 @@ for aligned_prot in "${prot_files}".split():
     # Force UPPERCASE to prevent case-mismatch bugs between FASTA translation and CSV markers
     ref_seq, query_seq = str(records[0].seq).upper(), str(records[1].seq).upper()
     ref_tag = str(records[0].description).split('_')[0]
-     if "${params.protocol}" == "HUMAN" :
+    if "${params.protocol}" == "HUMAN" :
         if ref_tag == "H1N1": ref_tag = "A(H1N1)pdm09"
         elif ref_tag == "H3N2": ref_tag = "A(H3N2)"
     # Determine the subtype value
