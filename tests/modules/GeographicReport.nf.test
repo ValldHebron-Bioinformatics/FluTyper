@@ -1,0 +1,35 @@
+nextflow_process {
+
+    name "Test Process GeographicReport"
+    script "nf_pipeline/modules/GeographicReport.nf"
+    process "GeographicReport"
+
+    test("Should create the interactive HTML geographic report") {
+
+        when {
+            params {
+                protocol = "HUMAN"
+            }
+            process {
+                """
+                input[0] = file("${projectDir}/tests/data/Graphs_test/final_genotyping_results.csv")
+                input[1] = file("${projectDir}/tests/data/Graphs_test/metadata.csv")
+                input[2] = file("${projectDir}/tests/data/Graphs_test/coordenades_cat.tsv")
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            
+            assert process.out.geo_report != null : "Output channel 'geo_report' is null"
+            assert process.out.geo_report.size() > 0 : "Geographic report file was not generated"
+
+            def report_file = process.out.geo_report.get(0)
+            assert report_file != null : "The report file path is null"
+            assert report_file.toString().endsWith('GeographicReport.html') : "The output file does not match the expected GeographicReport.html name"
+        }
+
+    }
+
+}
