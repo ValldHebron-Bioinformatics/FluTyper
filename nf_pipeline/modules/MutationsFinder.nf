@@ -113,7 +113,7 @@ for aligned_prot in "${prot_files}".split():
                 # SUBTYPE FILTERING FOR HUMAN PROTOCOL
                 if "${params.protocol}" == "HUMAN":
                     found_in = row.get('FOUND_IN', '').strip().upper()
-                     if found_in and found_in != "UNIVERSAL":
+                    if found_in and found_in != "UNIVERSAL":
                         h_val = "${h_tag}".upper()
                         n_val = "${n_tag}".upper()
                         raw_combo = h_val + n_val
