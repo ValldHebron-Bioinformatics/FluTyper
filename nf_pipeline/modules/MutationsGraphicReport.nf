@@ -161,8 +161,57 @@ process MutationsGraphicReport {
 
     fig = make_subplots(rows=rows_count, cols=1, subplot_titles=groups, vertical_spacing=spacing)
 
+    # Epitope definitions for the HUMAN protocol
+    epitope_definitions = {
+        'HA1 - A(H3N2)': [
+            {'name': 'RBD', 'positions': [98, 152, 153, 154, 155, 156], 'color': '#E41A1C'},
+            {'name': 'RBD-130LOOP', 'positions': [131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148], 'color': '#377EB8'},
+            {'name': 'RBD-180LOOP', 'positions': [183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195], 'color': '#4DAF4A'},
+            {'name': 'RBD-220LOOP', 'positions': [218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230], 'color': '#984EA3'},
+            {'name': 'A site', 'positions': [122, 124, 126, 130, 131, 132, 133, 135, 137, 138, 140, 142, 143, 144, 145, 146, 150, 152, 168], 'color': '#FF7F00'},
+            {'name': 'B site', 'positions': [128, 129, 155, 156, 157, 158, 159, 160, 163, 164, 165, 186, 187, 188, 189, 190, 192, 193, 194, 196, 197, 198], 'color': '#F781BF'},
+            {'name': 'C site', 'positions': [44, 45, 46, 47, 48, 50, 51, 53, 54, 273, 275, 276, 278, 279, 280, 294, 297, 299, 300, 304, 305, 307, 308, 309, 310, 311, 312], 'color': '#A65628'},
+            {'name': 'D site', 'positions': [96, 102, 103, 117, 121, 167, 170, 171, 172, 173, 174, 175, 176, 177, 179, 182, 201, 203, 207, 208, 209, 212, 213, 214, 215, 216, 217, 218, 219, 226, 227, 228, 229, 230, 238, 240, 242, 244, 246, 247, 248], 'color': '#FFFF33'},
+            {'name': 'E site', 'positions': [57, 59, 62, 63, 67, 75, 78, 80, 81, 82, 83, 86, 87, 88, 91, 92, 94, 109, 260, 261, 262, 265], 'color': '#00CED1'},
+        ],
+        'HA1 - A(H1N1)pdm09': [
+            {'name': 'Cb', 'positions': [70, 71, 72, 73, 74, 75], 'color': '#E41A1C'},
+            {'name': 'Sa', 'positions': [124, 125, 153, 154, 155, 156, 157, 159, 160, 161, 162, 163, 164], 'color': '#377EB8'},
+            {'name': 'RBD', 'positions': [91, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 143, 144, 145, 149, 150, 151, 152, 180, 181, 182, 183, 215, 216, 217, 218, 219, 220, 223, 224, 225, 226, 227], 'color': '#4DAF4A'},
+            {'name': 'Ca2', 'positions': [137, 138, 139, 140, 141, 142, 221, 222], 'color': '#984EA3'},
+            {'name': 'Ca1', 'positions': [166, 167, 168, 169, 170, 203, 204, 205, 235, 236, 237], 'color': '#FF7F00'},
+            {'name': 'Sb', 'positions': [184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195], 'color': '#F781BF'},
+        ]
+    }
+
     # Make scatter plots for each group
     for i, group in enumerate(groups, start=1):
+        
+        # Add epitope background bars for HUMAN protocol before rendering the actual mutations
+        if "${params.protocol}" == "HUMAN" and group in epitope_definitions:
+            for epitope in epitope_definitions[group]:
+                if 'positions' in epitope:
+                    x_vals     = epitope['positions']
+                    y_vals     = [115] * len(x_vals)
+                    width_vals = [1]   * len(x_vals)
+                elif 'start' in epitope and 'end' in epitope:
+                    width_val  = epitope['end'] - epitope['start']
+                    x_vals     = [epitope['start'] + (width_val / 2)]
+                    y_vals     = [115]
+                    width_vals = [width_val]
+                else:
+                    continue
+
+                fig.add_trace(
+                    go.Bar(
+                        x=x_vals, y=y_vals, width=width_vals,
+                        marker=dict(color=epitope['color'], line=dict(width=0)),
+                        opacity=0.4, hoverinfo='skip', showlegend=False,
+                        meta="Any"
+                    ),
+                    row=i, col=1
+                )
+
         group_df = df_grouped[df_grouped['Plot_Group'] == group]
         
         for mut_type in group_df['Color_Category'].unique():
@@ -210,7 +259,7 @@ process MutationsGraphicReport {
                         "<b>Reference Position (" + ref + " numbering):</b> %{customdata[7]}<br>"
                         "<b>Mutation:</b> %{customdata[2]}<br>"
                         "<b>Effect(s):</b> %{customdata[3]}<br>"
-                        "                 <b>Found in:</b>  %{customdata[6]}<br>"
+                        "                  <b>Found in:</b>  %{customdata[6]}<br>"
                         "<b>Occurrence:</b> %{customdata[4]}/%{customdata[8]} sample(s) (%{customdata[5]}%)<br>"
                         "<extra></extra>"
                     ),
@@ -301,9 +350,9 @@ process MutationsGraphicReport {
             <p style="color: gray; font-size: 14px; margin: 0;">{subtitle_text}</p>
             // The slider allows users to filter mutations based on their frequency in the dataset.
             <div class="slider-container">
-                <label><b>Minimum Frequency Threshold:</b> <span id="sliderValue">{default_val}%</span></label>
+                <label><b>Minimum Frequency Threshold:</b> <span id="sliderValue">{{default_val}}%</span></label>
                 <br><br>
-                <input type="range" id="freqSlider" min="0" max="100" value="{default_val}" oninput="applyFrequencyFilter(this.value)" style="width: 80%;">
+                <input type="range" id="freqSlider" min="0" max="100" value="{{default_val}}" oninput="applyFrequencyFilter(this.value)" style="width: 80%;">
                 
                 <p style="color: gray; font-size: 12px; margin-top: 8px; margin-bottom: 0;">
                     Percentage of frequency of mutations in the sequences assessed
