@@ -15,10 +15,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v6.0.3
 
       - name: Set up Java
-        uses: actions/setup-java@v5.2.0
+        uses: actions/setup-java@v5.3.0
         with:
           distribution: 'temurin'
           java-version: '21'
@@ -29,7 +29,7 @@ jobs:
           version: "latest"
 
       - name: Cache Python Packages
-        uses: actions/cache@v5.0.4
+        uses: actions/cache@v5.0.5
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('.github/workflows/ci.yml') }}
@@ -42,10 +42,10 @@ jobs:
           sudo apt-get install -y --no-install-recommends mafft
           
           # Unified tool installation
-          curl -fsSL "https://github.com/shenwei356/seqkit/releases/download/v2.8.2/seqkit_linux_amd64.tar.gz" | tar xz
+          curl -fsSL "https://github.com/shenwei356/seqkit/releases/download/v2.10.1/seqkit_linux_amd64.tar.gz" | tar xz
           sudo mv seqkit /usr/local/bin/
 
-          curl -fsSL "https://github.com/nextstrain/nextclade/releases/download/3.9.1/nextclade-x86_64-unknown-linux-musl" -o nextclade
+          curl -fsSL "https://github.com/nextstrain/nextclade/releases/download/3.18.0/nextclade-x86_64-unknown-linux-musl" -o nextclade
           chmod +x nextclade && sudo mv nextclade /usr/local/bin/
 
           python3 -m pip install --upgrade pip
@@ -67,10 +67,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v6.0.3
 
       - name: Set up Java
-        uses: actions/setup-java@v5.2.0
+        uses: actions/setup-java@v5.3.0
         with:
           distribution: 'temurin'
           java-version: '21'
@@ -84,18 +84,19 @@ jobs:
         run: |
           sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends mafft
           
-          curl -fsSL "https://github.com/shenwei356/seqkit/releases/download/v2.8.2/seqkit_linux_amd64.tar.gz" | tar xz
+          curl -fsSL "https://github.com/shenwei356/seqkit/releases/download/v2.10.1/seqkit_linux_amd64.tar.gz" | tar xz
           sudo mv seqkit /usr/local/bin/
           
-          curl -fsSL "https://github.com/nextstrain/nextclade/releases/download/3.9.1/nextclade-x86_64-unknown-linux-musl" -o nextclade
+          curl -fsSL "https://github.com/nextstrain/nextclade/releases/download/3.18.0/nextclade-x86_64-unknown-linux-musl" -o nextclade
           chmod +x nextclade && sudo mv nextclade /usr/local/bin/
           
           python3 -m pip install --upgrade pip
           pip install pandas openpyxl biopython numpy plotly nbformat genin2
 
       - name: Setup nf-test
-        uses: nf-core/setup-nf-test@v2.0.0
+        uses: nf-core/setup-nf-test@v2.1.0
         with:
+          version: '0.9.5'
           install-pdiff: true
 
       - name: Run Pipeline (nf-test)
