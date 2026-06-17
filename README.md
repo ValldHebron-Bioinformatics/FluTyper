@@ -66,7 +66,7 @@ MultiFASTA headers must use either an underscore (`_`) or a pipe (`|`) as a sepa
 To generate date-based frequency reports per protein, you must provide a metadata CSV file using the `--metadata` flag. The file requires strict headers, such as the `ID` and `DATE` columns shown below. You also have the option to include a `LOCATION` column, which is required if you intend for the `GeographicReport.nf` process to run and generate the interactive map of Catalonia.
 ```csv
 ID,DATE,LOCATION
-Sample_01,YYYY-MM-DD,Municipality_Name
+Sample_01,YYYY-MM-DD,Municipality Name
 
 ```
 
@@ -112,7 +112,7 @@ MARKER_ID,POSITION,AA,PROTEIN,EFFECT,FOUND_IN,REFERENCE
 
 ## 🔄 Pipeline Architecture
 
-![FluTyper pipeline walkthrough](docs/TFM/FluTyper.drawio.png)
+![FluTyper pipeline walkthrough](docs/images/FluTyper.drawio.svg)
 
 | Step | Process Name | Description |
 | :--- | :--- | :--- |
@@ -143,7 +143,7 @@ Mutation markers are matched using unified reference numbering based on H5 for H
 
 ## 📂 Outputs
 
-![FluTyper output folder organization](docs/TFM/Folderorganization.drawio.png)
+![FluTyper output folder organization](docs/images/Folderorganization.drawio.svg)
 
 ### Core Data Files
 | File Name | Description |
@@ -203,7 +203,7 @@ FluTyper is strictly verified using `nf-test`. The repository utilizes GitHub Ac
 | **[Genin2](https://izsvenezie-virology.github.io/genin2/)** | Genotype prediction for clade 2.3.4.4b. |
 | **[Seqkit](https://bioinf.shenwei.me/seqkit/usage/)** | High-performance sequence parsing and FASTA manipulation. |
 | **[MAFFT](https://mafft.cbrc.jp/alignment/software/)** | Multiple sequence alignment for accurate CDS mapping. |
-| **Python 3** | Data manipulation and reporting ([`pandas`](https://pandas.pydata.org/docs/user_guide/index.html#user-guide), [`biopython`](https://biopython.org/docs/latest/index.html), [`openpyxl`](https://openpyxl.readthedocs.io/en/stable/), [`sqlite3`](https://docs.python.org/3/library/sqlite3.html), [`plotly`](https://plotly.com/python/)). |
+| **Python 3** | Data manipulation and reporting ([`pandas`](https://pandas.pydata.org/docs/user_guide/index.html#user-guide), [`biopython`](https://biopython.org/docs/latest/index.html), [`openpyxl`](https://openpyxl.readthedocs.io/en/stable/), [`sqlite3`](https://docs.python.org/3/library/sqlite3.html), [`plotly`](https://plotly.com/python/), [`folium`](https://python-visualization.github.io/folium/latest/user_guide.html).) |
 | **[nf-test](https://www.nf-test.com/docs/getting-started/)** | Pipeline testing and validation framework. |
 
 *The minimizer indices used by this pipeline were generated using the methodology and tools developed by the Nextstrain team for the [nextclade_data](https://github.com/nextstrain/nextclade_data.git) repository.*
