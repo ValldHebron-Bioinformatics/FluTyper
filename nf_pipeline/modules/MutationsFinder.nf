@@ -24,7 +24,7 @@ from pathlib import Path
 from Bio import SeqIO
 
 # Set up paths and directories
-markers_dir = Path("${markers}")
+markers_input = Path("${markers}")
 ha_dict = "${params.protocols[params.protocol].resources}/HA_DICT.csv"
 na_dict = "${params.protocols[params.protocol].resources}/NA_DICT.csv"
 out_dir = Path("samples/${sample_id}/mutations")
@@ -105,7 +105,11 @@ for aligned_prot in "${prot_files}".split():
 
     # Markers information is stored in a dictionary keyed by marker ID, with values being sets of (position, amino acid) tuples
     markers_by_id, marker_info = {}, {}
-    m_file = markers_dir / f"{prot_name}_markers.csv"
+    # Handle whether Nextflow staged a directory or a list of files
+    if os.path.isdir(markers_input):
+        m_file = Path(markers_input) / f"{prot_name}_markers.csv"
+    else:
+        m_file = Path(f"{prot_name}_markers.csv")
 
     if m_file.exists():
         with open(m_file, encoding='utf-8-sig') as f:
@@ -173,9 +177,6 @@ for aligned_prot in "${prot_files}".split():
         if r_aa != "-": pos += 1
         pos_raw = str(pos)
         pos_ref = pos_to_base.get(pos_raw, pos_raw)
-        
-        # Decide which position to use for marker lookup based on the protocol
-        marker_pos = pos_ref if "${params.protocol}" == "AVIAN" else pos_raw
         
         is_mutation = r_aa != q_aa and "X" not in (r_aa, q_aa)
 
