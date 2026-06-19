@@ -54,6 +54,10 @@ process MutationsGraphicReport {
             if 'DATE' in df_meta.columns:
                 merge_cols.append('DATE')
                 
+            # Ensure the main dataframe ID is also a stripped string before merging
+            if 'SAMPLE_ID' in df.columns:
+                df['SAMPLE_ID'] = df['SAMPLE_ID'].astype(str).str.strip()
+                
             df = pd.merge(df, df_meta[merge_cols], on='SAMPLE_ID', how='left')
 
     # Calculate the ISO season using a robust function to prevent NaN float errors
