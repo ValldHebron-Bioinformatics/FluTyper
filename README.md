@@ -66,7 +66,7 @@ MultiFASTA headers must use either an underscore (`_`) or a pipe (`|`) as a sepa
 To generate date-based frequency reports per protein, you must provide a metadata CSV file using the `--metadata` flag. The file requires strict headers, such as the `ID` and `DATE` columns shown below. You also have the option to include a `LOCATION` column, which is required if you intend for the `GeographicReport.nf` process to run and generate the interactive map of Catalonia.
 ```csv
 ID,DATE,LOCATION
-Sample_01,YYYY-MM-DD,Municipality Name
+Sample01,YYYY-MM-DD,Municipality Name
 
 ```
 
