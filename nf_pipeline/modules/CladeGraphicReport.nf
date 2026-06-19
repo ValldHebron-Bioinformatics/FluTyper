@@ -247,10 +247,21 @@ process CladeGraphicReport {
             final_grouped['Text'] = final_grouped['Final_Count'].astype(str) + '/' + str(total_c)
             
             if is_colorblind:
-                pie_colors = okabe_ito_colors
+                base_palette = okabe_ito_colors
             else:
                 base_c = subtype_base_colors.get(str(h), '#888888')
-                pie_colors = generate_shades(base_c, len(final_grouped['Final_Label']))
+                base_palette = generate_shades(base_c, len(final_grouped['Final_Label']))
+
+            # Build a color map: Unassigned and Unknown get grey, others get the next color from base_palette
+            color_map = {}
+            base_palette_iter = iter(base_palette)
+            for label in final_grouped['Final_Label']:
+                if label in ['Unassigned', 'Unknown']:
+                    color_map[label] = '#888888'
+                else:
+                    color_map[label] = next(base_palette_iter)
+
+            pie_colors = [color_map[label] for label in final_grouped['Final_Label']]
 
             # Plot the pie chart for clade distribution of the specific H subtype
             fig.add_trace(
@@ -423,9 +434,18 @@ process CladeGraphicReport {
             # Generate the applicable palette once for the traces
             if palette_type == 'clade':
                 if is_colorblind:
-                    palette = okabe_ito_colors
+                    base_palette = okabe_ito_colors
                 else:
-                    palette = generate_shades(base_color, len(unique_groups))
+                    base_palette = generate_shades(base_color, len(unique_groups))
+
+                # Build a color map: Unassigned and Unknown get grey, others get the next color from base_palette
+                color_map = {}
+                base_palette_iter = iter(base_palette)
+                for g in unique_groups:
+                    if g in ['Unassigned', 'Unknown']:
+                        color_map[g] = '#888888'
+                    else:
+                        color_map[g] = next(base_palette_iter)
             elif palette_type == 'genotype':
                 palette = okabe_ito_colors if is_colorblind else colors.qualitative.Vivid
 
@@ -434,7 +454,9 @@ process CladeGraphicReport {
                 
                 if palette_type == 'h_subtype':
                     color = okabe_ito_colors[idx % len(okabe_ito_colors)] if is_colorblind else subtype_base_colors.get(str(g), '#888888')
-                else:
+                elif palette_type == 'clade':
+                    color = color_map[g]
+                else:  # genotype
                     color = palette[idx % len(palette)]
                 
                 display_group_col = "Group" if group_col == "Final_Label" else group_col.replace("_", " ")
