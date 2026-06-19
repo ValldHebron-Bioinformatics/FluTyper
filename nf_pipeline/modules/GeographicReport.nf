@@ -186,13 +186,24 @@ process GeographicReport {
             g_labels = sorted([g for g in df[df['Clade'] == '2.3.4.4b']['Genotype'].unique() if g not in ['-', 'Unassigned']])
             for i, g in enumerate(g_labels): view_map[g] = qualitative.Vivid[i % len(qualitative.Vivid)]
         elif classification['id'] == 'subtypes':
-            s_labels = sorted([s for s in df['H_Subtype'].unique() if s not in ['-', 'Unknown']])
-            for s in s_labels: view_map[s] = subtype_base_colors.get(s, '#888888')
+            s_labels = sorted([s for s in df['H_Subtype'].unique() if s != '-'])
+            for s in s_labels:
+                if s in ['Unassigned', 'Unknown', 'unassigned']:
+                    view_map[s] = '#888888'
+                else:
+                    view_map[s] = subtype_base_colors.get(s, '#888888')
         else:
             base_hex = subtype_base_colors.get(classification['filter'], '#888888')
-            c_labels = sorted([c for c in df[df['H_Subtype'] == classification['filter']]['Root_Clade'].unique() if c not in ['-', 'Unassigned']])
-            shades = generate_shades(base_hex, len(c_labels))
-            for clade, shade in zip(c_labels, shades): view_map[clade] = shade
+            c_labels = sorted([c for c in df[df['H_Subtype'] == classification['filter']]['Root_Clade'].unique() if c != '-'])
+            # Generate shades only for clades that are not Unassigned or Unknown
+            shades = generate_shades(base_hex, len([c for c in c_labels if c not in ['Unassigned', 'Unknown', 'unassigned']]))
+            view_map = {}
+            shade_iter = iter(shades)
+            for c in c_labels:
+                if c in ['Unassigned', 'Unknown', 'unassigned']:
+                    view_map[c] = '#888888'
+                else:
+                    view_map[c] = next(shade_iter)
         global_color_map[classification['id']] = view_map
 
     # MAP CREATION
