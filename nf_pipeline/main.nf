@@ -203,7 +203,7 @@ workflow {
     CladeGraphicReport(final_genotyping_ch, final_metadata_ch)
     ch_clade_evolution_report = CladeGraphicReport.out.evolution_report
 
-    MutationsGraphicReport(final_mutations_ch)
+    MutationsGraphicReport(final_mutations_ch, final_metadata_ch)
     ch_mutations_graphic_report = MutationsGraphicReport.out.report
     
     InteractiveMutationsTable(final_mutations_ch)
