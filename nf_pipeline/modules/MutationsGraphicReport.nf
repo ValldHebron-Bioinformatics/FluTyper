@@ -5,7 +5,7 @@ process MutationsGraphicReport {
     // This process generates a comprehensive HTML report visualizing mutation data using Plotly.
     // It reads mutation data from an Excel file, processes it, and creates interactive scatter 
     // plots for each protein group.
-    errorStrategy 'ignore'
+    //errorStrategy 'ignore'
     debug true
 
     input:
@@ -83,11 +83,14 @@ process MutationsGraphicReport {
 
     # Standardize missing values and replace pipes with a line break + spaces for indentation
     df['EFFECT'] = df['EFFECT'].replace('', 'Unknown').fillna('Unknown').astype(str).str.replace(' | ', '<br>                 ')
-    df['SUBTYPE'] = df['SUBTYPE'].replace('', 'Unknown').fillna('Unknown').astype(str)
-    df['REF_SUBTYPE'] = df['REF_SUBTYPE'].replace('', 'Unknown').fillna('Unknown').astype(str)
     df['FOUND_IN'] = df['FOUND_IN'].replace('', 'Unknown').fillna('Unknown').astype(str)
     df['POSITION_REF'] = df['POSITION_REF'].replace('', 'Unknown').fillna('Unknown').astype(str)
     df['POSITION'] = pd.to_numeric(df['POSITION'], errors='coerce')
+    
+    # Strip strings to avoid duplicate Plot Groups from trailing spaces
+    df['PROTEIN'] = df.get('PROTEIN', '').replace('', 'Unknown').fillna('Unknown').astype(str).str.strip()
+    df['SUBTYPE'] = df['SUBTYPE'].replace('', 'Unknown').fillna('Unknown').astype(str).str.strip()
+    df['REF_SUBTYPE'] = df['REF_SUBTYPE'].replace('', 'Unknown').fillna('Unknown').astype(str).str.strip()
 
     # Define the coloring logic based on mutation type or marker status
     def get_mutation_category(row):
@@ -140,14 +143,16 @@ process MutationsGraphicReport {
 
     df['Plot_Group'] = df.apply(get_plot_group, axis=1).astype(str)
 
-    # Calculate total unique samples per protein group and season
-    total_samples_per_group = df.groupby(['REF_SUBTYPE', 'Season'])['SAMPLE_ID'].nunique().reset_index()
-    total_samples_per_group.rename(columns={'SAMPLE_ID': 'Subtype_Total'}, inplace=True)
+    # Calculate total samples accurately
+    subtype_totals = df.groupby(['REF_SUBTYPE', 'Season'])['SAMPLE_ID'].nunique().reset_index()
+    subtype_totals.rename(columns={'SAMPLE_ID': 'Subtype_Total'}, inplace=True)
     
     pg_map = df[['Plot_Group', 'REF_SUBTYPE', 'Season']].drop_duplicates()
-    total_samples_per_group = pd.merge(pg_map, total_samples_per_group, on=['REF_SUBTYPE', 'Season'])
+    pg_totals = pd.merge(pg_map, subtype_totals, on=['REF_SUBTYPE', 'Season'])
+    
+    # Sum the totals for each Plot_Group to accommodate internal genes shared across subtypes
+    total_samples_per_group = pg_totals.groupby(['Plot_Group', 'Season'])['Subtype_Total'].sum().reset_index()
     total_samples_per_group.rename(columns={'Subtype_Total': 'Total_Group_Samples'}, inplace=True)
-    total_samples_per_group = total_samples_per_group[['Plot_Group', 'Season', 'Total_Group_Samples']]
 
     # Define the relevant columns for grouping and aggregation
     group_cols = ['Plot_Group', 'Season', 'POSITION', 'POSITION_REF', 'AA_MUTATION', 'Color_Category', 'ColorCode']
