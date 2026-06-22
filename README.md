@@ -76,7 +76,7 @@ Sample01,YYYY-MM-DD,Municipality Name
 
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `inputFasta` | Required | `docs/fastas/prova.fasta` | Path to the input FASTA file containing your sequences. |
+| `inputFasta` | Required | `docs/fastas/cresaid.fasta` | Path to the input FASTA file containing your sequences. |
 | `outDir` | Required | `RESULTS` | Destination directory where all pipeline results and reports will be saved. |
 | `protocol` | Optional | `AVIAN` | Defines the viral protocol. Supported options are `AVIAN` and `HUMAN`. |
 | `threshold` | Optional | `0.25` | Minimum mutation frequency required to report a non-marker mutation (0.0 to 1.0). |
