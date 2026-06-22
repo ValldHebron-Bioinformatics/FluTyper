@@ -28,7 +28,11 @@ Clone the repository to your local machine:
 git clone https://github.com/ValldHebron-Bioinformatics/FluTyper.git
 cd FluTyper
 ```
-
+To ensure full reproducibility of the analysis and provide all necessary dependencies, a Conda environment file is included. You can set up and activate this isolated environment using the provided configuration file before running the pipeline.
+```bash
+conda env create -f FluTyper_env.yaml
+conda activate FluTyper
+```
 ### Basic Execution
 Run the pipeline with your sequence data. If no parameters are provided, it defaults to the `AVIAN` protocol using the provided test dataset.
 ```bash
@@ -76,7 +80,7 @@ Sample01,YYYY-MM-DD,Municipality Name
 
 | Parameter | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `inputFasta` | Required | `docs/fastas/cresaid.fasta` | Path to the input FASTA file containing your sequences. |
+| `inputFasta` | Required | `docs/fastas/prova.fasta` | Path to the input FASTA file containing your sequences. |
 | `outDir` | Required | `RESULTS` | Destination directory where all pipeline results and reports will be saved. |
 | `protocol` | Optional | `AVIAN` | Defines the viral protocol. Supported options are `AVIAN` and `HUMAN`. |
 | `threshold` | Optional | `0.25` | Minimum mutation frequency required to report a non-marker mutation (0.0 to 1.0). |
