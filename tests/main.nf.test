@@ -127,7 +127,7 @@ nextflow_pipeline {
             assert csvText.contains("SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,POSITION_REF,REFERENCE_AA,QUERY_AA,AA_MUTATION,MUTATION_TYPE,MARKER,MARKER_ID,IS_COMBINATION,EFFECT,FOUND_IN,REFERENCE")
 
             // Updated these strings to also expect A(H3N2) in the SUBTYPE column
-            assert csvText.contains('198353883,A(H3N2),M2,A(H3N2),1,1,M,E,M1E,Substitution,No,,No,,,')
+            assert csvText.contains('198353883,A(H3N2),HA1,A(H3N2),96,89,S,R,S96R,Substitution,No,,No,,,')
             assert csvText.contains('198353883,A(H3N2),HA1,A(H3N2),189,186,K,R,K189R,Marker,Yes,176 | 362,No,EPITOP(B) | EPITOP(RBD - 180LOOP),H3N2,')
             
             def individualGraphicReport = outputDir.resolve("samples/198353883/198353883_MutationsReport.html")
