@@ -20,6 +20,23 @@ include { IndividualGraphicReport   } from './modules/IndividualGraphicReport'
 include { InteractiveMutationsTable } from './modules/InteractiveMutationsTable'
 include { DateGraphicReport         } from './modules/DateGraphicReport'
 include { MergeHistoricalData       } from './modules/MergeHistoricalData'
+include { GeographicReport          } from './modules/GeographicReport'
+
+// Function to check if the metadata file contains a "LOCATION" column
+def check_location_column(metadata_path) {
+    if (!metadata_path) return false
+    def f = file(metadata_path)
+    if (!f.exists()) return false
+    
+    def has_loc = false
+    f.withReader { reader ->
+        def header = reader.readLine()
+        if (header && header.toUpperCase().contains("LOCATION")) {
+            has_loc = true
+        }
+    }
+    return has_loc
+}
 
 workflow {
     main:
@@ -35,12 +52,13 @@ workflow {
     SampleInput_ch = channel
         .fromPath(params.inputFasta, checkIfExists: true)
         .splitFasta(record: [id: true])
-        .map { rec -> rec.id.tokenize('[|_]')[0] } 
+        .map { rec -> rec.id.tokenize('[|_]')[0] } // Extract sample ID from FASTA header using the first token before '|' or '_'
         .unique()
  
     OrganizeBySample(SampleInput_ch)
 
     // SUBTYPE DETECTION
+    // Prepare channel for subtype detection by mapping sample IDs to their corresponding HA and NA FASTA files
     SubtypeInput_ch = OrganizeBySample.out.results.map { sample_id, sample_dir ->
         def ha_fasta = file("${sample_dir}/segments/${sample_id}_HA.fasta")
         def na_fasta = file("${sample_dir}/segments/${sample_id}_NA.fasta")
@@ -49,11 +67,12 @@ workflow {
 
     SubtypeDetection(SubtypeInput_ch)
 
+    // Collect inferred subtypes into a single CSV file for downstream processing
     SubtypeMerged_ch = SubtypeDetection.out.results
         .map { tup -> tup[1] }
         .collectFile(
             name: 'inferred_subtypes.csv',
-            seed: 'seqName,inferred_subtype,pathotype\n' 
+            seed: 'Sample_ID,inferred_subtype,pathotype\n' 
         )
 
     // DATASET PREPARATION
@@ -71,6 +90,7 @@ workflow {
     ch_individual_graphic_report = channel.empty()
     ch_clade_evolution_report = channel.empty()
     date_report_ch = channel.empty()
+    ch_geo_report = channel.empty()
   
     // GENOTYPING ANALYSIS (NEXTCLADE)
     GenotypingInfo_ch = SubtypeDetection.out.results
@@ -78,11 +98,11 @@ workflow {
         .map { sample_id, row ->
             def subtype = row[1]
             def pathotype = row[2]
-            def h_tag = subtype.find(/H\d+/) ?: "Hx" 
-            def n_tag = subtype.find(/N\d+/) ?: "Nx"
+            def h_tag = subtype.find(/H\d+/) ?: "Hx" // Extract H subtype or default to "Hx" if not found
+            def n_tag = subtype.find(/N\d+/) ?: "Nx" // Extract N subtype or default to "Nx" if not found
             tuple(sample_id, h_tag, n_tag, pathotype)
         }
-        
+    
     GenotypingHfile_ch = SubtypeInput_ch.map { sample_id, ha_fasta, _na_fasta -> 
         tuple(sample_id, ha_fasta) 
     }
@@ -103,11 +123,11 @@ workflow {
     .join(GenotypingNextclade.out.results, remainder: true) 
     .join(GenotypingNextclade.out.genin, remainder: true) 
     .map { sample_id, h_tag, n_tag, pathotype, csv_file, genin_file -> 
-        tuple(sample_id, h_tag, n_tag, pathotype, csv_file ?: [], genin_file ?: [])
+        tuple(sample_id, h_tag, n_tag, pathotype, csv_file ?: [], genin_file ?: []) // Ensure that missing files are represented as empty lists
     }
         
     GenotypingResults(GenotypingResultsInput_ch, GetDatasets.out.collect()) 
-    
+    // Use .collectFile to gather all genotyping results into a single CSV file
     GenotypingFinal_ch = GenotypingResults.out.results.map { tup -> tup[1] }
         .collectFile(
             name: 'final_genotyping_results.csv',
@@ -115,6 +135,7 @@ workflow {
         )
 
     // MARKERS PREPARATION
+    // Depending on the protocol, either use FluMutDB for Avian or the predefined markers directory for Human
     if (params.protocol == "AVIAN") {
         FluMutDB(SubtypeMerged_ch)
         ch_database = FluMutDB.out
@@ -148,8 +169,8 @@ workflow {
             tuple(sample_id, prot_files, h_tag, n_tag, pathotype)
         }
         
-    MutationsFinder(Mutations_ch)
-    ch_mut = MutationsFinder.out.results.map { _id, mut_files, combined_csv -> [mut_files, combined_csv] }.flatten()
+    MutationsFinder(Mutations_ch, ch_markerfiles.collect()) // Markers are collected into a list for the process to use
+    ch_mut = MutationsFinder.out.results.map { _id, mut_files, combined_csv -> [mut_files, combined_csv] }.flatten() // Flatten the channel to emit individual mutation files and the combined CSV for downstream processing
     
     MutationsCompiler_ch = MutationsFinder.out.results
         .map { _sample_id, _mut_files, combined_csv -> combined_csv }
@@ -159,8 +180,8 @@ workflow {
     ch_raw_mutations = MutationsCompiler.out.results
     ch_mutations_report = MutationsCompiler.out.results
 
-    // --- APPEND LOGIC INTERCEPTION ---
-    def meta_str = params.metadata ? file(params.metadata).toAbsolutePath().toString() : ""
+    // APPEND LOGIC INTERCEPTION
+    def meta_str = params.metadata ? file(params.metadata).toAbsolutePath().toString() : "" // Resolve the absolute path for metadata if provided
 
     if (params.get('append')) {
         append_dir_ch = file(params.append, checkIfExists: true)
@@ -175,14 +196,14 @@ workflow {
         final_subtypes_ch   = SubtypeMerged_ch
         final_genotyping_ch = GenotypingFinal_ch
         final_mutations_ch  = ch_raw_mutations
-        final_metadata_ch   = params.metadata ? channel.fromPath(params.metadata, checkIfExists: true) : channel.of([])
+        final_metadata_ch   = params.metadata ? channel.fromPath(params.metadata, checkIfExists: true) : channel.of([]) // Create an empty channel if no metadata is provided
     }
 
-    // --- AGGREGATED GRAPHIC REPORTS (Using Merged Data) ---
+    // AGGREGATED GRAPHIC REPORTS (Using Merged Data)
     CladeGraphicReport(final_genotyping_ch, final_metadata_ch)
     ch_clade_evolution_report = CladeGraphicReport.out.evolution_report
 
-    MutationsGraphicReport(final_mutations_ch)
+    MutationsGraphicReport(final_mutations_ch, final_metadata_ch)
     ch_mutations_graphic_report = MutationsGraphicReport.out.report
     
     InteractiveMutationsTable(final_mutations_ch)
@@ -195,6 +216,12 @@ workflow {
         date_report_ch = channel.empty()
     }
 
+    // Conditionally generate the Geographic Report if metadata location is provided or if appending to existing data
+    def run_geographic_report = check_location_column(params.metadata)
+    if (run_geographic_report && params.coordinates) {
+        GeographicReport(final_genotyping_ch, final_metadata_ch, file(params.coordinates, checkIfExists: true))
+        ch_geo_report = GeographicReport.out.geo_report
+    }
     // CONDITIONALLY RUN INDIVIDUAL GRAPHIC REPORTS
     if (params.get('IndividualReports', false).toString().toLowerCase() == 'true') {
         IndividualMutations_Ch = MutationsFinder.out.results.map { sample_id, _mut_files, combined_csv -> tuple(sample_id, combined_csv) }
@@ -216,7 +243,7 @@ workflow {
     Errors_ch = BaseErrors_ch.groupTuple()
 
     CompileErrors(Errors_ch)
-    
+    // Merge all individual error logs into a single comprehensive log file
     ErrorsMerged_ch = CompileErrors.out
         .map { sample_id, log_file ->
             def content = log_file.text
@@ -245,6 +272,7 @@ workflow {
     individual_graphic_report = ch_individual_graphic_report
     interactive_mutations_table = ch_interactive_mutations_table
     date_report = date_report_ch
+    geo_report = ch_geo_report
     mut = ch_mut
     mutations_report = final_mutations_ch
     merged_metadata = final_metadata_ch
@@ -318,6 +346,10 @@ output {
         mode "copy"
     }
     date_report {
+        path { "${projectDir}/../${params.outDir}/graphic_reports" }
+        mode "copy"
+    }
+    geo_report {
         path { "${projectDir}/../${params.outDir}/graphic_reports" }
         mode "copy"
     }

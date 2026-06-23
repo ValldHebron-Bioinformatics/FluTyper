@@ -1,0 +1,22 @@
+name: FluTyper
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3.9.15
+  - nextflow=26.04.1
+  - nextclade=3.18.0
+  - seqkit=2.10.1
+  - mafft=7.525
+  - nf-test=0.9.5
+  - biopython=1.85
+  - numpy=1.26.4
+  - pip
+  - pip:
+    - pandas==2.3.0
+    - openpyxl==3.1.5
+    - plotly==5.20.0
+    - nbformat==5.10.4
+    - folium==0.20.0
+    - genin2==2.1.6

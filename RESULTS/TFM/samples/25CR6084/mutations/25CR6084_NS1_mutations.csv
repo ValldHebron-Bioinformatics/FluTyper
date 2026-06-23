@@ -1,0 +1,21 @@
+SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,POSITION_REF,REFERENCE_AA,QUERY_AA,AA_MUTATION,MUTATION_TYPE,MARKER,MARKER_ID,IS_COMBINATION,EFFECT,FOUND_IN,REFERENCE
+25CR6084,H5N1(HPAI),NS1,H5,28,28,G,C,G28C,Substitution,No,,No,,,
+25CR6084,H5N1(HPAI),NS1,H5,42,42,S,S,42S,Marker,Yes,14,No,Decreased antiviral response in mice | Increased virulence in mice,H5N1,"Jiao P. et al., 2008 | Suttie A. et al., 2019"
+25CR6084,H5N1(HPAI),NS1,H5,53,53,G,D,G53D,Marker,Yes,395,No,Increased virulence in mice,H1N1,"Zhu M. et al., 2023"
+25CR6084,H5N1(HPAI),NS1,H5,55,55,E,E,55E,Marker,Yes,27,Yes,Decreased interferon response | Enhanced replication in mammalian cells,H5N1,"Li J. et al., 2018 | Suttie A. et al., 2019"
+25CR6084,H5N1(HPAI),NS1,H5,56,56,T,A,T56A,Substitution,No,,No,,,
+25CR6084,H5N1(HPAI),NS1,H5,66,66,E,E,66E,Marker,Yes,27,Yes,Decreased interferon response | Enhanced replication in mammalian cells,H5N1,"Li J. et al., 2018 | Suttie A. et al., 2019"
+25CR6084,H5N1(HPAI),NS1,H5,76,76,T,A,T76A,Substitution,No,,No,,,
+25CR6084,H5N1(HPAI),NS1,H5,83,83,P,S,P83S,Substitution,No,,No,,,
+25CR6084,H5N1(HPAI),NS1,H5,88,88,R,H,R88H,Substitution,No,,No,,,
+25CR6084,H5N1(HPAI),NS1,H5,103,103,F,F,103F,Marker,Yes,22,Yes,Increased virulence in mice,H5N1,"Kuo R. et al., 2009 | Spesock A. et al., 2011 | Suttie A. et al., 2019"
+25CR6084,H5N1(HPAI),NS1,H5,104,104,M,M,104M,Marker,Yes,430,No,Decreased interferon response in mammalian cells | Enhanced polymerase activity,H10N7,"Kuryshko M. et al., 2026"
+25CR6084,H5N1(HPAI),NS1,H5,106,106,M,M,106M,Marker,Yes,19 | 22,No | Yes,Increased viral replication in mammalian cells | Increased virulence in mice,H1N1 with all internal genes from H7N9 | H5N1,"Ayllon J. et al., 2014 | Suttie A. et al., 2019 | Kuo R. et al., 2009 | Spesock A. et al., 2011"
+25CR6084,H5N1(HPAI),NS1,H5,129,129,I,T,I129T,Substitution,No,,No,,,
+25CR6084,H5N1(HPAI),NS1,H5,138,138,F,F,138F,Marker,Yes,20 | 27,No | Yes,Decreased interferon response | Increased viral replication in mammalian cells | Enhanced replication in mammalian cells,H5N1,"Li J. et al., 2018 | Suttie A. et al., 2019"
+25CR6084,H5N1(HPAI),NS1,H5,149,149,A,A,149A,Marker,Yes,21,No,Decreased interferon response in chickens | Increased virulence in chickens,H5N1,"Li Z. et al., 2006 | Suttie A. et al., 2019"
+25CR6084,H5N1(HPAI),NS1,H5,165,165,S,F,S165F,Substitution,No,,No,,,
+25CR6084,H5N1(HPAI),NS1,H5,171,171,D,N,D171N,Substitution,No,,No,,,
+25CR6084,H5N1(HPAI),NS1,H5,205,205,S,I,S205I,Substitution,No,,No,,,
+25CR6084,H5N1(HPAI),NS1,H5,218,218,Q,*,Q218*,Substitution,No,,No,,,
+25CR6084,H5N1(HPAI),NS1,H5,227,227,E,G,E227G,Substitution,No,,No,,,

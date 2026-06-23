@@ -1,0 +1,4 @@
+OrganizeBySample: No records found for sample 25CR5413 segment PB1, skipping.
+OrganizeBySample: No records found for sample 25CR5413 segment PA, skipping.
+GetCDS: No valid FASTA found for sample 25CR5413 segment PB1. Skipping all proteins for this segment.
+GetCDS: No valid FASTA found for sample 25CR5413 segment PA. Skipping all proteins for this segment.

@@ -2,6 +2,7 @@
 nextflow.enable.dsl=2
 
 process MergeHistoricalData {
+    // This process is activated with the --append flag and merges new data with historical data from the append_dir.
     errorStrategy 'ignore'
     
     input:
@@ -33,7 +34,7 @@ process MergeHistoricalData {
     df_new_sub = pd.read_csv("new_sub.csv")
     if os.path.exists(old_sub_path):
         df_old_sub = pd.read_csv(old_sub_path)
-        df_old_sub = df_old_sub[~df_old_sub['seqName'].isin(df_new_sub['seqName'])]
+        df_old_sub = df_old_sub[~df_old_sub['Sample_ID'].isin(df_new_sub['Sample_ID'])]
         df_final_sub = pd.concat([df_old_sub, df_new_sub], ignore_index=True)
     else:
         df_final_sub = df_new_sub

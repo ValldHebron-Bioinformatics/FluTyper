@@ -1,0 +1,19 @@
+SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,POSITION_REF,REFERENCE_AA,QUERY_AA,AA_MUTATION,MUTATION_TYPE,MARKER,MARKER_ID,IS_COMBINATION,EFFECT,FOUND_IN,REFERENCE
+25CR5413,H6N8,HA1,H6,35,35,N,T,N35T,Substitution,No,,No,,,
+25CR5413,H6N8,HA1,H6,53,53,G,R,G53R,Substitution,No,,No,,,
+25CR5413,H6N8,HA1,H6,74,74,Q,K,Q74K,Substitution,No,,No,,,
+25CR5413,H6N8,HA1,H6,84,84,T,S,T84S,Substitution,No,,No,,,
+25CR5413,H6N8,HA1,H6,94,94,A,T,A94T,Substitution,No,,No,,,
+25CR5413,H6N8,HA1,H6,97,97,E,D,E97D,Substitution,No,,No,,,
+25CR5413,H6N8,HA1,H6,98,98,V,A,V98A,Substitution,No,,No,,,
+25CR5413,H6N8,HA1,H6,123,123,T,A,T123A,Substitution,No,,No,,,
+25CR5413,H6N8,HA1,H6,133,133,R,K,R133K,Substitution,No,,No,,,
+25CR5413,H6N8,HA1,H6,134,134,A,A,134A,Marker,Yes,391,No,Increased viral replication in mice lungs | Increased virus thermostability,H9N2,"Zhang J. et al., 2023"
+25CR5413,H6N8,HA1,H6,138,138,I,N,I138N,Substitution,No,,No,,,
+25CR5413,H6N8,HA1,H6,157,156,A,A,157A,Marker,Yes,142,No,Increased transmission in guinea pigs | Increased virus binding to α2-6,H5N1,"Gao Y. et al., 2009 | Suttie A. et al., 2019 | Wang W. et al., 2010"
+25CR5413,H6N8,HA1,H6,190,189,T,T,190T,Marker,Yes,154,No,Increased virus binding to α2-6,H5N1,"Peng W. et al., 2018 | Suttie A. et al., 2019 | Wang W. et al., 2010"
+25CR5413,H6N8,HA1,H6,211,210,S,G,S211G,Substitution,No,,No,,,
+25CR5413,H6N8,HA1,H6,258,257,V,A,V258A,Substitution,No,,No,,,
+25CR5413,H6N8,HA1,H6,270,268,N,S,N270S,Substitution,No,,No,,,
+25CR5413,H6N8,HA1,H6,303,301,E,G,E303G,Substitution,No,,No,,,
+25CR5413,H6N8,HA1,H6,327,325,T,N,T327N,Substitution,No,,No,,,

@@ -1,0 +1,9 @@
+SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,POSITION_REF,REFERENCE_AA,QUERY_AA,AA_MUTATION,MUTATION_TYPE,MARKER,MARKER_ID,IS_COMBINATION,EFFECT,FOUND_IN,REFERENCE
+24CR5067,H5N2(LPAI),PB1,H5,3,3,V,V,3V,Marker,Yes,94,No,Increased polymerase activity in avian cells | Increased polymerase activity in mammalian cells | Increased replication in avian cells | Increased replication in mammalian cells,H5N1,"Elgendy E. et al., 2017 | Suttie A. et al., 2019"
+24CR5067,H5N2(LPAI),PB1,H5,59,59,S,T,S59T,Substitution,No,,No,,,
+24CR5067,H5N2(LPAI),PB1,H5,115,115,Q,Q,115Q,Marker,Yes,417,No,Transmitted via aerosol among guinea pigs,H7N9,"Zhang C. et al., 2021"
+24CR5067,H5N2(LPAI),PB1,H5,216,216,S,G,S216G,Substitution,No,,No,,,
+24CR5067,H5N2(LPAI),PB1,H5,375,375,S,N,S375N,Substitution,No,,No,,,
+24CR5067,H5N2(LPAI),PB1,H5,386,386,R,K,R386K,Substitution,No,,No,,,
+24CR5067,H5N2(LPAI),PB1,H5,622,622,G,G,622G,Marker,Yes,101,No,Increased polymerase activity in mammalian cells | Increased polymerase activity in mice | Increased virulence in mice,H5N1,"Feng X. et al., 2016 | Suttie A. et al., 2019"
+24CR5067,H5N2(LPAI),PB1,H5,694,694,N,S,N694S,Substitution,No,,No,,,

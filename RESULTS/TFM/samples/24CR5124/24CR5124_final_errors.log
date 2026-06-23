@@ -1,0 +1,3 @@
+OrganizeBySample: No records found for sample 24CR5124 segment PB2, skipping.
+GetCDS: No valid FASTA found for sample 24CR5124 segment PB2. Skipping all proteins for this segment.
+WARNING: Marker file not found for protein PA-X: PA-X_markers.csv
