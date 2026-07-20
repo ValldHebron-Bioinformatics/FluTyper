@@ -14,10 +14,12 @@ nextflow_process {
                 def nTag = "N1"
                 def pathotype = "HPAI"
                 
-                def protDir = file("${projectDir}/tests/data/19135815/aligned_PROT")
+                def protDir = file("\${projectDir}/tests/data/19135815/aligned_PROT", type: 'dir', checkIfExists: true)
                 def protFiles = protDir.listFiles().findAll { it.name.endsWith(".fasta") }
 
                 input[0] = [ sampleId, protFiles, hTag, nTag, pathotype ]
+                
+                input[1] = file("\${projectDir}/protocols/AVIAN/v1/markers/", type: 'dir', checkIfExists: true)
                 """
             }
         }
