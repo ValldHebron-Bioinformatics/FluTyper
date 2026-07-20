@@ -11,3 +11,4 @@ MARKER_ID,POSITION,AA,EFFECT,FOUND_IN,REFERENCE
 3,43,M,Increased virulence in mice,H5N1,"Suttie A. et al., 2019"
 414,95,K,Transmitted via aerosol among ferrets,H7N1,"Sutton T. et al., 2014"
 414,211,Q,Transmitted via aerosol among ferrets,H7N1,"Sutton T. et al., 2014"
+436,115,I,Evade human stimulator of interferon genes (STING) (inhibitor of avian influenza A viruses replication),H1N1,"Ye R. et al., 2026"
