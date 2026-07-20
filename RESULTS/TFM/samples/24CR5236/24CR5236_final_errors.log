@@ -1,5 +1,0 @@
-OrganizeBySample: No records found for sample 24CR5236 segment PB2, skipping.
-GetCDS: No valid FASTA found for sample 24CR5236 segment PB2. Skipping all proteins for this segment.
-WARNING: Marker file not found for protein NS1: /home/vhir/Desktop/FluTyper/nf_pipeline/../protocols/AVIAN/v1/markers/NS1_markers.csv
-WARNING: Marker file not found for protein NS2: /home/vhir/Desktop/FluTyper/nf_pipeline/../protocols/AVIAN/v1/markers/NS2_markers.csv
-WARNING: Marker file not found for protein PA-X: /home/vhir/Desktop/FluTyper/nf_pipeline/../protocols/AVIAN/v1/markers/PA-X_markers.csv

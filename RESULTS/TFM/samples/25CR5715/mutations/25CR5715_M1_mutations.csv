@@ -1,7 +1,0 @@
-SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,POSITION_REF,REFERENCE_AA,QUERY_AA,AA_MUTATION,MUTATION_TYPE,MARKER,MARKER_ID,IS_COMBINATION,EFFECT,FOUND_IN,REFERENCE
-25CR5715,H5N1(HPAI),M1,H5,30,30,D,D,30D,Marker,Yes,1,No,Increased virulence in mice,H5N1,"Fan S. et al., 2009 | Suttie A. et al., 2019"
-25CR5715,H5N1(HPAI),M1,H5,43,43,M,M,43M,Marker,Yes,3,No,Increased virulence in chickens | Increased virulence in ducks | Increased virulence in mice,H5N1,"Nao N. et al., 2015 | Suttie A. et al., 2019"
-25CR5715,H5N1(HPAI),M1,H5,55,55,L,M,L55M,Substitution,No,,No,,,
-25CR5715,H5N1(HPAI),M1,H5,101,101,R,K,R101K,Substitution,No,,No,,,
-25CR5715,H5N1(HPAI),M1,H5,200,200,V,A,V200A,Substitution,No,,No,,,
-25CR5715,H5N1(HPAI),M1,H5,215,215,A,A,215A,Marker,Yes,2,No,Increased virulence in mice,H5N1,"Fan S. et al., 2009 | Suttie A. et al., 2019"
