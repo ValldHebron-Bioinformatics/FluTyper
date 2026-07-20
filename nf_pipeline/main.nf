@@ -21,6 +21,7 @@ include { InteractiveMutationsTable } from './modules/InteractiveMutationsTable'
 include { DateGraphicReport         } from './modules/DateGraphicReport'
 include { MergeHistoricalData       } from './modules/MergeHistoricalData'
 include { GeographicReport          } from './modules/GeographicReport'
+include { MetadataMerge             } from './modules/MetadataMerge'
 
 // Comprovació invisible per decidir si generem el mapa
 def check_location_column(metadata_path) {
@@ -70,7 +71,7 @@ workflow {
         .map { tup -> tup[1] }
         .collectFile(
             name: 'inferred_subtypes.csv',
-            seed: 'seqName,inferred_subtype,pathotype\n' 
+            seed: 'Sample_ID,inferred_subtype,pathotype\n' 
         )
 
     // DATASET PREPARATION
@@ -166,7 +167,7 @@ workflow {
             tuple(sample_id, prot_files, h_tag, n_tag, pathotype)
         }
         
-    MutationsFinder(Mutations_ch)
+    MutationsFinder(Mutations_ch, ch_markerfiles.collect())
     ch_mut = MutationsFinder.out.results.map { _id, mut_files, combined_csv -> [mut_files, combined_csv] }.flatten()
     
     MutationsCompiler_ch = MutationsFinder.out.results
@@ -194,6 +195,23 @@ workflow {
         final_genotyping_ch = GenotypingFinal_ch
         final_mutations_ch  = ch_raw_mutations
         final_metadata_ch   = params.metadata ? channel.fromPath(params.metadata, checkIfExists: true) : channel.of([])
+    }
+
+    // METADATA MERGE — runs in parallel, only affects published outputs
+    if (params.metadata) {
+        MetadataMerge(
+            final_subtypes_ch,
+            final_genotyping_ch,
+            final_mutations_ch,
+            final_metadata_ch
+        )
+        published_subtypes_ch   = MetadataMerge.out.subtypes
+        published_genotyping_ch = MetadataMerge.out.genotyping
+        published_mutations_ch  = MetadataMerge.out.mutations
+    } else {
+        published_subtypes_ch   = final_subtypes_ch
+        published_genotyping_ch = final_genotyping_ch
+        published_mutations_ch  = final_mutations_ch
     }
 
     // AGGREGATED GRAPHIC REPORTS (Using Merged Data)
@@ -257,11 +275,11 @@ workflow {
     // PUBLISH DECLARATIONS
     publish:
     folder = OrganizeBySample.out.results.map { _id, path -> path }
-    subtype = final_subtypes_ch
+    subtype = published_subtypes_ch
     datasets = GetDatasets.out
     database = ch_database
     markerfiles = ch_markerfiles
-    results = final_genotyping_ch
+    results = published_genotyping_ch
     CDS = ch_cds
     prot = ch_prot
     graphic_report = CladeGraphicReport.out.report
@@ -272,7 +290,7 @@ workflow {
     date_report = date_report_ch
     geo_report = ch_geo_report
     mut = ch_mut
-    mutations_report = final_mutations_ch
+    mutations_report = published_mutations_ch
     merged_metadata = final_metadata_ch
     errors = CompileErrors.out.map { _id, log -> log }
     errors_merged = ErrorsMerged_ch

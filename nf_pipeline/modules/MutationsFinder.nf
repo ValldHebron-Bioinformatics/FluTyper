@@ -7,6 +7,7 @@ process MutationsFinder {
 
     input:
     tuple val(sample_id), path(prot_files), val(h_tag), val(n_tag), val(pathotype)
+    path markers
 
     output:
     tuple val(sample_id), path("samples/${sample_id}/mutations/${sample_id}_*_mutations.csv"), path("samples/${sample_id}/${sample_id}_mutations.csv"), emit: results
@@ -18,7 +19,9 @@ import os, csv
 from pathlib import Path
 from Bio import SeqIO
 
-markers_dir = Path("${params.protocols[params.protocol].resources}/markers")
+markers_dir = Path("${markers}")
+if not markers_dir.exists():
+    markers_dir = Path(".")
 ha_dict = "${params.protocols[params.protocol].resources}/HA_DICT.csv"
 na_dict = "${params.protocols[params.protocol].resources}/NA_DICT.csv"
 out_dir = Path("samples/${sample_id}/mutations")
@@ -132,7 +135,8 @@ for aligned_prot in "${prot_files}".split():
                 # Avoid duplicate info entries for the same marker ID
                 if info not in marker_info.setdefault(m_id, []): marker_info[m_id].append(info)
     else:
-        with open("MFerrors.log", 'a') as f: f.write(f"WARNING: Marker file not found for protein {prot_name}: {m_file}\\n")
+        if "${params.protocol}" == "AVIAN":
+            with open("MFerrors.log", 'a') as f: f.write(f"WARNING: Marker file not found for protein {prot_name}: {m_file}\\n")
 
     observed_mutations, protein_pos = set(), 0
     for r_aa, q_aa in zip(ref_seq, query_seq):

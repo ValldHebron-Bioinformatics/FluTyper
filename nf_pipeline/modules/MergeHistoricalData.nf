@@ -23,7 +23,12 @@ process MergeHistoricalData {
     import pandas as pd
     import os
 
-    # Define historical file paths
+    # Columns added by MetadataMerge — strip from historical data to avoid duplicates on re-run
+    META_COLS = ['Season', 'AGE GROUP', 'SEX', 'LOCATION', 'ORIGINATING_LAB']
+
+    def strip_meta_cols(df):
+        return df.drop(columns=[c for c in META_COLS if c in df.columns])
+
     old_sub_path = os.path.join("${append_dir}", "inferred_subtypes.csv")
     old_geno_path = os.path.join("${append_dir}", "final_genotyping_results.csv")
     old_mut_path = os.path.join("${append_dir}", "final_mutations_report.xlsx")
@@ -32,8 +37,8 @@ process MergeHistoricalData {
     # Merge Subtypes
     df_new_sub = pd.read_csv("new_sub.csv")
     if os.path.exists(old_sub_path):
-        df_old_sub = pd.read_csv(old_sub_path)
-        df_old_sub = df_old_sub[~df_old_sub['seqName'].isin(df_new_sub['seqName'])]
+        df_old_sub = strip_meta_cols(pd.read_csv(old_sub_path))
+        df_old_sub = df_old_sub[~df_old_sub['Sample_ID'].isin(df_new_sub['Sample_ID'])]
         df_final_sub = pd.concat([df_old_sub, df_new_sub], ignore_index=True)
     else:
         df_final_sub = df_new_sub
@@ -42,7 +47,7 @@ process MergeHistoricalData {
     # Merge Genotyping
     df_new_geno = pd.read_csv("new_geno.csv")
     if os.path.exists(old_geno_path):
-        df_old_geno = pd.read_csv(old_geno_path)
+        df_old_geno = strip_meta_cols(pd.read_csv(old_geno_path))
         if 'SampleID' in df_old_geno.columns and 'SampleID' in df_new_geno.columns:
             df_old_geno = df_old_geno[~df_old_geno['SampleID'].isin(df_new_geno['SampleID'])]
         df_final_geno = pd.concat([df_old_geno, df_new_geno], ignore_index=True)
@@ -59,12 +64,10 @@ process MergeHistoricalData {
             
             for sheet_name, df_new in new_mut_sheets.items():
                 if sheet_name in old_mut_sheets:
-                    df_old = old_mut_sheets[sheet_name]
+                    df_old = strip_meta_cols(old_mut_sheets[sheet_name])
                     if 'SAMPLE_ID' in df_old.columns and 'SAMPLE_ID' in df_new.columns:
                         df_old = df_old[~df_old['SAMPLE_ID'].isin(df_new['SAMPLE_ID'])]
-                    
-                    df_final = pd.concat([df_old, df_new], ignore_index=True)
-                    df_final.to_excel(writer, sheet_name=sheet_name, index=False)
+                    pd.concat([df_old, df_new], ignore_index=True).to_excel(writer, sheet_name=sheet_name, index=False)
                 else:
                     df_new.to_excel(writer, sheet_name=sheet_name, index=False)
         else:
@@ -72,7 +75,6 @@ process MergeHistoricalData {
                 df_new.to_excel(writer, sheet_name=sheet_name, index=False)
 
     # Merge Metadata
-    new_meta_path = "${meta_path}"
     df_meta_list = []
     
     if os.path.exists(old_meta_path):
@@ -81,6 +83,7 @@ process MergeHistoricalData {
         except Exception:
             pass
 
+    new_meta_path = "${meta_path}"
     if os.path.exists(new_meta_path) and os.path.getsize(new_meta_path) > 0:
         try:
             df_meta_list.append(pd.read_csv(new_meta_path))

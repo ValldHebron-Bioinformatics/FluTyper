@@ -7,18 +7,18 @@ process CladeGraphicReport {
 
     input:
     path(genotyping_file)
-    path(metadata_file) // Nextflow safely ignores this if it receives an empty collection
+    path(metadata_file) 
 
     output:
     path("CladeGraphicReport.html"), emit: report
     path("CladeEvolutionReport.html"), emit: evolution_report, optional: true
 
     script:
-    // Evaluate the Groovy variable. If it's an empty list, pass an empty string to Python.
     def meta_str = metadata_file ? metadata_file.toString() : ""
     """
     #!/usr/bin/env python3
     import os
+    import json
     import pandas as pd
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
@@ -26,7 +26,6 @@ process CladeGraphicReport {
     import colorsys
     import random
 
-    # Define text color (black or white) based on background color for readability
     def get_contrast_text_color(hex_str):
         hex_str = str(hex_str).lstrip('#')
         if len(hex_str) == 6:
@@ -40,10 +39,8 @@ process CladeGraphicReport {
 
     is_colorblind = "${params.colorblind}".lower() == "true"
 
-    # Okabe-Ito Colors Palette (colorblind-friendly)
     okabe_ito_colors = ['#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7', '#999999', '#000000']
     
-    # Base Colors mapping for H Subtypes including new Human labels
     subtype_base_colors = {
         'H1': '#1F77B4', 'A(H1)pdm09': '#1F77B4',
         'H2': '#D62728', 
@@ -53,179 +50,178 @@ process CladeGraphicReport {
         'H13': '#8C6D31','H14': '#843C39','H15': '#7B4173','H16': '#5254A3','H17': '#8CA252','H18': '#BD9E39' 
     }
 
-    # Generate a randomized monochromatic palette
     def generate_shades(base_hex, n):
         if n <= 0: return []
         if n == 1: return [base_hex]
-        
         clean_hex = str(base_hex).lstrip('#')
-        
         try:
-            # Convert the hex string into basic Red, Green, and Blue values
             r, g, b = [int(clean_hex[i:i+2], 16) / 255.0 for i in (0, 2, 4)]
         except ValueError:
             return ['#888888'] * n
-            
-        # Extract the Hue (color identity), Lightness, and Saturation (intensity)
         hue, lightness, saturation = colorsys.rgb_to_hls(r, g, b)
-        
-        # Create an evenly spaced sequence of light to dark values between 0.1 and 0.9
         step = 0.8 / (n - 1)
         brightness_levels = [0.1 + (step * i) for i in range(n)]
-        
-        # Shuffle the brightness levels using the base color as a predictable seed
         random.Random(base_hex).shuffle(brightness_levels)
-        
         shades = []
         for new_lightness in brightness_levels:
-            # Rebuild the color using the new lightness, and convert it back to a hex string
             new_r, new_g, new_b = colorsys.hls_to_rgb(hue, new_lightness, saturation)
             shades.append(f"#{int(new_r * 255):02x}{int(new_g * 255):02x}{int(new_b * 255):02x}")
-            
         return shades
 
-    # Dataframe preparation
     genotyping_df = pd.read_csv("${genotyping_file}")
     genotyping_df['H_Subtype'] = genotyping_df['Subtype'].astype(str).str.extract(r'(H\\d+)', expand=False)
     
     if "${params.protocol}".upper() == "HUMAN":
-        genotyping_df['H_Subtype'] = genotyping_df['H_Subtype'].replace({
-            'H1': 'A(H1)pdm09',
-            'H3': 'A(H3)'
-        })
+        genotyping_df['H_Subtype'] = genotyping_df['H_Subtype'].replace({'H1': 'A(H1)pdm09', 'H3': 'A(H3)'})
 
-    # Standardize Clade, Genotype, and Sub-genotype columns
+    # Ensure Clade columns are treated as categorical/string and clean them
     for col in ['Clade', 'Genotype', 'Sub-genotype']:
         genotyping_df[col] = genotyping_df[col].fillna("Unassigned").astype(str).str.strip()
-        genotyping_df.loc[genotyping_df[col].str.lower().str.contains('unassigned'), col] = 'Unassigned'
         
-    genotyping_df = genotyping_df[genotyping_df['Clade'] != '-'].copy()
+    # Safely handle Optional Metadata
+    genotyping_df['Age_Group'] = 'Sense dades'
+    genotyping_df['Sex'] = 'Sense dades'
+    genotyping_df['Season'] = 'Unknown Season'
+    
+    metadata_param = "${meta_str}"
+    if metadata_param and os.path.isfile(metadata_param):
+        df_meta = pd.read_csv(metadata_param, skipinitialspace=True)
+        # Normalize columns to uppercase to avoid case-sensitivity issues
+        df_meta.columns = [c.upper() for c in df_meta.columns]
+        
+        if 'ID' in df_meta.columns:
+            df_meta = df_meta.dropna(subset=['ID']).drop_duplicates(subset=['ID'], keep='first')
+            
+            # Map optional demographics
+            if 'AGE GROUP' in df_meta.columns:
+                df_meta = df_meta.rename(columns={'AGE GROUP': 'AGE_GROUP'})
+            
+            if 'AGE_GROUP' in df_meta.columns:
+                df_meta['AGE_GROUP'] = df_meta['AGE_GROUP'].fillna('Sense dades')
+                
+            if 'SEX' in df_meta.columns:
+                df_meta['SEX'] = df_meta['SEX'].fillna('Sense dades')
+                
+            # Merge Metadata
+            genotyping_df = genotyping_df.merge(df_meta, left_on='SampleID', right_on='ID', how='left')
+            genotyping_df['Age_Group'] = genotyping_df['AGE_GROUP'].fillna('Sense dades') if 'AGE_GROUP' in genotyping_df.columns else 'Sense dades'
+            genotyping_df['Sex'] = genotyping_df['SEX'].fillna('Sense dades') if 'SEX' in genotyping_df.columns else 'Sense dades'
+            
+            # Calculate Season and WEEK if Date exists
+            if 'DATE' in df_meta.columns:
+                genotyping_df['DATE'] = pd.to_datetime(genotyping_df['DATE'], errors='coerce')
+                iso_cal = genotyping_df['DATE'].dt.isocalendar()
+                s_year = iso_cal.year.where(iso_cal.week >= 40, iso_cal.year - 1)
+                genotyping_df['Season'] = s_year.apply(lambda x: f"{int(x)}-{int(x)+1}" if pd.notna(x) else "Unknown Season")
+                # Create WEEK column as the Monday of each ISO week (needed for evolution charts)
+                genotyping_df['WEEK'] = genotyping_df['DATE'].dt.to_period('W').apply(
+                    lambda p: p.start_time if pd.notna(p) else pd.NaT
+                )
 
-    # Dynamic Root Grouping Logic
+    invalid_clade_values = {'-', 'Unassigned', 'No dataset available'}
+
+    # Clade logic refinement for Avian
     if "${params.protocol}".upper() == "AVIAN":
         genotyping_df['Root_Clade'] = genotyping_df['Clade']
     else:
+        # Existing logic for human/other
         all_clades = genotyping_df['Clade'].dropna().unique()
         def get_root_clade(c):
             if pd.isna(c) or c in ["Unassigned", "No dataset available"]: return c
             parts = str(c).split('.')
-            if len(parts) > 3: return ".".join(parts[:3]) + "-like"
-            elif len(parts) == 3 and any(str(x).startswith(str(c) + ".") for x in all_clades): return str(c) + "-like"
-            return c
+            return ".".join(parts[:3]) + "-like" if len(parts) > 3 else c
         genotyping_df['Root_Clade'] = genotyping_df['Clade'].apply(get_root_clade)
 
-    # Inject the safely evaluated Groovy string
-    metadata_param = "${meta_str}"
-
-    # Process metadata purely inside Python
-    if metadata_param and os.path.isfile(metadata_param):
-        df_meta = pd.read_csv(metadata_param, skipinitialspace=True)
-        df_meta['DATE'] = pd.to_datetime(df_meta['DATE'], format='%Y-%m-%d')
-        df_meta['WEEK'] = df_meta['DATE'].dt.to_period('W').dt.to_timestamp()
-        
-        # Merge utilizing SampleID
-        genotyping_df = genotyping_df.merge(df_meta[['ID', 'DATE', 'WEEK']], left_on='SampleID', right_on='ID', how='left')
-
-    # Calculate Season based on the merged DATE column
-    if 'DATE' in genotyping_df.columns:
-        # Force conversion to datetime to catch any empty strings or garbage as pure nulls
-        genotyping_df['DATE'] = pd.to_datetime(genotyping_df['DATE'], errors='coerce')
-        
-        iso_cal = genotyping_df['DATE'].dt.isocalendar()
-        s_year = iso_cal.year.where(iso_cal.week >= 40, iso_cal.year - 1)
-        valid_dates = s_year.notna()
-        
-        if valid_dates.any():
-            # If we have some valid dates, initialize with pd.NA so the missing ones vanish
-            genotyping_df['Season'] = pd.NA
-            genotyping_df.loc[valid_dates, 'Season'] = (
-                s_year[valid_dates].astype(int).astype(str) + "-" + 
-                (s_year[valid_dates].astype(int) + 1).astype(str)
-            )
-        else:
-            # The column exists but absolutely zero valid dates were found
-            genotyping_df['Season'] = "All Time"
-    else:
-        genotyping_df['Season'] = "All Time"
-
-    # Extract unique seasons, ensuring most recent is first and "All Time" is strictly last
     raw_seasons = genotyping_df['Season'].dropna().unique()
-    seasons = sorted([s for s in raw_seasons if s != "All Time"], reverse=True)
-    if "All Time" in raw_seasons or len(seasons) == 0:
-        seasons.append("All Time")
+    seasons_pie = sorted([s for s in raw_seasons if s not in ["All Time", "Unknown Season"]], reverse=True)
+    seasons_evo = seasons_pie.copy()
+    seasons_evo.append("All Time")
+
+    age_order = {'0-2': 0, '3-4': 1, '5-14': 2, '15-65': 3, '>65': 4}
+    age_groups = ['All'] + sorted([a for a in genotyping_df['Age_Group'].unique() if str(a).strip() not in ['nan', '', 'None', 'Sense dades']], key=lambda x: age_order.get(str(x).strip(), 99))
+    sexs = ['All'] + sorted([g for g in genotyping_df['Sex'].unique() if str(g).strip() not in ['nan', '', 'None', 'Sense dades']])
 
     unique_h_subtypes = sorted(genotyping_df['H_Subtype'].dropna().unique())
-    
-    # Filter out subtypes 
     valid_h_subtypes = []
     for h in unique_h_subtypes:
-        clades_for_h = genotyping_df[genotyping_df['H_Subtype'] == h]['Clade'].unique()
-        if not (len(clades_for_h) == 1 and clades_for_h[0] == "No dataset available"):
-            valid_h_subtypes.append(h)
+        sub = genotyping_df[genotyping_df['H_Subtype'] == h]
+        # Only count rows that have a real clade assignment
+        valid_clade_rows = sub[~sub['Clade'].isin(invalid_clade_values)]
+        if valid_clade_rows.empty:
+            continue
+        valid_h_subtypes.append(h)
             
-    # Check if there are any valid Genotypes for clade 2.3.4.4b globally
     include_genotype_chart = genotyping_df[(genotyping_df['Clade'] == '2.3.4.4b') & (genotyping_df['Genotype'] != '-')].shape[0] > 0
+    total_charts = 1 + len(valid_h_subtypes) + (1 if include_genotype_chart else 0)
     
-    # Consistent color mapping across all seasons
     global_color_map = {}
-    
-    # H Subtype colors
     h_labels = sorted([h for h in genotyping_df['H_Subtype'].dropna().unique() if h != '-'])
     h_color_map = {}
+    h_color_map["Unassigned"] = '#d3d3d3'
     for h in h_labels:
         h_color_map[h] = okabe_ito_colors[len(h_color_map) % len(okabe_ito_colors)] if is_colorblind else subtype_base_colors.get(str(h), '#888888')
     global_color_map['h_subtypes'] = h_color_map
     
-    # Clade colors for each H subtype
     for h in valid_h_subtypes:
         base_c = subtype_base_colors.get(str(h), '#888888')
         h_clades = sorted([c for c in genotyping_df[genotyping_df['H_Subtype'] == h]['Root_Clade'].dropna().unique() if c not in ["Unassigned", "No dataset available", "-"]])
-        
-        if is_colorblind:
-            clade_palette = okabe_ito_colors
-        else:
-            clade_palette = generate_shades(base_c, len(h_clades) + 2)
-        
+        clade_palette = okabe_ito_colors if is_colorblind else generate_shades(base_c, len(h_clades) + 2)
         clade_map = {}
-        for idx, clade in enumerate(h_clades):
-            clade_map[clade] = clade_palette[idx % len(clade_palette)]
-        clade_map["Unassigned"] = clade_palette[-2] if len(clade_palette) > 1 else '#888888'
+        for idx, clade in enumerate(h_clades): clade_map[clade] = clade_palette[idx % len(clade_palette)]
+        clade_map["Unassigned"] = '#d3d3d3'
         clade_map["Others"] = clade_palette[-1]
         global_color_map[f'clades_{h}'] = clade_map
     
-    # Genotype colors for 2.3.4.4b
     if include_genotype_chart:
         g_labels = sorted([g for g in genotyping_df[genotyping_df['Clade'] == '2.3.4.4b']['Genotype'].dropna().unique() if g not in ["-", "None", "", "nan", "Unassigned"]])
         genotype_palette = okabe_ito_colors if is_colorblind else colors.qualitative.Vivid
         genotype_map = {}
-        for idx, genotype in enumerate(g_labels):
-            genotype_map[genotype] = genotype_palette[idx % len(genotype_palette)]
+        for idx, genotype in enumerate(g_labels): genotype_map[genotype] = genotype_palette[idx % len(genotype_palette)]
         global_color_map['genotypes'] = genotype_map
-            
-    total_charts = 1 + len(valid_h_subtypes) + (1 if include_genotype_chart else 0)
+
+    season_options_evo = "".join([f'<option value="{s}">{s}</option>' for s in seasons_evo])
+    season_options_pie = "".join([f'<option value="{s}">{s}</option>' for s in seasons_pie])
+    age_options = "".join([f'<option value="{a}">{a}</option>' for a in age_groups])
+    sex_options = "".join([f'<option value="{g}">{g}</option>' for g in sexs])
+
+    def generate_ui_html(report_type):
+        opts = season_options_evo if report_type == 'evo' else season_options_pie
+        return f'''
+        <div style="display:flex; gap:15px; justify-content:center; margin-top:20px; font-family:Arial; background:#f9f9f9; padding:15px; border-radius:8px; border:1px solid #ddd; width:fit-content; margin-left:auto; margin-right:auto; box-shadow:0 4px 10px rgba(0,0,0,0.05);">
+            <div style="min-width:150px;">
+                <label style="font-size:10px; font-weight:bold; color:#666;">SEASON</label><br>
+                <select id="sel_season_{report_type}" style="padding:6px; border-radius:4px; width:100%; border:1px solid #ccc; background:white;">{opts}</select>
+            </div>
+            <div style="min-width:120px;">
+                <label style="font-size:10px; font-weight:bold; color:#666;">AGE GROUP</label><br>
+                <select id="sel_age_{report_type}" style="padding:6px; border-radius:4px; width:100%; border:1px solid #ccc; background:white;">{age_options}</select>
+            </div>
+            <div style="min-width:120px;">
+                <label style="font-size:10px; font-weight:bold; color:#666;">SEX</label><br>
+                <select id="sel_sex_{report_type}" style="padding:6px; border-radius:4px; width:100%; border:1px solid #ccc; background:white;">{sex_options}</select>
+            </div>
+        </div>
+        '''
 
     # CLADE EVOLUTION BAR CHARTS
-    if 'WEEK' in genotyping_df.columns and not genotyping_df['WEEK'].isna().all():
+    if 'WEEK' in genotyping_df.columns and not genotyping_df['WEEK'].isna().all() and len(valid_h_subtypes) > 0:
         df_all = genotyping_df.dropna(subset=['WEEK']).copy()
         
-        subplot_titles_evo = ["<b>H Subtype Weekly Evolution</b>"] + [f"<b>Clade Evolution for {h}</b>" for h in valid_h_subtypes]
+        if "${params.protocol}".upper() == "HUMAN":
+            subplot_titles_evo = ["<b>Influenza A Subtype Weekly Evolution</b>"] + [f"<b>Clade Evolution for {h}</b>" for h in valid_h_subtypes]
+        else:
+            subplot_titles_evo = ["<b>H Subtype Weekly Evolution</b>"] + [f"<b>Clade Evolution for {h}</b>" for h in valid_h_subtypes]
         if include_genotype_chart:
             subplot_titles_evo.append("<b>Genotype Evolution (Clade 2.3.4.4b)</b>")
         
         fig_evo = make_subplots(rows=total_charts, cols=1, shared_xaxes=True, vertical_spacing=0.08, subplot_titles=subplot_titles_evo)
-        # Registry to track which subtype/clade/genotype corresponds to which trace for visibility toggling
-        trace_registry = []
 
-        def add_stacked_bars(df_subset, group_col, row_num, detail_col=None, palette_type='clade', base_color='#888888', color_key=''):
-            if df_subset.empty:
-                return
-                
+        def add_stacked_bars(df_subset, group_col, row_num, detail_col=None, color_key='', meta_dict=None):
+            if df_subset.empty: return
             weekly_totals = df_subset.groupby('WEEK').size().rename('TotalWeek')
-            
             if detail_col:
                 detail_counts = df_subset.groupby(['WEEK', group_col, detail_col]).size().reset_index(name='DetailCount')
                 detail_counts = detail_counts[~detail_counts[detail_col].isin(["-", "None", "", "nan", "Unassigned"])]
-                
                 if not detail_counts.empty:
                     detail_counts['DetailStr'] = "- " + detail_counts[detail_col].astype(str) + ": " + detail_counts['DetailCount'].astype(str)
                     hover_details = detail_counts.groupby(['WEEK', group_col])['DetailStr'].apply(lambda x: "<br>".join(x)).reset_index(name='Hover_Details')
@@ -236,379 +232,225 @@ process CladeGraphicReport {
 
             group_counts = df_subset.groupby(['WEEK', group_col]).size().reset_index(name='Count')
             group_counts = group_counts.merge(weekly_totals, on='WEEK')
-            
-            if not hover_details.empty:
-                group_counts = group_counts.merge(hover_details, on=['WEEK', group_col], how='left')
-            else:
-                group_counts['Hover_Details'] = float('nan')
-                
+            group_counts = group_counts.merge(hover_details, on=['WEEK', group_col], how='left') if not hover_details.empty else group_counts.assign(Hover_Details=float('nan'))
             group_counts['Hover_Details'] = group_counts['Hover_Details'].fillna("")
             group_counts['Pct'] = (group_counts['Count'] / group_counts['TotalWeek']) * 100
 
             def make_hover_extra(row):
                 val = str(row[group_col])
                 details = row['Hover_Details']
-                if not details:
-                    return ""
-                
-                if group_col == 'Final_Label' and val.endswith("-like"):
-                    return "<br><br><b>Clade Breakdown:</b><br>" + details
-                elif group_col == 'Genotype':
-                    return "<br><br><b>Sub-genotypes Breakdown:</b><br>" + details
+                if not details: return ""
+                if group_col == 'Final_Label' and val.endswith("-like"): return "<br><br><b>Clade Breakdown:</b><br>" + details
+                elif group_col == 'Genotype': return "<br><br><b>Sub-genotypes Breakdown:</b><br>" + details
                 return ""
 
             group_counts['Hover_Extra'] = group_counts.apply(make_hover_extra, axis=1)
+            color_map = global_color_map.get(color_key, {})
 
-            unique_groups = group_counts[group_col].unique()
-            
-            # Get color mapping from global_color_map
-            if color_key:
-                color_map = global_color_map.get(color_key, {})
-            else:
-                color_map = {}
-
-            for idx, g in enumerate(unique_groups):
+            for g in group_counts[group_col].unique():
                 g_df = group_counts[group_counts[group_col] == g]
-                
-                if color_key:
-                    color = color_map.get(str(g), '#888888')
-                elif palette_type == 'h_subtype':
-                    color = okabe_ito_colors[idx % len(okabe_ito_colors)] if is_colorblind else subtype_base_colors.get(str(g), '#888888')
-                else:
-                    color = '#888888'
-                
+                color = color_map.get(str(g), '#888888')
                 display_group_col = "Group" if group_col == "Final_Label" else group_col.replace("_", " ")
                 
-                fig_evo.add_trace(
-                    go.Bar(
-                        x=g_df['WEEK'], 
-                        y=g_df['Pct'],
-                        name=str(g),
-                        text=g_df['Count'],
-                        textposition='inside',
-                        insidetextanchor='middle',
-                        textangle=0,
-                        textfont=dict(color=get_contrast_text_color(color), size=14, family='Arial'),
-                        marker_color=color,
-                        legend=f"legend{row_num}" if row_num > 1 else "legend",
-                        customdata=g_df[['Count', 'TotalWeek', 'Pct', 'Hover_Extra']],
-                        hovertemplate=(
-                            "<b>Week:</b> %{x|%V, %Y}<br>"
-                            "<b>" + display_group_col + ":</b> " + str(g) + "<br>"
-                            "<b>Occurrence:</b> %{customdata[0]}/%{customdata[1]} samples (%{customdata[2]:.1f}%)"
-                            "%{customdata[3]}<extra></extra>"
-                        )
-                    ), 
-                    row=row_num, col=1
-                )
-                trace_registry.append({'col': group_col, 'val': str(g)})
-
+                fig_evo.add_trace(go.Bar(
+                    x=g_df['WEEK'], y=g_df['Pct'], name=str(g), showlegend=True, text=g_df['Count'], textposition='inside', insidetextanchor='middle', textangle=0,
+                    textfont=dict(color=get_contrast_text_color(color), size=14, family='Arial'), marker_color=color, legend=f"legend{row_num}" if row_num > 1 else "legend",
+                    customdata=g_df[['Count', 'TotalWeek', 'Pct', 'Hover_Extra']],
+                    hovertemplate=("<b>Week:</b> %{x|%V, %Y}<br><b>" + display_group_col + ":</b> " + str(g) + "<br><b>Occurrence:</b> %{customdata[0]}/%{customdata[1]} samples (%{customdata[2]:.1f}%)%{customdata[3]}<extra></extra>"),
+                    visible=False, meta=meta_dict, width=504800000
+                ), row=row_num, col=1)
             fig_evo.update_yaxes(title_text="Frequency (%)", range=[0, 100], row=row_num, col=1)
 
-        add_stacked_bars(df_all, 'H_Subtype', 1, palette_type='h_subtype', color_key='h_subtypes')
+        for age in age_groups:
+            for sex in sexs:
+                df_view = df_all.copy()
+                if age != 'All': df_view = df_view[df_view['Age_Group'] == age]
+                if sex != 'All': df_view = df_view[df_view['Sex'] == sex]
+                meta_dict = {'age': age, 'sex': sex}
+                
+                add_stacked_bars(df_view, 'H_Subtype', 1, color_key='h_subtypes', meta_dict=meta_dict)
+                current_row = 2
+                for h in valid_h_subtypes:
+                    sub_df = df_view[df_view['H_Subtype'] == h].copy()
+                    sub_df = sub_df[~sub_df['Clade'].isin(invalid_clade_values)]
+                    sub_df['Final_Label'] = sub_df['Root_Clade']
+                    add_stacked_bars(sub_df, 'Final_Label', current_row, detail_col='Clade', color_key=f'clades_{h}', meta_dict=meta_dict)
+                    current_row += 1
 
-        current_row = 2
-        for h in valid_h_subtypes:
-            sub_df = df_all[df_all['H_Subtype'] == h].copy()
-            sub_df['Final_Label'] = sub_df['Root_Clade']
-            add_stacked_bars(sub_df, 'Final_Label', current_row, detail_col='Clade', palette_type='clade', base_color=subtype_base_colors.get(str(h), '#888888'), color_key=f'clades_{h}')
-            current_row += 1
-
-        if include_genotype_chart:
-            sub_df = df_all[(df_all['Clade'] == '2.3.4.4b') & (df_all['Genotype'] != '-')].copy()
-            add_stacked_bars(sub_df, 'Genotype', current_row, detail_col='Sub-genotype', palette_type='genotype', color_key='genotypes')
-
-        all_time_start = df_all['WEEK'].min() - pd.Timedelta(days=7)
-        all_time_end = df_all['WEEK'].max() + pd.Timedelta(days=14)
-        all_time_range = [all_time_start.strftime('%Y-%m-%d'), all_time_end.strftime('%Y-%m-%d')] if pd.notnull(all_time_start) else None
+                if include_genotype_chart:
+                    sub_df = df_view[(df_view['Clade'] == '2.3.4.4b') & (df_view['Genotype'] != '-')].copy()
+                    add_stacked_bars(sub_df, 'Genotype', current_row, detail_col='Sub-genotype', color_key='genotypes', meta_dict=meta_dict)
 
         season_ranges = {}
         for season_val in sorted(df_all['Season'].dropna().unique()):
-            if season_val == "Unknown Season" or season_val == "All Time":
-                continue
+            if season_val in ["Unknown Season", "All Time"]: continue
             try:
-                y1 = int(season_val.split('-')[0])
-                y2 = int(season_val.split('-')[1])
-                s_start = pd.to_datetime(f'{y1}-W40-1', format='%G-W%V-%u')
-                s_end = pd.to_datetime(f'{y2}-W39-7', format='%G-W%V-%u')
-                season_ranges[season_val] = [s_start.strftime('%Y-%m-%d'), s_end.strftime('%Y-%m-%d')]
+                y1, y2 = int(season_val.split('-')[0]), int(season_val.split('-')[1])
+                season_ranges[season_val] = [pd.to_datetime(f'{y1}-W40-1', format='%G-W%V-%u').strftime('%Y-%m-%d'), pd.to_datetime(f'{y2}-W39-7', format='%G-W%V-%u').strftime('%Y-%m-%d')]
             except Exception:
                 s_data = df_all[df_all['Season'] == season_val]
-                if not s_data.empty:
-                    s_start = s_data['WEEK'].min()
-                    s_end = s_data['WEEK'].max()
-                    season_ranges[season_val] = [s_start.strftime('%Y-%m-%d'), s_end.strftime('%Y-%m-%d')]
+                if not s_data.empty: season_ranges[season_val] = [s_data['WEEK'].min().strftime('%Y-%m-%d'), s_data['WEEK'].max().strftime('%Y-%m-%d')]
 
-        dropdown_buttons_evo = []
-        
-        # Loop through distinct actual seasons first
-        for season_val in [s for s in seasons if s != "All Time"]:
-            s_range = season_ranges.get(season_val)
-            if not s_range:
-                continue
-
-            season_args = {f"xaxis{i+1 if i>0 else ''}.range": s_range for i in range(total_charts)}
-            s_data = df_all[df_all['Season'] == season_val]
-            active_groups = {
-                'H_Subtype': set(s_data['H_Subtype'].dropna().astype(str).unique()),
-                'Final_Label': set(s_data['Root_Clade'].dropna().astype(str).unique()) if 'Root_Clade' in s_data.columns else set(),
-                'Genotype': set(s_data['Genotype'].dropna().astype(str).unique()) if 'Genotype' in s_data.columns else set()
-            }
-            
-            season_visibility_mask = [
-                (trace['col'] in active_groups and trace['val'] in active_groups[trace['col']])
-                for trace in trace_registry
-            ]
-            
-            dropdown_buttons_evo.append(dict(args=[{"visible": season_visibility_mask}, season_args], label=f"Season {season_val}", method="update"))
-
-        # Explicitly append All Time as the final selection item
-        if all_time_range:
-            all_time_args = {f"xaxis{i+1 if i>0 else ''}.range": all_time_range for i in range(total_charts)}
-        else:
-            all_time_args = {f"xaxis{i+1 if i>0 else ''}.autorange": True for i in range(total_charts)}
-            
-        all_time_mask = [True] * len(trace_registry)
-        dropdown_buttons_evo.append(dict(args=[{"visible": all_time_mask}, all_time_args], label="All Time", method="update"))
-
-        if "${params.protocol}" == "AVIAN":
-            center_x = 0.45
-        else:
-            center_x = 0.465
-
-        # Configure independent legends perfectly aligned with the top of each subplot row
-        h_domain = (1.0 - (total_charts - 1) * 0.08) / total_charts
         legends_layout = {}
+        h_domain = (1.0 - (total_charts - 1) * 0.08) / total_charts
         for i in range(1, total_charts + 1):
-            y_pos = 1.0 - (i - 1) * (h_domain + 0.08)
-            leg_key = f"legend{i}" if i > 1 else "legend"
-            legends_layout[leg_key] = dict(
-                y=y_pos, 
-                yanchor="top", 
-                x=1.02, 
-                xanchor="left", 
-                title_text=subplot_titles_evo[i-1].replace("<b>","").replace("</b>",""),
-                tracegroupgap=0
-            )
+            legends_layout[f"legend{i}" if i > 1 else "legend"] = dict(y=1.0 - (i - 1) * (h_domain + 0.08), yanchor="top", x=1.02, xanchor="left", title_text=subplot_titles_evo[i-1].replace("<b>","").replace("</b>",""), tracegroupgap=0)
 
+        initial_lbl_evo = seasons_evo[0] if seasons_evo[0] == "All Time" else f"Season {seasons_evo[0]}"
         fig_evo.update_layout(
-            barmode='stack',
-            title=dict(text="<b>Evolution of Subtypes and Clades</b>", x=center_x, y=0.98, xanchor="center", yanchor="top", font=dict(size=24)),
-            updatemenus=[dict(active=0, buttons=dropdown_buttons_evo, x=0.5, xanchor="center", y=1.07, yanchor="top", direction="down", showactive=True)],
-            height=450 * total_charts,
-            hovermode="closest",
-            margin=dict(t=160, b=80, l=80, r=200),
-            **legends_layout
+            barmode='stack', title=dict(text=f"<b>Evolution of Subtypes and Clades - {initial_lbl_evo}</b>", x=0.45 if "${params.protocol}" == "AVIAN" else 0.465, y=0.98, xanchor="center", yanchor="top", font=dict(size=24)),
+            height=450 * total_charts, hovermode="closest", margin=dict(t=120, b=80, l=80, r=200), **legends_layout
         )
-        
-        # Apply the initial state based on the first button (most recent season)
-        if dropdown_buttons_evo:
-            initial_mask = dropdown_buttons_evo[0]['args'][0]['visible']
-            initial_axes = dropdown_buttons_evo[0]['args'][1]
-            for idx, trace in enumerate(fig_evo.data):
-                trace.visible = initial_mask[idx]
-            fig_evo.update_layout(**initial_axes)
-        
         fig_evo.update_xaxes(tickformat="Week %V<br>%Y", showticklabels=True)
-        fig_evo.write_html("CladeEvolutionReport.html")
 
-    # Set up a dynamic grid for the subplots (horizontal layout)
-    cols = total_charts
-    rows = 1
+        js_evo = f'''
+        <script>
+            var seasonRanges = {json.dumps(season_ranges)};
+            var totalCharts = {total_charts};
+            function updateEvoPlot() {{
+                var s = document.getElementById('sel_season_evo').value;
+                var a = document.getElementById('sel_age_evo').value;
+                var g = document.getElementById('sel_sex_evo').value;
+                var plotDivs = document.getElementsByClassName('plotly-graph-div');
+                if (plotDivs.length === 0) return;
+                var plotDiv = plotDivs[0];
+                var update = {{ visible: [] }};
+                
+                for (var i = 0; i < plotDiv.data.length; i++) {{
+                    var meta = plotDiv.data[i].meta;
+                    if (meta && meta.age === a && meta.sex === g) {{
+                        var hasData = false;
+                        if (s === 'All Time') {{ hasData = plotDiv.data[i].x && plotDiv.data[i].x.length > 0; }}
+                        else if (seasonRanges[s]) {{
+                            var sStart = new Date(seasonRanges[s][0]), sEnd = new Date(seasonRanges[s][1]);
+                            if (plotDiv.data[i].x) {{
+                                for (var j = 0; j < plotDiv.data[i].x.length; j++) {{
+                                    var xDate = new Date(plotDiv.data[i].x[j]);
+                                    if (xDate >= sStart && xDate <= sEnd) {{ hasData = true; break; }}
+                                }}
+                            }}
+                        }}
+                        update.visible.push(hasData ? true : false);
+                    }} else {{ update.visible.push(false); }}
+                }}
+                Plotly.restyle(plotDiv, update);
+                
+                var layoutUpdate = {{}};
+                layoutUpdate['title.text'] = '<b>Evolution of Subtypes and Clades - ' + (s === 'All Time' ? s : 'Season ' + s) + '</b>';
+                for (var i = 0; i < totalCharts; i++) {{
+                    var ax = i === 0 ? 'xaxis' : 'xaxis' + (i + 1);
+                    if (s !== 'All Time' && seasonRanges[s]) {{
+                        layoutUpdate[ax + '.range'] = seasonRanges[s];
+                        layoutUpdate[ax + '.autorange'] = false;
+                        layoutUpdate[ax + '.fixedrange'] = true;
+                    }} else {{
+                        layoutUpdate[ax + '.autorange'] = true;
+                        layoutUpdate[ax + '.fixedrange'] = false;
+                    }}
+                }}
+                Plotly.relayout(plotDiv, layoutUpdate);
+            }}
+            document.getElementById('sel_season_evo').addEventListener('change', updateEvoPlot);
+            document.getElementById('sel_age_evo').addEventListener('change', updateEvoPlot);
+            document.getElementById('sel_sex_evo').addEventListener('change', updateEvoPlot);
+            window.addEventListener('load', updateEvoPlot);
+        </script>
+        '''
+        with open("CladeEvolutionReport.html", "w") as f: f.write(fig_evo.to_html(include_plotlyjs='cdn', full_html=True).replace('<body>', '<body>\\n' + generate_ui_html('evo')).replace('</body>', js_evo + '\\n</body>'))
+
+    # PIE CHARTS
+    cols, rows = total_charts, 1
+
+    if "${params.protocol}".upper() == "HUMAN":
+        subplot_titles = ["<b>Influenza A Subtype Distribution</b>"] + [f"<b>Clade Distribution for {h}</b>" for h in valid_h_subtypes]
+    else:
+        subplot_titles = ["<b>H Subtype Distribution</b>"] + [f"<b>Clade Distribution for {h}</b>" for h in valid_h_subtypes]
+    if include_genotype_chart: subplot_titles.append("<b>Genotype Distribution (Clade 2.3.4.4b)</b>")
+    fig = make_subplots(rows=rows, cols=cols, specs=[[{"type": "domain"} for _ in range(cols)]], subplot_titles=subplot_titles, horizontal_spacing=0.05)
+
+    for season in seasons_pie:
+        for age in age_groups:
+            for sex in sexs:
+                meta_dict = {'season': season, 'age': age, 'sex': sex}
+                df_view = genotyping_df[genotyping_df['Season'] == season].copy()
+                if age != 'All': df_view = df_view[df_view['Age_Group'] == age]
+                if sex != 'All': df_view = df_view[df_view['Sex'] == sex]
+
+                h_counts = df_view['H_Subtype'].value_counts().reset_index()
+                h_counts.columns = ['Label', 'Count']
+                if h_counts.empty: fig.add_trace(go.Pie(labels=["No Data"], values=[1], name="H Subtypes", textinfo='none', hoverinfo='none', marker=dict(colors=['#f0f0f0']), visible=False, meta=meta_dict), row=1, col=1)
+                else:
+                    h_counts['Text'] = h_counts['Count'].astype(str) + '/' + str(h_counts['Count'].sum())
+                    fig.add_trace(go.Pie(
+                        labels=h_counts['Label'], values=h_counts['Count'], name="H Subtypes", text=h_counts['Text'], texttemplate='<b>%{label}</b><br><b>%{text}</b><br><b>%{percent}</b>',
+                        textposition='outside', insidetextorientation='horizontal', rotation=270, automargin=True, hole=0.35, marker=dict(colors=[global_color_map['h_subtypes'].get(str(lbl), '#888888') for lbl in h_counts['Label']], line=dict(color='#ffffff', width=2)),
+                        hoverlabel=dict(font_size=14), hovertemplate='<b>H Subtype:</b> %{label}<br><b>Count:</b> %{text}<br><b>Percentage:</b> %{percent}<extra></extra>', visible=False, meta=meta_dict
+                    ), row=1, col=1)
+
+                for i, h in enumerate(valid_h_subtypes):
+                    c_col = i + 2
+                    sub_df = df_view[df_view['H_Subtype'] == h]
+                    sub_df = sub_df[~sub_df['Clade'].isin(invalid_clade_values)]
+                    if len(sub_df) == 0: fig.add_trace(go.Pie(labels=["No Data"], values=[1], name=str(h), textinfo='none', hoverinfo='none', marker=dict(colors=['#f0f0f0']), visible=False, meta=meta_dict), row=1, col=c_col); continue
+                    
+                    orig_counts = sub_df.groupby(['Clade', 'Root_Clade']).size().reset_index(name='Count')
+                    orig_counts['Hover_Detail'] = orig_counts.apply(lambda x: f"- {x['Clade']}: {x['Count']}/{len(sub_df)} ({x['Count']/len(sub_df):.1%})" if x['Count'] > 0 else "", axis=1)
+                    root_grouped = orig_counts.groupby('Root_Clade').agg(Root_Count=('Count', 'sum'), Root_Hover_Details=('Hover_Detail', lambda x: "<br>".join([d for d in x if d]))).reset_index()
+                    root_grouped['Final_Label'] = root_grouped.apply(lambda x: "Others" if x['Root_Count']/len(sub_df) < 0.01 and str(x['Root_Clade']) not in ["Unassigned", "No dataset available"] else x['Root_Clade'], axis=1)
+                    final_grouped = root_grouped.groupby('Final_Label').agg(Final_Count=('Root_Count', 'sum'), Final_Hover_Details=('Root_Hover_Details', lambda x: "<br>".join([d for d in x if d]))).reset_index()
+                    final_grouped['Hover_Extra'] = final_grouped.apply(lambda x: "<br><br><b>Clade Breakdown:</b><br>" + x['Final_Hover_Details'] if str(x['Final_Label']).endswith("-like") or str(x['Final_Label']) == "Others" else "", axis=1)
+                    final_grouped['Text'] = final_grouped['Final_Count'].astype(str) + '/' + str(len(sub_df))
+                    
+                    fig.add_trace(go.Pie(
+                        labels=final_grouped['Final_Label'], values=final_grouped['Final_Count'], name=str(h), text=final_grouped['Text'], texttemplate='<b>%{label}</b><br><b>%{text}</b><br><b>%{percent}</b>',
+                        textposition='outside', rotation=270, automargin=True, insidetextorientation='horizontal', hole=0.35, marker=dict(colors=[global_color_map[f'clades_{h}'].get(str(lbl), '#888888') for lbl in final_grouped['Final_Label']], line=dict(color='#ffffff', width=2)),
+                        hoverlabel=dict(font_size=14, align='left'), customdata=final_grouped['Hover_Extra'], hovertemplate='<b>Group:</b> %{label}<br><b>Total Count:</b> %{text}<br><b>Group Percentage:</b> %{percent}%{customdata}<extra></extra>', visible=False, meta=meta_dict
+                    ), row=1, col=c_col)
+
+                if include_genotype_chart:
+                    sub_df = df_view[(df_view['Clade'] == '2.3.4.4b') & (df_view['Genotype'] != '-')]
+                    if len(sub_df) == 0: fig.add_trace(go.Pie(labels=["No Data"], values=[1], name="Genotypes", textinfo='none', hoverinfo='none', marker=dict(colors=['#f0f0f0']), visible=False, meta=meta_dict), row=1, col=total_charts)
+                    else:
+                        orig_counts = sub_df.groupby(['Genotype', 'Sub-genotype']).size().reset_index(name='Count')
+                        orig_counts['Hover_Detail'] = orig_counts.apply(lambda x: f"- {x['Sub-genotype']}: {x['Count']}/{len(sub_df)} ({x['Count']/len(sub_df):.1%})" if str(x['Sub-genotype']) not in ["-", "None", "", "nan", "Unassigned"] else "", axis=1)
+                        root_grouped = orig_counts.groupby('Genotype').agg(Final_Count=('Count', 'sum'), Hover_Details=('Hover_Detail', lambda x: "<br>".join([d for d in x if d]))).reset_index()
+                        root_grouped['Hover_Extra'] = root_grouped.apply(lambda x: "<br><br><b>Sub-genotypes Breakdown:</b><br>" + x['Hover_Details'] if x['Hover_Details'] else "", axis=1)
+                        root_grouped['Text'] = root_grouped['Final_Count'].astype(str) + '/' + str(len(sub_df))
+
+                        fig.add_trace(go.Pie(
+                            labels=root_grouped['Genotype'], values=root_grouped['Final_Count'], name="Genotypes 2.3.4.4b", text=root_grouped['Text'], texttemplate='<b>%{label}</b><br><b>%{text}</b><br><b>%{percent}</b>',
+                            textposition='outside', rotation=270, automargin=True, insidetextorientation='horizontal', hole=0.35, marker=dict(colors=[global_color_map['genotypes'].get(str(lbl), '#888888') for lbl in root_grouped['Genotype']], line=dict(color='#ffffff', width=2)),
+                            hoverlabel=dict(font_size=14, align='left'), customdata=root_grouped['Hover_Extra'], hovertemplate='<b>Genotype:</b> %{label}<br><b>Total Count:</b> %{text}<br><b>Percentage:</b> %{percent}%{customdata}<extra></extra>', visible=False, meta=meta_dict
+                        ), row=1, col=total_charts)
+
+    if 'annotations' in fig['layout']:
+        for annotation in fig['layout']['annotations']: annotation['y'] += 0.1
     
-    specs = [[{"type": "domain"} for _ in range(cols)]]
-    
-    # Subplot titles in bold
-    subplot_titles = ["<b>H Subtype Distribution</b>"] + [f"<b>Clade Distribution for {h}</b>" for h in valid_h_subtypes]
-    if include_genotype_chart:
-        subplot_titles.append("<b>Genotype Distribution (Clade 2.3.4.4b)</b>")
-    
-    # Create the subplot figure with horizontal spacing
-    fig = make_subplots(rows=rows, cols=cols, specs=specs, subplot_titles=subplot_titles, horizontal_spacing=0.05)
+    fig.update_layout(title=dict(text=f"<b>Subtype and Clade Report - Season {seasons_pie[0] if seasons_pie else 'No Data'}</b>", x=0.5, y=0.98, xanchor="center", yanchor="top", font=dict(size=24)), height=680, showlegend=False, hovermode="closest", margin=dict(t=180, b=80, l=40, r=40), uniformtext=dict(minsize=10, mode='show'))
 
-    traces_per_season = total_charts
-    total_traces = len(seasons) * traces_per_season
-
-    for s_idx, season in enumerate(seasons):
-        season_df = genotyping_df[genotyping_df['Season'] == season]
-        is_visible = (s_idx == 0)
-
-        # H Subtype pie chart
-        h_counts = season_df['H_Subtype'].value_counts().reset_index()
-        h_counts.columns = ['Label', 'Count']
-        
-        if h_counts.empty:
-            fig.add_trace(go.Pie(labels=["No Data"], values=[1], name="H Subtypes", textinfo='none', hoverinfo='none', visible=is_visible, marker=dict(colors=['#f0f0f0'])), row=1, col=1)
-        else:
-            # Calculate the total to display as part of the customized text (e.g., "5/20")
-            total_h = h_counts['Count'].sum()
-            h_counts['Text'] = h_counts['Count'].astype(str) + '/' + str(total_h)
-            
-            h_color_map = global_color_map['h_subtypes']
-            pie_colors = [h_color_map.get(str(lbl), '#888888') for lbl in h_counts['Label']]
-
-            fig.add_trace(
-                go.Pie(
-                    labels=h_counts['Label'], 
-                    values=h_counts['Count'], 
-                    name="H Subtypes", 
-                    text=h_counts['Text'],
-                    texttemplate='<b>%{label}</b><br><b>%{text}</b><br><b>%{percent}</b>',
-                    textposition='outside',
-                    insidetextorientation='horizontal',
-                    rotation=90, 
-                    automargin=True,
-                    hole=0.35,
-                    marker=dict(colors=pie_colors, line=dict(color='#ffffff', width=2)),
-                    hoverlabel=dict(font_size=14),
-                    hovertemplate='<b>H Subtype:</b> %{label}<br><b>Count:</b> %{text}<br><b>Percentage:</b> %{percent}<extra></extra>',
-                    visible=is_visible
-                ),
-                row=1, col=1
-            )
-
-        # Clade pie chart for each valid specific H Subtype
-        for i, h in enumerate(valid_h_subtypes):
-            c_col = i + 2
-            
-            # Filter the dataframe for the specific subtype and get clade counts
-            sub_df = season_df[season_df['H_Subtype'] == h]
-            total_c = len(sub_df)
-            
-            if total_c == 0:
-                fig.add_trace(go.Pie(labels=["No Data"], values=[1], name=str(h), textinfo='none', hoverinfo='none', visible=is_visible, marker=dict(colors=['#f0f0f0'])), row=1, col=c_col)
-                continue
-
-            orig_counts = sub_df.groupby(['Clade', 'Root_Clade']).size().reset_index(name='Count')
-            orig_counts['Orig_Pct'] = orig_counts['Count'] / total_c
-            orig_counts['Hover_Detail'] = orig_counts.apply(lambda x: f"- {x['Clade']}: {x['Count']}/{total_c} ({x['Orig_Pct']:.1%})" if x['Count'] > 0 else "", axis=1)
-            
-            root_grouped = orig_counts.groupby('Root_Clade').agg(Root_Count=('Count', 'sum'), Root_Hover_Details=('Hover_Detail', lambda x: "<br>".join([detail for detail in x if detail])), Num_Clades=('Clade', 'nunique')).reset_index()
-            root_grouped['Root_Pct'] = root_grouped['Root_Count'] / total_c
-            
-            root_grouped['Final_Label'] = root_grouped.apply(
-                lambda x: "Others" if x['Root_Pct'] < 0.01 and str(x['Root_Clade']) not in ["Unassigned", "No dataset available"] else x['Root_Clade'], 
-                axis=1
-            )
-            
-            final_grouped = root_grouped.groupby('Final_Label').agg(Final_Count=('Root_Count', 'sum'), Final_Hover_Details=('Root_Hover_Details', lambda x: "<br>".join([detail for detail in x if detail])), Total_Unique_Clades=('Num_Clades', 'sum')).reset_index()
-            
-            final_grouped['Hover_Extra'] = final_grouped.apply(lambda x: "<br><br><b>Clade Breakdown:</b><br>" + x['Final_Hover_Details'] if str(x['Final_Label']).endswith("-like") or str(x['Final_Label']) == "Others" else "", axis=1)
-            
-            # Calculate the total clades for this specific subtype for the customized text
-            final_grouped['Text'] = final_grouped['Final_Count'].astype(str) + '/' + str(total_c)
-            
-            clade_color_map = global_color_map[f'clades_{h}']
-            pie_colors = [clade_color_map.get(str(lbl), '#888888') for lbl in final_grouped['Final_Label']]
-
-            fig.add_trace(
-                go.Pie(
-                    labels=final_grouped['Final_Label'], 
-                    values=final_grouped['Final_Count'], 
-                    name=str(h), 
-                    text=final_grouped['Text'], 
-                    texttemplate='<b>%{label}</b><br><b>%{text}</b><br><b>%{percent}</b>',
-                    textposition='outside',
-                    rotation=90,
-                    automargin=True,
-                    insidetextorientation='horizontal',
-                    hole=0.35,
-                    marker=dict(colors=pie_colors, line=dict(color='#ffffff', width=2)),
-                    hoverlabel=dict(font_size=14, align='left'),
-                    customdata=final_grouped['Hover_Extra'],
-                    hovertemplate='<b>Group:</b> %{label}<br><b>Total Count:</b> %{text}<br><b>Group Percentage:</b> %{percent}%{customdata}<extra></extra>',
-                    visible=is_visible
-                ),
-                row=1, col=c_col
-            )
-            
-        # Genotype chart for Clade 2.3.4.4b
-        if include_genotype_chart:
-            c_col = total_charts
-            sub_df = season_df[(season_df['Clade'] == '2.3.4.4b') & (season_df['Genotype'] != '-')]
-            total_g = len(sub_df)
-            
-            if total_g == 0:
-                fig.add_trace(go.Pie(labels=["No Data"], values=[1], name="Genotypes", textinfo='none', hoverinfo='none', visible=is_visible, marker=dict(colors=['#f0f0f0'])), row=1, col=c_col)
-            else:
-                orig_counts = sub_df.groupby(['Genotype', 'Sub-genotype']).size().reset_index(name='Count')
-                orig_counts['Orig_Pct'] = orig_counts['Count'] / total_g
-                orig_counts['Hover_Detail'] = orig_counts.apply(
-                    lambda x: f"- {x['Sub-genotype']}: {x['Count']}/{total_g} ({x['Orig_Pct']:.1%})" if str(x['Sub-genotype']) not in ["-", "None", "", "nan", "Unassigned"] else "", axis=1
-                )
-
-                root_grouped = orig_counts.groupby('Genotype').agg(
-                    Final_Count=('Count', 'sum'),
-                    Hover_Details=('Hover_Detail', lambda x: "<br>".join([d for d in x if d]))
-                ).reset_index()
-
-                root_grouped['Hover_Extra'] = root_grouped.apply(
-                    lambda x: "<br><br><b>Sub-genotypes Breakdown:</b><br>" + x['Hover_Details'] if x['Hover_Details'] else "", axis=1
-                )
-                root_grouped['Text'] = root_grouped['Final_Count'].astype(str) + '/' + str(total_g)
-
-                genotype_color_map = global_color_map['genotypes']
-                pie_colors = [genotype_color_map.get(str(lbl), '#888888') for lbl in root_grouped['Genotype']]
-
-                fig.add_trace(
-                    go.Pie(
-                        labels=root_grouped['Genotype'],
-                        values=root_grouped['Final_Count'],
-                        name="Genotypes 2.3.4.4b",
-                        text=root_grouped['Text'],
-                        texttemplate='<b>%{label}</b><br><b>%{text}</b><br><b>%{percent}</b>',
-                        textposition='outside',
-                        rotation=90,
-                        automargin=True,
-                        insidetextorientation='horizontal',
-                        hole=0.35,
-                        marker=dict(colors=pie_colors, line=dict(color='#ffffff', width=2)),
-                        hoverlabel=dict(font_size=14, align='left'),
-                        customdata=root_grouped['Hover_Extra'],
-                        hovertemplate='<b>Genotype:</b> %{label}<br><b>Total Count:</b> %{text}<br><b>Percentage:</b> %{percent}%{customdata}<extra></extra>',
-                        visible=is_visible
-                    ),
-                    row=1, col=c_col
-                )
-
-    dropdown_buttons = []
-    for s_idx, season in enumerate(seasons):
-        visibility_array = [False] * total_traces
-        start_idx = s_idx * traces_per_season
-        end_idx = start_idx + traces_per_season
-        for j in range(start_idx, end_idx):
-            visibility_array[j] = True
-            
-        # Prevent the word 'Season' from attaching to 'All Time'
-        display_label = season if season == "All Time" else f"Season {season}"
-            
-        dropdown_buttons.append(dict(
-            args=[
-                {"visible": visibility_array}, 
-                {"title": dict(text=f"<b>Subtype and Clade Report - {display_label}</b>", x=0.5, y=0.98, xanchor="center", yanchor="top")}
-            ], 
-            label=display_label, 
-            method="update"
-        ))
-        
-    first_lbl = seasons[0] if seasons[0] == "All Time" else f"Season {seasons[0]}"
-    default_title = f"<b>Subtype and Clade Report - {first_lbl}</b>"
-
-    # Push all subplot titles upward by adjusting their y coordinate
-    for annotation in fig['layout']['annotations']:
-        annotation['y'] += 0.02
-
-    # Final layout adjustments for horizontal display
-    fig.update_layout(
-        title=dict(text=default_title, x=0.5, y=0.98, xanchor="center", yanchor="top", font=dict(size=24)),
-        updatemenus=[dict(active=0, buttons=dropdown_buttons, x=0.5, xanchor="center", y=1.50, yanchor="top", direction="down", showactive=True)],
-        height=600,
-        showlegend=False,
-        hovermode="closest",
-        margin=dict(t=220, b=80, l=40, r=40),
-        uniformtext=dict(minsize=10, mode='show') 
-    )
-
-    fig.write_html("CladeGraphicReport.html")
+    js_pie = f'''
+    <script>
+        function updatePiePlot() {{
+            var s = document.getElementById('sel_season_pie').value;
+            var a = document.getElementById('sel_age_pie').value;
+            var g = document.getElementById('sel_sex_pie').value;
+            var plotDivs = document.getElementsByClassName('plotly-graph-div');
+            if (plotDivs.length === 0) return;
+            var plotDiv = plotDivs[0];
+            var update = {{ visible: [] }};
+            for (var i = 0; i < plotDiv.data.length; i++) {{
+                var meta = plotDiv.data[i].meta;
+                update.visible.push(meta && meta.season === s && meta.age === a && meta.sex === g);
+            }}
+            Plotly.restyle(plotDiv, update);
+            Plotly.relayout(plotDiv, {{ 'title.text': '<b>Subtype and Clade Report - Season ' + s + '</b>' }});
+        }}
+        document.getElementById('sel_season_pie').addEventListener('change', updatePiePlot);
+        document.getElementById('sel_age_pie').addEventListener('change', updatePiePlot);
+        document.getElementById('sel_sex_pie').addEventListener('change', updatePiePlot);
+        window.addEventListener('load', updatePiePlot);
+    </script>
+    '''
+    with open("CladeGraphicReport.html", "w") as f: f.write(fig.to_html(include_plotlyjs='cdn', full_html=True).replace('<body>', '<body>\\n' + generate_ui_html('pie')).replace('</body>', js_pie + '\\n</body>'))
     """
 }

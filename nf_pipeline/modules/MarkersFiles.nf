@@ -61,7 +61,7 @@ else:
 
 
 # Extra Markers Integration
-target_prots = ["HA1", "HA2", "M1", "M2", "NA", "NP", "NS-1", "NS-2", "PA", "PB1", "PB1-F2", "PB2"]
+target_prots = ["HA1", "HA2", "M1", "M2", "NA", "NP", "NS-1", "NS-2", "PA", "PA-X", "PB1", "PB1-F2", "PB2"]
 extra_file_path = "${extra_markers_abs}"
 
 # Check if the path points to a file
@@ -99,9 +99,16 @@ if not mutations_dataframe.empty:
     mutations_dataframe['POSITION'] = mutations_dataframe['POSITION'].astype(int)
     mutations_dataframe = mutations_dataframe.sort_values(['MARKER_ID', 'POSITION'])
 
+    name_map = {
+        "NS-1": "NS1",
+        "NS-2": "NS2"
+    }
+
     for protein_id, protein_specific_dataframe in mutations_dataframe.groupby('protein_name'):
         if protein_id in target_prots:
-            # Final CSV structure
-            protein_specific_dataframe[['MARKER_ID', 'POSITION', 'AA', 'EFFECT', 'FOUND_IN', 'REFERENCE']].to_csv(f"{protein_id}_markers.csv", index=False)
+            # Use the map to get the new name, or default to the original protein_id
+            export_name = name_map.get(protein_id, protein_id)
+            
+            protein_specific_dataframe[['MARKER_ID', 'POSITION', 'AA', 'EFFECT', 'FOUND_IN', 'REFERENCE']].to_csv(f"{export_name}_markers.csv", index=False)
     """
 }

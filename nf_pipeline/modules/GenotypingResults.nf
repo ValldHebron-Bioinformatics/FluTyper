@@ -19,6 +19,11 @@ d_path = "datasets/nextclade_${h_tag}_dataset"
 d_name = "nextclade_${h_tag}_dataset" if os.path.isdir(d_path) else "-"
 
 subtype_val = "${h_tag}${n_tag}(${pathotype})" if "${pathotype}" != "" else "${h_tag}${n_tag}"
+if "${params.protocol}" == "HUMAN":
+    if subtype_val == "H1N1":
+        subtype_val = "A(H1N1)pdm09"
+    else:
+        subtype_val = "A(${h_tag}${n_tag})"
 
 # Prepare the data dictionary with default values
 data = {
