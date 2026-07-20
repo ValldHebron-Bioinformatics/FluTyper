@@ -124,7 +124,7 @@ nextflow_pipeline {
             // Precise check for the subtype CSV
             def subtypeFile = outputDir.resolve("inferred_subtypes.csv")
             assert subtypeFile.exists() : "inferred_subtypes.csv was not published"
-            assert subtypeFile.text.contains("198353883,H3N2,")
+            assert subtypeFile.text.contains("198353883,A(H3N2),")
 
             // Verify Excel reports are created (without checking internal content)
             def finalReport = outputDir.resolve("final_mutations_report.xlsx")
@@ -148,10 +148,10 @@ nextflow_pipeline {
 
             // Use single quotes for the Groovy strings so the double quotes in the references are handled natively
             // Updated to reflect the new empty fields for standard substitutions: "No,,No,,,"
-            assert csvText.contains('198353883,H3N2,M2,H3N2,1,1,M,E,M1E,Substitution,No,,No,,,')
+            assert csvText.contains('198353883,A(H3N2),M2,A(H3N2),1,1,M,E,M1E,Substitution,No,,No,,,')
             
             // Updated to reflect the new marker IDs, combination flags, FOUND_IN values, and joined metadata
-            assert csvText.contains('198353883,H3N2,HA1,H3N2,189,186,K,R,K189R,Marker,Yes,176 | 362,No,EPITOP(B) | EPITOP(RBD - 180LOOP),H3N2,')
+            assert csvText.contains('198353883,A(H3N2),HA1,A(H3N2),189,186,K,R,K189R,Marker,Yes,179 | 365,No,EPITOP(B) | EPITOP(RBD - 180LOOP),H3N2,')
             
             // Verify the individual graphical barcode report is published
             def individualGraphicReport = outputDir.resolve("samples/198353883/198353883_MutationsReport.html")
@@ -162,7 +162,7 @@ nextflow_pipeline {
             
             def interactiveTableReport = outputDir.resolve("graphic_reports/MutationsTable.html")
             assert interactiveTableReport.exists() : "MutationsTable.html was not published"
-            def dateGraphicReport = outputDir.resolve("graphic_reports/FrequencyEvolution/HA/evolution_HA1_H1N1.html")
+            def dateGraphicReport = outputDir.resolve("graphic_reports/FrequencyEvolution/HA/evolution_HA1_A(H1N1)pdm09.html")
             assert dateGraphicReport.exists() : "FrequencyEvolution HTML reports were not published"
         }
     }
