@@ -12,7 +12,6 @@ process MutationsFinder {
     input:
     tuple val(sample_id), path(prot_files), val(h_tag), val(n_tag), val(pathotype)
     path markers
-    path markers
 
     output:
     tuple val(sample_id), path("samples/${sample_id}/mutations/${sample_id}_*_mutations.csv"), path("samples/${sample_id}/${sample_id}_mutations.csv"), emit: results
