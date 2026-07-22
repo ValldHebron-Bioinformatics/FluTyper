@@ -34,11 +34,7 @@ nextflow_pipeline {
             def finalReport = outputDir.resolve("final_mutations_report.xlsx")
             assert finalReport.exists() : "final_mutations_report.xlsx was not published"
             
-            def cladeGraphicReport = outputDir.resolve("graphic_reports/CladeGraphicReport.html")
-            assert cladeGraphicReport.exists() : "CladeGraphicReport.html was not published"
-
-            def mutationsGraphicReport = outputDir.resolve("graphic_reports/MutationsReport.html")
-            assert mutationsGraphicReport.exists() : "MutationsReport.html was not published"
+    
 
             def sampleMutationsCsv = outputDir.resolve("samples/19135815/19135815_mutations.csv")
             assert sampleMutationsCsv.exists() : "19135815_mutations.csv was not published"
@@ -59,9 +55,13 @@ nextflow_pipeline {
             assert individualGraphicReport.text.contains("19135815")
 
             assert workflow.stdout.join('\n').contains("FluMutDB: Local database is up to date")
-            
-            def interactiveTableReport = outputDir.resolve("graphic_reports/MutationsTable.html")
-            assert interactiveTableReport.exists() : "MutationsTable.html was not published"
+             def dashboardReport = outputDir.resolve("index.html")
+           assert dashboardReport.exists() : "The interactive index.html dashboard was not published"
+           
+           // Verify that the file generated is actually the dashboard and contains data
+           def dashboardText = dashboardReport.text
+           assert dashboardText.contains("<title>FluTyper Interactive Dashboard</title>") : "Dashboard title missing"
+           assert dashboardText.contains("CladeGraphicReport") : "CladeGraphicReport was not encoded into the dashboard catalog"
         }
     }
 
@@ -112,12 +112,7 @@ nextflow_pipeline {
             def finalReport = outputDir.resolve("final_mutations_report.xlsx")
             assert finalReport.exists() : "final_mutations_report.xlsx was not published"
 
-            def cladeGraphicReport = outputDir.resolve("graphic_reports/CladeGraphicReport.html")
-            assert cladeGraphicReport.exists() : "CladeGraphicReport.html was not published"
-
-            def mutationsGraphicReport = outputDir.resolve("graphic_reports/MutationsReport.html")
-            assert mutationsGraphicReport.exists() : "MutationsReport.html was not published"
-
+            
             def sampleMutationsCsv = outputDir.resolve("samples/198353883/198353883_mutations.csv")
             assert sampleMutationsCsv.exists() : "198353883_mutations.csv was not published"
             
@@ -137,10 +132,13 @@ nextflow_pipeline {
             assert individualGraphicReport.text.contains("<html")
             assert individualGraphicReport.text.contains("198353883")
 
-            def interactiveTableReport = outputDir.resolve("graphic_reports/MutationsTable.html")
-            assert interactiveTableReport.exists() : "MutationsTable.html was not published"
-            def dateGraphicReport = outputDir.resolve("graphic_reports/FrequencyEvolution/HA/evolution_HA1_A(H1N1)pdm09.html")
-            assert dateGraphicReport.exists() : "FrequencyEvolution HTML reports were not published"
+           def dashboardReport = outputDir.resolve("index.html")
+           assert dashboardReport.exists() : "The interactive index.html dashboard was not published"
+           
+           // Verify that the file generated is actually the dashboard and contains data
+           def dashboardText = dashboardReport.text
+           assert dashboardText.contains("<title>FluTyper Interactive Dashboard</title>") : "Dashboard title missing"
+           assert dashboardText.contains("CladeGraphicReport") : "CladeGraphicReport was not encoded into the dashboard catalog"
         }
     }
 }
