@@ -22,6 +22,7 @@ include { DateGraphicReport         } from './modules/DateGraphicReport'
 include { MergeHistoricalData       } from './modules/MergeHistoricalData'
 include { GeographicReport          } from './modules/GeographicReport'
 include { MetadataMerge             } from './modules/MetadataMerge'
+include { MergeReports              } from './modules/MergeReports.nf'
 
 // Comprovació invisible per decidir si generem el mapa
 def check_location_column(metadata_path) {
@@ -275,6 +276,15 @@ workflow {
             name: 'pipeline_errors.log',
         )
 
+    all_reports_ch = CladeGraphicReport.out.report
+        .mix(ch_clade_evolution_report)
+        .mix(ch_mutations_graphic_report)
+        .mix(ch_interactive_mutations_table)
+        .mix(date_report_ch)
+        .mix(ch_geo_report)
+        .collect()
+
+    MergeReports(all_reports_ch)
     // PUBLISH DECLARATIONS
     publish:
     folder = OrganizeBySample.out.results.map { _id, path -> path }
@@ -285,15 +295,10 @@ workflow {
     results = published_genotyping_ch
     CDS = ch_cds
     prot = ch_prot
-    graphic_report = CladeGraphicReport.out.report
-    clade_evolution_report = ch_clade_evolution_report
-    mutations_graphic_report = ch_mutations_graphic_report
     individual_graphic_report = ch_individual_graphic_report
-    interactive_mutations_table = ch_interactive_mutations_table
-    date_report = date_report_ch
-    geo_report = ch_geo_report
     mut = ch_mut
     mutations_report = published_mutations_ch
+    index = MergeReports.out.index
     merged_metadata = final_metadata_ch
     errors = CompileErrors.out.map { _id, log -> log }
     errors_merged = ErrorsMerged_ch
@@ -344,32 +349,12 @@ output {
         path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
-    graphic_report {
-        path { "${projectDir}/../${params.outDir}/graphic_reports" }
-        mode "copy"
-    }
-    clade_evolution_report {
-        path { "${projectDir}/../${params.outDir}/graphic_reports" }
-        mode "copy"
-    }
-    mutations_graphic_report {
-        path { "${projectDir}/../${params.outDir}/graphic_reports" }
-        mode "copy"
-    }
     individual_graphic_report {
         path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
-    interactive_mutations_table {
-        path { "${projectDir}/../${params.outDir}/graphic_reports" }
-        mode "copy"
-    }
-    date_report {
-        path { "${projectDir}/../${params.outDir}/graphic_reports" }
-        mode "copy"
-    }
-    geo_report {
-        path { "${projectDir}/../${params.outDir}/graphic_reports" }
+    index {
+        path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
     errors {
