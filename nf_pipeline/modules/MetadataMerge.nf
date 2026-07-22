@@ -2,6 +2,7 @@
 nextflow.enable.dsl=2
 
 process MetadataMerge {
+    // This process merges metadata information into the inferred subtypes, genotyping results, and mutations report.
     errorStrategy 'ignore'
 
     input:

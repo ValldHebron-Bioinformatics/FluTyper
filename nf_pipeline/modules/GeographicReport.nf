@@ -18,7 +18,6 @@ process GeographicReport {
 
     script:
     def meta_str = metadata_file ? metadata_file.toString() : ""
-    def meta_str = metadata_file ? metadata_file.toString() : ""
     """
     #!/usr/bin/env python3
     import pandas as pd

@@ -4,8 +4,6 @@ nextflow.enable.dsl=2
 process GetCDS {
     // This process extracts the coding sequences (CDS) for each protein from the aligned segment FASTA files.
     // It uses MAFFT for alignment and applies trimming based on gaps and identity thresholds.
-    // This process extracts the coding sequences (CDS) for each protein from the aligned segment FASTA files.
-    // It uses MAFFT for alignment and applies trimming based on gaps and identity thresholds.
     errorStrategy 'ignore'
 
     input:
@@ -19,7 +17,6 @@ process GetCDS {
     script:
     """
 #!/usr/bin/env python3
-import os, subprocess, io
 import os, subprocess, io
 from Bio import SeqIO
 
@@ -42,11 +39,6 @@ if protocol == "HUMAN":
         prot_dict["PB1"].remove("PB1-F2")
 
 def TrimCDS(ref_seq, aligned_seq, gap_threshold):
-    '''
-    Trim the aligned query sequence based on gaps in the reference sequence.
-    This way we ensure that the query sequence is aligned to the reference 
-    correctly extracting the CDS.
-    '''
     '''
     Trim the aligned query sequence based on gaps in the reference sequence.
     This way we ensure that the query sequence is aligned to the reference 
@@ -119,30 +111,9 @@ for seg, prots in prot_dict.items():
                     ref_subtype = "H1N1" # Default fallback
                     
             pattern = f"^{ref_subtype}_{prot}_"
-            h_val = "${h_tag}"
-            n_val = "${n_tag}"
-            
-            if seg == "NA":
-                if n_val == "N1":
-                    ref_subtype = "H1N1"
-                elif n_val == "N2":
-                    ref_subtype = "H3N2"
-                else:
-                    ref_subtype = "H1N1" # Default fallback
-            else:
-                if h_val == "H1":
-                    ref_subtype = "H1N1"
-                elif h_val == "H3":
-                    ref_subtype = "H3N2"
-                else:
-                    ref_subtype = "H1N1" # Default fallback
-                    
-            pattern = f"^{ref_subtype}_{prot}_"
         else:
             pattern = f"^{ref_tag}_{prot}_.*{ref_patho}"
         
-        
-        min_identity = 0.4   # Use Pearson (2013) identity threshold
         
         min_identity = 0.4   # Use Pearson (2013) identity threshold
         min_coverage = 0.5
@@ -209,7 +180,6 @@ for seg, prots in prot_dict.items():
             identity_ratio = matches / aligned_informative_positions if aligned_informative_positions > 0 else 0
 
             # Minimum 50% coverage AND 40% minimum identity
-            # Minimum 50% coverage AND 40% minimum identity
             if coverage_ratio < min_coverage or identity_ratio < min_identity:
                 with open(log_file, 'a') as f:
                     f.write(f"GetCDS: ${sample_id} {prot} ignored. No real homology (Coverage: {coverage_ratio:.1%}, Identity: {identity_ratio:.1%}).\\n")
@@ -224,7 +194,6 @@ for seg, prots in prot_dict.items():
                 
             clean_ref, clean_query = TrimCDS(ref_seq, aligned_seq, current_threshold)
             
-            # Remove alignment gaps from the query sequence so downstream residue coordinates remain accurate
             # Remove alignment gaps from the query sequence so downstream residue coordinates remain accurate
             clean_query_no_gaps = clean_query.replace('-', '')
 

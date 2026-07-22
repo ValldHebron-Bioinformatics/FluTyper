@@ -2,11 +2,9 @@
 nextflow.enable.dsl=2
 
 process MutationsGraphicReport {
-    // This process generates a comprehensive HTML report visualizing mutation data using Plotly.
-    // It reads mutation data from an Excel file, processes it, and creates interactive scatter 
-    // plots for each protein group.
-    //errorStrategy 'ignore'
+    errorStrategy 'ignore'
     debug true
+    // This process generates an interactive HTML report visualizing the mutations detected in the samples.
 
     input:
     path(full_mutations)
@@ -19,7 +17,6 @@ process MutationsGraphicReport {
     def meta_str = metadata_file ? metadata_file.toString() : ""
     """
     #!/usr/bin/env python3
-    import os
     import pandas as pd
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
@@ -470,7 +467,6 @@ process MutationsGraphicReport {
 
         <div class="sticky-header">
             <h2 id="report-title" style="margin: 0 0 5px 0;">Mutation Summary per Protein - Season {default_season}</h2>
-            <h2 id="report-title" style="margin: 0 0 5px 0;">Mutation Summary per Protein - Season {default_season}</h2>
             <p style="color: gray; font-size: 14px; margin: 0;">{subtitle_text}</p>
 
             <div class="controls-container">
@@ -546,11 +542,6 @@ process MutationsGraphicReport {
                 document.getElementById('report-title').innerText =
                     'Mutation Summary per Protein - ' + titleLabel;
 
-
-                var titleLabel = activeSeason === 'All Time' ? 'All Time' : 'Season ' + activeSeason;
-                document.getElementById('report-title').innerText =
-                    'Mutation Summary per Protein - ' + titleLabel;
-
                 var graphContainer = document.getElementById('plotly-graphs');
                 if (!graphContainer || !graphContainer.originalYValues) return;
 
@@ -596,10 +587,8 @@ process MutationsGraphicReport {
                                 filteredY.push(pct >= minimumFrequency ? baselineY[pi] : null);
                             }} else {{
                                 filteredY.push(null);
-                                filteredY.push(null);
                             }}
                         }}
-                        newY.push(filteredY);
                         newY.push(filteredY);
                     }}
                 }}

@@ -129,7 +129,6 @@ process InteractiveMutationsTable {
             <a href="https://izsvenezie-virology.github.io/FluMut/docs/markers" target="_blank">https://izsvenezie-virology.github.io/FluMut/docs/markers</a>
         </p>'''
 
-    # This html_template was generated with the help of Gemini AI, since it was too complex for a beginner in HTML and CSS.
     html_template = f'''
     <!DOCTYPE html>
     <html lang="en">

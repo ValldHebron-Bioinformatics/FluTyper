@@ -74,7 +74,6 @@ workflow {
         .collectFile(
             name: 'inferred_subtypes.csv',
             seed: 'Sample_ID,inferred_subtype,pathotype\n' 
-            seed: 'Sample_ID,inferred_subtype,pathotype\n' 
         )
 
     // DATASET PREPARATION
@@ -92,7 +91,6 @@ workflow {
     ch_individual_graphic_report = channel.empty()
     ch_clade_evolution_report = channel.empty()
     date_report_ch = channel.empty()
-    ch_geo_report = channel.empty()
     ch_geo_report = channel.empty()
   
     // GENOTYPING ANALYSIS (NEXTCLADE)
@@ -224,7 +222,6 @@ workflow {
     ch_clade_evolution_report = CladeGraphicReport.out.evolution_report
 
     MutationsGraphicReport(final_mutations_ch, final_metadata_ch)
-    MutationsGraphicReport(final_mutations_ch, final_metadata_ch)
     ch_mutations_graphic_report = MutationsGraphicReport.out.report
     
     InteractiveMutationsTable(final_mutations_ch)
@@ -294,7 +291,6 @@ workflow {
     individual_graphic_report = ch_individual_graphic_report
     interactive_mutations_table = ch_interactive_mutations_table
     date_report = date_report_ch
-    geo_report = ch_geo_report
     geo_report = ch_geo_report
     mut = ch_mut
     mutations_report = published_mutations_ch
@@ -369,10 +365,6 @@ output {
         mode "copy"
     }
     date_report {
-        path { "${projectDir}/../${params.outDir}/graphic_reports" }
-        mode "copy"
-    }
-    geo_report {
         path { "${projectDir}/../${params.outDir}/graphic_reports" }
         mode "copy"
     }

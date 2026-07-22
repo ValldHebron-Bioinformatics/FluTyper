@@ -104,14 +104,9 @@ for aligned_prot in "${prot_files}".split():
             ref_N = "${n_tag}" if "${n_tag}".startswith("N") else "N1"
             pos_to_base = build_pos_lookup(na_dict, f"{ref_N}_pos", "N1_pos")
 
-    # Markers information is stored in a dictionary keyed by marker ID, with values being sets of (position, amino acid) tuples
     markers_by_id, marker_info = {}, {}
-    # Handle whether Nextflow staged a directory or a list of files
-    if os.path.isdir(markers_input):
-        m_file = Path(markers_input) / f"{prot_name}_markers.csv"
-    else:
-        m_file = Path(f"{prot_name}_markers.csv")
-
+    m_file = markers_dir / f"{prot_name}_markers.csv"
+    
     if m_file.exists():
         with open(m_file, encoding='utf-8-sig') as f:
             for row in csv.DictReader(f):
@@ -122,21 +117,10 @@ for aligned_prot in "${prot_files}".split():
                         h_val = "${h_tag}".upper()
                         n_val = "${n_tag}".upper()
                         raw_combo = h_val + n_val
-                        raw_combo = h_val + n_val
                         
-                        allowed_tags = [raw_combo]
                         allowed_tags = [raw_combo]
                         if h_val != "HX": allowed_tags.append(h_val)
                         if n_val != "NX": allowed_tags.append(n_val)
-                        
-                        # Support for human specific formatting in the marker files
-                        if raw_combo == "H1N1": allowed_tags.append("A(H1N1)pdm09")
-                        elif raw_combo == "H3N2": allowed_tags.append("A(H3N2)")
-                        elif "X" in raw_combo: allowed_tags.append(f"A({raw_combo})")
-                        elif raw_combo.startswith("H") and "N" in raw_combo: allowed_tags.append(f"A({raw_combo})")
-                        
-                        if h_val == "H1": allowed_tags.append("A(H1)pdm09")
-                        elif h_val == "H3": allowed_tags.append("A(H3)")
                         
                         # Support for human specific formatting in the marker files
                         if raw_combo == "H1N1": allowed_tags.append("A(H1N1)pdm09")
