@@ -1,0 +1,9 @@
+OrganizeBySample: No records found for sample 25CR6193 segment NA, skipping.
+SubtypeDetection: Missing N for 25CR6193
+GetCDS: No valid FASTA found for sample 25CR6193 segment NA. Skipping all proteins for this segment.
+GetCDS: 25CR6193 PB1 ignored. Bad read with >50.0% Ns.
+GetCDS: No homologous sequence found in 25CR6193 for protein PB1-F2. Skipping.
+GetCDS: 25CR6193 PA ignored. Bad read with >50.0% Ns.
+GetCDS: No homologous sequence found in 25CR6193 for protein PA-X. Skipping.
+GetCDS: 25CR6193 NP ignored. Bad read with >50.0% Ns.
+GenotypingResults: CHANGELOG.md not found for dataset nextclade_H9_dataset, cannot extract version.

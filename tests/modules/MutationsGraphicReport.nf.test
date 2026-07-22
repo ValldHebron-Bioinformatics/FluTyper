@@ -1,11 +1,24 @@
 nextflow_process {
 
+    // Test file for the MutationsGraphicReport process
+
     name "Test Process MutationsGraphicReport"
     script "nf_pipeline/modules/MutationsGraphicReport.nf"
     process "MutationsGraphicReport"
 
+    // Test: Verify that the process successfully creates the HTML report
+    // when given a valid Excel file with mutation data
     test("Should create the HTML report") {
+        // When: Provide a valid Excel file with mutation data as input
         when {
+            params  {
+                colorblind = false
+                threshold = 0.25
+                protocol = "AVIAN"
+                protocols = [
+                    AVIAN: [ resources: "${projectDir}/tests/data/Graphs_test/" ]
+                ]
+            }
             process {
                 """
                 input[0] = file("${projectDir}/tests/data/Graphs_test/relevant_mutations.xlsx")
@@ -14,16 +27,21 @@ nextflow_process {
             }
         }
 
+        // Then: Verify the process succeeds and emits exactly one HTML report file
         then {
+            // Check that the process executed successfully
             assert process.success
 
             // Use positional output to avoid named-channel lookup issues in nf-test 0.9.5
+            // Get the emitted HTML report file(s) from the output channel
             def reportFiles = process.out[0]
             assert reportFiles != null : "Output channel is null. The HTML report was not emitted."
-            assert reportFiles.size() == 1
+            assert reportFiles.size() == 1 : "Expected exactly one HTML report file to be emitted"
 
+            // Convert the file path to a Path object for easier checking
             def htmlFile = path(reportFiles[0])
-            assert htmlFile.exists()
+            // Verify that the HTML report file actually exists on disk
+            assert htmlFile.exists() : "HTML report file was not created at expected location"
         }
     }
 }

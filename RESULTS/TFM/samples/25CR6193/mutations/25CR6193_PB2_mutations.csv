@@ -1,0 +1,23 @@
+SAMPLE_ID,SUBTYPE,PROTEIN,REF_SUBTYPE,POSITION,POSITION_REF,REFERENCE_AA,QUERY_AA,AA_MUTATION,MUTATION_TYPE,MARKER,MARKER_ID,IS_COMBINATION,EFFECT,FOUND_IN,REFERENCE
+25CR6193,H9Nx,PB2,H9,22,22,R,K,R22K,Substitution,No,,No,,,
+25CR6193,H9Nx,PB2,H9,81,81,A,T,A81T,Substitution,No,,No,,,
+25CR6193,H9Nx,PB2,H9,89,89,V,V,89V,Marker,Yes,84 | 85,Yes,Increased polymerase activity in mammalian cells | Increased virulence in mice,H5N1,"Li J. et al., 2009 | Suttie A. et al., 2019"
+25CR6193,H9Nx,PB2,H9,148,148,T,N,T148N,Substitution,No,,No,,,
+25CR6193,H9Nx,PB2,H9,255,255,V,L,V255L,Substitution,No,,No,,,
+25CR6193,H9Nx,PB2,H9,309,309,D,D,309D,Marker,Yes,84 | 85,Yes,Increased polymerase activity in mammalian cells | Increased virulence in mice,H5N1,"Li J. et al., 2009 | Suttie A. et al., 2019"
+25CR6193,H9Nx,PB2,H9,338,338,A,V,A338V,Substitution,No,,No,,,
+25CR6193,H9Nx,PB2,H9,339,339,K,K,339K,Marker,Yes,85,Yes,Increased polymerase activity in mammalian cells | Increased virulence in mice,H5N1,"Li J. et al., 2009 | Suttie A. et al., 2019"
+25CR6193,H9Nx,PB2,H9,340,340,K,R,K340R,Substitution,No,,No,,,
+25CR6193,H9Nx,PB2,H9,344,344,V,M,V344M,Substitution,No,,No,,,
+25CR6193,H9Nx,PB2,H9,369,369,K,R,K369R,Substitution,No,,No,,,
+25CR6193,H9Nx,PB2,H9,389,389,R,R,389R,Marker,Yes,56,No,Increased polymerase activity in mammalian cells | Increased replication in mammalian cells,H7N9,"Hu M. et al., 2017b | Suttie A. et al., 2019"
+25CR6193,H9Nx,PB2,H9,395,395,T,A,T395A,Substitution,No,,No,,,
+25CR6193,H9Nx,PB2,H9,477,477,G,G,477G,Marker,Yes,85,Yes,Increased polymerase activity in mammalian cells | Increased virulence in mice,H5N1,"Li J. et al., 2009 | Suttie A. et al., 2019"
+25CR6193,H9Nx,PB2,H9,495,495,V,V,495V,Marker,Yes,85,Yes,Increased polymerase activity in mammalian cells | Increased virulence in mice,H5N1,"Li J. et al., 2009 | Suttie A. et al., 2019"
+25CR6193,H9Nx,PB2,H9,627,627,E,E,627E,Marker,Yes,85,Yes,Increased polymerase activity in mammalian cells | Increased virulence in mice,H5N1,"Li J. et al., 2009 | Suttie A. et al., 2019"
+25CR6193,H9Nx,PB2,H9,631,631,M,V,M631V,Substitution,No,,No,,,
+25CR6193,H9Nx,PB2,H9,637,637,T,A,T637A,Substitution,No,,No,,,
+25CR6193,H9Nx,PB2,H9,674,674,A,S,A674S,Substitution,No,,No,,,
+25CR6193,H9Nx,PB2,H9,676,676,T,T,676T,Marker,Yes,85,Yes,Increased polymerase activity in mammalian cells | Increased virulence in mice,H5N1,"Li J. et al., 2009 | Suttie A. et al., 2019"
+25CR6193,H9Nx,PB2,H9,699,699,K,R,K699R,Marker,Yes,411,No,Enhanced virulence in mice | Increased viral replication in mammalian cells,H1N1,"Zhang T. et al., 2017"
+25CR6193,H9Nx,PB2,H9,715,715,N,N,715N,Marker,Yes,82,No,Decreased virulence in mice,H5N1,"Sun H. et al., 2015 | Suttie A. et al., 2019"

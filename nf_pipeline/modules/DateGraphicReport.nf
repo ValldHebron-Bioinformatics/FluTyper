@@ -2,6 +2,10 @@
 nextflow.enable.dsl=2
 
 process DateGraphicReport {
+    // This process generates a frequency evolution report for each protein and subtype combination over time, 
+    // based on the provided Excel mutation data and metadata CSV file. It creates interactive HTML plots using Plotly, 
+    // showing both weekly and cumulative frequencies of mutations, along with total sample counts. 
+    // The report includes dropdowns for selecting different time ranges (all time or specific seasons).
     errorStrategy 'ignore'
     debug true
     input:

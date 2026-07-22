@@ -2,11 +2,16 @@
 nextflow.enable.dsl=2
 
 process MutationsFinder {
+    // This process identifies mutations in the translated protein sequences based on the 
+    // aligned protein FASTA files and the provided marker files.
+    // It generates a CSV file for each protein containing the detected mutations, their types, and 
+    // associated marker information.
     errorStrategy 'ignore'
     debug true
 
     input:
     tuple val(sample_id), path(prot_files), val(h_tag), val(n_tag), val(pathotype)
+    path markers
     path markers
 
     output:
@@ -31,6 +36,9 @@ target_H = "${h_tag}" if "${h_tag}".startswith("H") and "${h_tag}"[1:].isdigit()
 target_N = "${n_tag}" if "${n_tag}".startswith("N") and "${n_tag}"[1:].isdigit() else "N1"
 
 def build_pos_lookup(dict_path, from_col, to_col, prot_filter=None):
+    '''
+    Build a position lookup dictionary from a CSV file, filtering by protein if specified.
+    '''
     if not os.path.exists(dict_path):
         return {}
     with open(dict_path, 'r', encoding='utf-8-sig') as f:
@@ -53,7 +61,7 @@ output_files = []
 for aligned_prot in "${prot_files}".split():
     file_path = Path(aligned_prot)
     
-    # Bulletproof protein name extraction (strips extensions)
+    # Protein name extraction from the file name
     file_stem = file_path.stem 
     prot_name = file_stem.replace("${sample_id}_", "").split("_")[0]
 
@@ -97,9 +105,14 @@ for aligned_prot in "${prot_files}".split():
             ref_N = "${n_tag}" if "${n_tag}".startswith("N") else "N1"
             pos_to_base = build_pos_lookup(na_dict, f"{ref_N}_pos", "N1_pos")
 
+    # Markers information is stored in a dictionary keyed by marker ID, with values being sets of (position, amino acid) tuples
     markers_by_id, marker_info = {}, {}
-    m_file = markers_dir / f"{prot_name}_markers.csv"
-    
+    # Handle whether Nextflow staged a directory or a list of files
+    if os.path.isdir(markers_input):
+        m_file = Path(markers_input) / f"{prot_name}_markers.csv"
+    else:
+        m_file = Path(f"{prot_name}_markers.csv")
+
     if m_file.exists():
         with open(m_file, encoding='utf-8-sig') as f:
             for row in csv.DictReader(f):
@@ -110,10 +123,21 @@ for aligned_prot in "${prot_files}".split():
                         h_val = "${h_tag}".upper()
                         n_val = "${n_tag}".upper()
                         raw_combo = h_val + n_val
+                        raw_combo = h_val + n_val
                         
+                        allowed_tags = [raw_combo]
                         allowed_tags = [raw_combo]
                         if h_val != "HX": allowed_tags.append(h_val)
                         if n_val != "NX": allowed_tags.append(n_val)
+                        
+                        # Support for human specific formatting in the marker files
+                        if raw_combo == "H1N1": allowed_tags.append("A(H1N1)pdm09")
+                        elif raw_combo == "H3N2": allowed_tags.append("A(H3N2)")
+                        elif "X" in raw_combo: allowed_tags.append(f"A({raw_combo})")
+                        elif raw_combo.startswith("H") and "N" in raw_combo: allowed_tags.append(f"A({raw_combo})")
+                        
+                        if h_val == "H1": allowed_tags.append("A(H1)pdm09")
+                        elif h_val == "H3": allowed_tags.append("A(H3)")
                         
                         # Support for human specific formatting in the marker files
                         if raw_combo == "H1N1": allowed_tags.append("A(H1N1)pdm09")
@@ -184,7 +208,8 @@ for aligned_prot in "${prot_files}".split():
         
         if not (is_marker or is_mutation):
             continue
-
+        
+        # If the mutation is part of a marker, we record it with all relevant marker information; otherwise, we classify it as an insertion, deletion, or substitution
         if is_marker:
             m_ids = combined_m_ids
             is_combo = " | ".join(dict.fromkeys("Yes" if len(set(m[0] for m in markers_by_id[mid])) > 1 else "No" for mid in m_ids))
@@ -246,7 +271,7 @@ for aligned_prot in "${prot_files}".split():
 
     events = collapse_indels(events)
 
-    # --- Write output CSV ---
+    # Write output CSV
     out_csv = out_dir / f"${sample_id}_{prot_name}_mutations.csv"
     output_files.append(out_csv)
 

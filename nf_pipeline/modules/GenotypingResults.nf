@@ -2,6 +2,9 @@
 nextflow.enable.dsl=2
 
 process GenotypingResults {
+    // This process compiles the genotyping results from Nextclade and Genin2 into a final CSV report for each sample.
+    
+    errorStrategy 'ignore'
     input:
     tuple val(sample_id), val(h_tag), val(n_tag), val(pathotype), path(csv_path), path(genin_path)
     path("datasets/*")

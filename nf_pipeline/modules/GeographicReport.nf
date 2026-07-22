@@ -1,19 +1,29 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl=2
+nextflow.enable.dsl=2
 
 process GeographicReport {
+    // This process generates an interactive geographic report using Folium and Plotly based on genotyping and metadata files.
+    // It is optionally activated via a column in the metadata file (LOCATION), and it can handle both human and avian influenza protocols.
+    // It uses coordinates from a provided coordinates file to map towns and provinces, and it creates a dynamic legend and controls for filtering by season, geographic level, and classification.
     errorStrategy 'ignore'
+    debug true
     debug true
 
     input:
     path(genotyping_file)
     path(metadata_file) 
     path(coordinates_file)
+    path(genotyping_file)
+    path(metadata_file) 
+    path(coordinates_file)
 
     output:
     path("GeographicReport.html"), emit: geo_report
+    path("GeographicReport.html"), emit: geo_report
 
     script:
+    def meta_str = metadata_file ? metadata_file.toString() : ""
     def meta_str = metadata_file ? metadata_file.toString() : ""
     """
     #!/usr/bin/env python3

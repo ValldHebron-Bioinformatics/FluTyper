@@ -1,11 +1,15 @@
 nextflow_process {
 
+    // Test file for the CladeGraphicReport process
+
     name "Test Process CladeGraphicReport"
     script "nf_pipeline/modules/CladeGraphicReport.nf"
     process "CladeGraphicReport"
 
+    // Test 1: Verify the process creates correct HTML report when NO metadata is provided
     test("Should match the expected clade HTML report without the metadata file") {
 
+        // When: Provide genotyping results CSV but EMPTY metadata array
         when {
             process {
                 """
@@ -15,19 +19,26 @@ nextflow_process {
             }
         }
 
+        // Then: Verify the process succeeds and emits exactly one HTML report file
         then {
+            // Check that the process executed successfully
             assert process.success
 
+            // Get the emitted HTML report file(s) from the output channel
             def reportFiles = process.out[0]
             assert reportFiles != null : "Output channel is null. The HTML report was not emitted."
-            assert reportFiles.size() == 1
+            assert reportFiles.size() == 1 : "Expected exactly one HTML report file to be emitted"
 
+            // Convert the file path to a Path object for easier checking
             def htmlFile = path(reportFiles[0])
-            assert htmlFile.exists()
+            // Verify that the HTML report file actually exists on disk
+            assert htmlFile.exists() : "HTML report file was not created at expected location"
         }
     }
+    // Test 2: Verify the process creates correct HTML report WHEN metadata IS provided
     test("Should match the expected clade HTML report with the metadata file") {
 
+        // When: Provide BOTH genotyping results CSV AND metadata CSV
         when {
             process {
                 """
@@ -37,15 +48,22 @@ nextflow_process {
             }
         }
 
+        // Then: Verify the process succeeds and emits exactly two HTML report files
         then {
             assert process.success
 
-            def reportFiles = process.out[0]
-            assert reportFiles != null : "Output channel is null. The HTML report was not emitted."
-            assert reportFiles.size() == 1
+            // Access the channels individually using their named emits
+            def reportChannel = process.out.report
+            def evolutionChannel = process.out.evolution_report
 
-            def htmlFile = path(reportFiles[0])
-            assert htmlFile.exists()
+            assert reportChannel != null : "The main HTML report channel is null."
+            assert evolutionChannel != null : "The evolution HTML report channel is null."
+
+            def htmlFile = path(reportChannel[0])
+            assert htmlFile.exists() : "Main HTML report file was not created at expected location"
+            
+            def evohtmlFile = path(evolutionChannel[0])
+            assert evohtmlFile.exists() : "Evolution HTML report file was not created at expected location"
         }
 
     }

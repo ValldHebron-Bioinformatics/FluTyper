@@ -2,6 +2,8 @@
 nextflow.enable.dsl = 2
 
 process TranslateToProtein {
+    // This process translates the coding CDS of influenza samples into protein sequences.
+    // It uses the seqkit translate command to perform the translation, and outputs the resulting protein FASTA files.
     errorStrategy 'ignore'
 
     input:
@@ -17,6 +19,7 @@ process TranslateToProtein {
     
     """
     mkdir -p "samples/${sample_id}/proteins"
+    # Translate the CDS files
     for cds_fasta in *_CDS.fasta; do
         prot_fasta="\$(basename "\${cds_fasta}" _CDS.fasta)_PROT.fasta"
         
@@ -27,7 +30,7 @@ process TranslateToProtein {
             echo "TranslateToProtein: CDS FASTA file \${cds_fasta} not found for sample ${sample_id}, skipping translation for this file." >> "TPerrors.log"
         fi
     done
-    # Translate the aligned CDS files sequentially right after
+    # Translate the aligned CDS files
     for aligned_cds in ${aligned_cds_files}; do
         if [[ -f "\${aligned_cds}" ]]; then
             protname=\$(echo "\${aligned_cds}" | cut -d'_' -f2)
@@ -41,4 +44,3 @@ process TranslateToProtein {
     """
 }
     
-

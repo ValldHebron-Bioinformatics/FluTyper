@@ -2,6 +2,9 @@
 nextflow.enable.dsl=2
 
 process CladeGraphicReport {
+    // This process generates a comprehensive HTML report visualizing the clade and genotype distributions over time, based on the genotyping results and optional metadata.
+    // The report includes stacked bar charts for H subtypes, clade evolution, and genotype evolution (if applicable), with colorblind-friendly palettes and interactive features.
+    // The process uses Plotly for visualization and Pandas for data manipulation, ensuring that the report is both informative and visually appealing.
     errorStrategy 'ignore'
     debug true
 
@@ -27,6 +30,9 @@ process CladeGraphicReport {
     import random
 
     def get_contrast_text_color(hex_str):
+        '''  
+        Define text color (black or white) based on background color for readability
+        '''
         hex_str = str(hex_str).lstrip('#')
         if len(hex_str) == 6:
             try:
@@ -51,6 +57,9 @@ process CladeGraphicReport {
     }
 
     def generate_shades(base_hex, n):
+        '''
+        Generate a monotone sequence of n shades from a base color
+        '''
         if n <= 0: return []
         if n == 1: return [base_hex]
         clean_hex = str(base_hex).lstrip('#')

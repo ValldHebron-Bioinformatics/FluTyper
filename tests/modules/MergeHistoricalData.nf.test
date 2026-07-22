@@ -1,0 +1,45 @@
+nextflow_process {
+
+    name "Test Process MergeHistoricalData"
+    script "nf_pipeline/modules/MergeHistoricalData.nf"
+    process "MergeHistoricalData"
+
+    test("Should successfully append new data to the historical directory") {
+
+        when {
+            process {
+                """
+                input[0] = file("${projectDir}/tests/data/append_dir/inferred_subtypes.csv", checkIfExists: true)
+                input[1] = file("${projectDir}/tests/data/append_dir/final_genotyping_results.csv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/append_dir/final_mutations_report.xlsx", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/append_dir/metadata.csv", checkIfExists: true)
+                input[4] = file("${projectDir}/tests/data/append_dir", type: 'dir', checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            // Confirm the overall process completed without crashing
+            assert process.success
+            
+            // Validate that all expected channels successfully emitted files
+            assert process.out.subtypes != null : "Output channel 'subtypes' is null"
+            assert process.out.genotyping != null : "Output channel 'genotyping' is null"
+            assert process.out.mutations != null : "Output channel 'mutations' is null"
+            assert process.out.metadata != null : "Output channel 'metadata' is null"
+
+            // Verify file generation names match the output declarations
+            assert process.out.subtypes.get(0).toString().endsWith('inferred_subtypes.csv')
+            assert process.out.genotyping.get(0).toString().endsWith('final_genotyping_results.csv')
+            assert process.out.mutations.get(0).toString().endsWith('final_mutations_report.xlsx')
+            assert process.out.metadata.get(0).toString().endsWith('metadata.csv')
+
+            // Optional Deep Validation: 
+            // Extract the text from the resulting genotyping file to prove the historical data was merged
+            def finalGenotyping = path(process.out.genotyping.get(0))
+            assert finalGenotyping.text.contains("198217653,A(H3N2),") : "Historical sequence 198217653 is missing from the merged file!"
+        }
+
+    }
+
+}

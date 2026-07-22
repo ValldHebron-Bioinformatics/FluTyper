@@ -2,6 +2,9 @@
 nextflow.enable.dsl=2
 
 process GetDatasets {
+    // This process retrieves the appropriate Nextclade datasets based on the inferred H subtypes from the SubtypeDetection process.
+    // It uses the Nextclade CLI to fetch datasets for H1, H3, H5, H7, and H9 subtypes, depending on the protocol (HUMAN or AVIAN).
+    // The datasets are stored in subdirectories named after the H subtype, and the process emits the paths to these datasets for downstream use.
     errorStrategy 'ignore'
     debug true
 
@@ -43,6 +46,7 @@ process GetDatasets {
         done
     else
         echo "\$h_tags" | sort -u | while read -r tag; do
+        # H7 and H9 logic is included for future expansion, but currently only H5 has a dataset available.
         case "\$tag" in
             H5)
                 DATASET_NAME='community/moncla-lab/iav-h5/ha/2.3.4.4'

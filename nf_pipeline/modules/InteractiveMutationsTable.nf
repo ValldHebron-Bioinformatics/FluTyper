@@ -2,6 +2,8 @@
 nextflow.enable.dsl=2
 
 process InteractiveMutationsTable {
+    // This process generates an interactive HTML table for mutations based on the provided Excel file.
+    errorStrategy 'ignore'
 
     input:
     path excel_file
@@ -127,6 +129,7 @@ process InteractiveMutationsTable {
             <a href="https://izsvenezie-virology.github.io/FluMut/docs/markers" target="_blank">https://izsvenezie-virology.github.io/FluMut/docs/markers</a>
         </p>'''
 
+    # This html_template was generated with the help of Gemini AI, since it was too complex for a beginner in HTML and CSS.
     html_template = f'''
     <!DOCTYPE html>
     <html lang="en">
@@ -134,6 +137,7 @@ process InteractiveMutationsTable {
         <meta charset="UTF-8">
         <title>Interactive Mutations Table</title>
         <style>
+        // Define the CSS styles for the HTML table and mutation tags
             body {{
                 font-family: Arial, sans-serif;
                 margin: 40px;

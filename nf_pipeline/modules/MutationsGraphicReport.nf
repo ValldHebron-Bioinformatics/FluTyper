@@ -2,7 +2,10 @@
 nextflow.enable.dsl=2
 
 process MutationsGraphicReport {
-    errorStrategy 'ignore'
+    // This process generates a comprehensive HTML report visualizing mutation data using Plotly.
+    // It reads mutation data from an Excel file, processes it, and creates interactive scatter 
+    // plots for each protein group.
+    //errorStrategy 'ignore'
     debug true
 
     input:
@@ -16,6 +19,7 @@ process MutationsGraphicReport {
     def meta_str = metadata_file ? metadata_file.toString() : ""
     """
     #!/usr/bin/env python3
+    import os
     import pandas as pd
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
@@ -105,12 +109,16 @@ process MutationsGraphicReport {
 
     # Define the coloring logic based on mutation type or marker status
     def get_mutation_category(row):
+        '''
+        Categorizes each mutation based on its type or marker status.
+        '''
         if str(row.get('MARKER', 'No')) == 'Yes':
             return 'Marker'
         return str(row.get('MUTATION_TYPE', 'Unknown'))
 
     df_expanded['Color_Category'] = df_expanded.apply(get_mutation_category, axis=1)
 
+    # Define color mapping 
     if "${params.colorblind}".lower() == "true":
         color_map = {'Marker': '#D55E00', 'Substitution': '#0072B2', 'Deletion': '#000000', 'Insertion': '#CC79A7'}
     else:
@@ -118,6 +126,11 @@ process MutationsGraphicReport {
     df_expanded['ColorCode'] = df_expanded['Color_Category'].map(lambda x: color_map.get(x, '#aaaaaa'))
 
     def get_plot_group(row):
+        '''
+        Determines the plot group for each mutation based on the protein and subtype.
+        For HUMAN protocol, all proteins are strictly separated by subtype to avoid mixing.
+        For AVIAN protocol, only HA and NA surface proteins are separated by subtype.
+        '''
         protein = str(row.get('PROTEIN', 'Unknown'))
         subtype = str(row.get('REF_SUBTYPE', 'Unknown'))
         
@@ -166,6 +179,9 @@ process MutationsGraphicReport {
     group_cols = ['Plot_Group', 'Season', 'POSITION', 'POSITION_REF', 'AA_MUTATION', 'Color_Category', 'ColorCode']
     
     def list_unique_items(data_column, joiner=', '):
+        '''
+        Returns a string of unique, non-empty items from a pandas Series.
+        '''
         valid_items = []
         for item in data_column.unique():
             if str(item).strip() != '':
@@ -209,6 +225,9 @@ process MutationsGraphicReport {
     }
 
     def custom_sort_key(group_name):
+        '''
+        Custom sorting key for plot groups based on biological segment order.
+        '''
         base_protein = group_name.split(' - ')[0]
         return (segment_mapping.get(base_protein, 99), group_name)
 
@@ -451,6 +470,7 @@ process MutationsGraphicReport {
 
         <div class="sticky-header">
             <h2 id="report-title" style="margin: 0 0 5px 0;">Mutation Summary per Protein - Season {default_season}</h2>
+            <h2 id="report-title" style="margin: 0 0 5px 0;">Mutation Summary per Protein - Season {default_season}</h2>
             <p style="color: gray; font-size: 14px; margin: 0;">{subtitle_text}</p>
 
             <div class="controls-container">
@@ -493,6 +513,7 @@ process MutationsGraphicReport {
         </div>
 
         <script>
+            // setInterval creates a loop that checks every 200ms if the Plotly graph has been rendered and contains data.
             var checkGraphReady = setInterval(function() {{
                 var graphContainer = document.getElementById('plotly-graphs');
                 
@@ -520,6 +541,11 @@ process MutationsGraphicReport {
                 var activeSex     = document.getElementById('sexSel').value;
 
                 document.getElementById('sliderValue').innerText = minimumFrequency + '%';
+
+                var titleLabel = activeSeason === 'All Time' ? 'All Time' : 'Season ' + activeSeason;
+                document.getElementById('report-title').innerText =
+                    'Mutation Summary per Protein - ' + titleLabel;
+
 
                 var titleLabel = activeSeason === 'All Time' ? 'All Time' : 'Season ' + activeSeason;
                 document.getElementById('report-title').innerText =
@@ -570,8 +596,10 @@ process MutationsGraphicReport {
                                 filteredY.push(pct >= minimumFrequency ? baselineY[pi] : null);
                             }} else {{
                                 filteredY.push(null);
+                                filteredY.push(null);
                             }}
                         }}
+                        newY.push(filteredY);
                         newY.push(filteredY);
                     }}
                 }}
@@ -582,7 +610,7 @@ process MutationsGraphicReport {
     </body>
     </html>
     '''
-
+    
     with open("MutationsReport.html", "w", encoding="utf-8") as f:
         f.write(html_template)
     """
