@@ -1,6 +1,3 @@
-#!/usr/bin/env nextflow
-nextflow.enable.dsl=2
-
 process CladeGraphicReport {
     // This process generates a comprehensive HTML report visualizing the clade and genotype distributions over time, based on the genotyping results and optional metadata.
     // The report includes stacked bar charts for H subtypes, clade evolution, and genotype evolution (if applicable), with colorblind-friendly palettes and interactive features.
@@ -127,7 +124,7 @@ process CladeGraphicReport {
                     lambda p: p.start_time if pd.notna(p) else pd.NaT
                 )
 
-    invalid_clade_values = {'-', 'Unassigned', 'No dataset available'}
+    invalid_clade_values = {'-', 'Unassigned', 'No dataset available', '[unassigned]', '[Unassigned]', 'unassigned'}
 
     # Clade logic refinement for Avian
     if "${params.protocol}".upper() == "AVIAN":
@@ -136,7 +133,7 @@ process CladeGraphicReport {
         # Existing logic for human/other
         all_clades = genotyping_df['Clade'].dropna().unique()
         def get_root_clade(c):
-            if pd.isna(c) or c in ["Unassigned", "No dataset available"]: return c
+            if pd.isna(c) or str(c).lower() in ["unassigned", "[unassigned]", "no dataset available"]: return c
             parts = str(c).split('.')
             return ".".join(parts[:3]) + "-like" if len(parts) > 3 else c
         genotyping_df['Root_Clade'] = genotyping_df['Clade'].apply(get_root_clade)
@@ -166,26 +163,62 @@ process CladeGraphicReport {
     global_color_map = {}
     h_labels = sorted([h for h in genotyping_df['H_Subtype'].dropna().unique() if h != '-'])
     h_color_map = {}
-    h_color_map["Unassigned"] = '#d3d3d3'
     for h in h_labels:
         h_color_map[h] = okabe_ito_colors[len(h_color_map) % len(okabe_ito_colors)] if is_colorblind else subtype_base_colors.get(str(h), '#888888')
+    h_color_map["Unassigned"] = '#d3d3d3'
+    h_color_map["unassigned"] = '#d3d3d3'
+    h_color_map["[unassigned]"] = '#d3d3d3'
+    h_color_map["[Unassigned]"] = '#d3d3d3'
+    h_color_map["No dataset available"] = '#d3d3d3'
     global_color_map['h_subtypes'] = h_color_map
     
     for h in valid_h_subtypes:
         base_c = subtype_base_colors.get(str(h), '#888888')
-        h_clades = sorted([c for c in genotyping_df[genotyping_df['H_Subtype'] == h]['Root_Clade'].dropna().unique() if c not in ["Unassigned", "No dataset available", "-"]])
-        clade_palette = okabe_ito_colors if is_colorblind else generate_shades(base_c, len(h_clades) + 2)
+        h_clades = sorted([c for c in genotyping_df[genotyping_df['H_Subtype'] == h]['Root_Clade'].dropna().unique()])
+        
+        # Filter out anything containing 'unassigned' before generating the color palette so it doesn't steal a vibrant color
+        pure_clades = [c for c in h_clades if "unassigned" not in str(c).lower() and str(c) not in ["No dataset available", "-"]]
+        
+        clade_palette = okabe_ito_colors if is_colorblind else generate_shades(base_c, len(pure_clades) + 2)
         clade_map = {}
-        for idx, clade in enumerate(h_clades): clade_map[clade] = clade_palette[idx % len(clade_palette)]
+        
+        # Map valid clades normally
+        for idx, clade in enumerate(pure_clades): 
+            clade_map[clade] = clade_palette[idx % len(clade_palette)]
+            
+        # Aggressively map any unassigned variation found in this subtype to grey
+        for clade in h_clades:
+            if "unassigned" in str(clade).lower() or str(clade) in ["No dataset available", "-"]:
+                clade_map[clade] = '#d3d3d3'
+                
         clade_map["Unassigned"] = '#d3d3d3'
+        clade_map["unassigned"] = '#d3d3d3'
+        clade_map["[unassigned]"] = '#d3d3d3'
+        clade_map["[Unassigned]"] = '#d3d3d3'
+        clade_map["No dataset available"] = '#d3d3d3'
         clade_map["Others"] = clade_palette[-1]
         global_color_map[f'clades_{h}'] = clade_map
     
     if include_genotype_chart:
-        g_labels = sorted([g for g in genotyping_df[genotyping_df['Clade'] == '2.3.4.4b']['Genotype'].dropna().unique() if g not in ["-", "None", "", "nan", "Unassigned"]])
+        g_labels = sorted([g for g in genotyping_df[genotyping_df['Clade'] == '2.3.4.4b']['Genotype'].dropna().unique() if g not in ["-", "None", "", "nan"]])
+        
+        pure_genotypes = [g for g in g_labels if "unassigned" not in str(g).lower() and str(g) not in ["No dataset available", "-"]]
+        
         genotype_palette = okabe_ito_colors if is_colorblind else colors.qualitative.Vivid
         genotype_map = {}
-        for idx, genotype in enumerate(g_labels): genotype_map[genotype] = genotype_palette[idx % len(genotype_palette)]
+        
+        for idx, genotype in enumerate(pure_genotypes): 
+            genotype_map[genotype] = genotype_palette[idx % len(genotype_palette)]
+            
+        for g in g_labels:
+            if "unassigned" in str(g).lower() or str(g) in ["No dataset available", "-"]:
+                genotype_map[g] = '#d3d3d3'
+                
+        genotype_map["Unassigned"] = '#d3d3d3'
+        genotype_map["unassigned"] = '#d3d3d3'
+        genotype_map["[unassigned]"] = '#d3d3d3'
+        genotype_map["[Unassigned]"] = '#d3d3d3'
+        genotype_map["No dataset available"] = '#d3d3d3'
         global_color_map['genotypes'] = genotype_map
 
     season_options_evo = "".join([f'<option value="{s}">{s}</option>' for s in seasons_evo])
@@ -230,7 +263,7 @@ process CladeGraphicReport {
             weekly_totals = df_subset.groupby('WEEK').size().rename('TotalWeek')
             if detail_col:
                 detail_counts = df_subset.groupby(['WEEK', group_col, detail_col]).size().reset_index(name='DetailCount')
-                detail_counts = detail_counts[~detail_counts[detail_col].isin(["-", "None", "", "nan", "Unassigned"])]
+                detail_counts = detail_counts[~detail_counts[detail_col].isin(["-", "None", "", "nan"])]
                 if not detail_counts.empty:
                     detail_counts['DetailStr'] = "- " + detail_counts[detail_col].astype(str) + ": " + detail_counts['DetailCount'].astype(str)
                     hover_details = detail_counts.groupby(['WEEK', group_col])['DetailStr'].apply(lambda x: "<br>".join(x)).reset_index(name='Hover_Details')
@@ -258,7 +291,10 @@ process CladeGraphicReport {
 
             for g in group_counts[group_col].unique():
                 g_df = group_counts[group_counts[group_col] == g]
-                color = color_map.get(str(g), '#888888')
+                
+                # Dynamic fallback guarantees grey for ANY unassigned variation
+                color = color_map.get(str(g), '#d3d3d3' if 'unassigned' in str(g).strip().lower() or str(g) in ['No dataset available', '-'] else '#888888')
+                
                 display_group_col = "Group" if group_col == "Final_Label" else group_col.replace("_", " ")
                 
                 fig_evo.add_trace(go.Bar(
@@ -281,7 +317,6 @@ process CladeGraphicReport {
                 current_row = 2
                 for h in valid_h_subtypes:
                     sub_df = df_view[df_view['H_Subtype'] == h].copy()
-                    sub_df = sub_df[~sub_df['Clade'].isin(invalid_clade_values)]
                     sub_df['Final_Label'] = sub_df['Root_Clade']
                     add_stacked_bars(sub_df, 'Final_Label', current_row, detail_col='Clade', color_key=f'clades_{h}', meta_dict=meta_dict)
                     current_row += 1
@@ -390,29 +425,30 @@ process CladeGraphicReport {
                 if h_counts.empty: fig.add_trace(go.Pie(labels=["No Data"], values=[1], name="H Subtypes", textinfo='none', hoverinfo='none', marker=dict(colors=['#f0f0f0']), visible=False, meta=meta_dict), row=1, col=1)
                 else:
                     h_counts['Text'] = h_counts['Count'].astype(str) + '/' + str(h_counts['Count'].sum())
+                    
                     fig.add_trace(go.Pie(
                         labels=h_counts['Label'], values=h_counts['Count'], name="H Subtypes", text=h_counts['Text'], texttemplate='<b>%{label}</b><br><b>%{text}</b><br><b>%{percent}</b>',
-                        textposition='outside', insidetextorientation='horizontal', rotation=270, automargin=True, hole=0.35, marker=dict(colors=[global_color_map['h_subtypes'].get(str(lbl), '#888888') for lbl in h_counts['Label']], line=dict(color='#ffffff', width=2)),
+                        textposition='outside', insidetextorientation='horizontal', rotation=270, automargin=True, hole=0.35, marker=dict(colors=[global_color_map['h_subtypes'].get(str(lbl), '#d3d3d3' if 'unassigned' in str(lbl).strip().lower() or str(lbl) in ['No dataset available'] else '#888888') for lbl in h_counts['Label']], line=dict(color='#ffffff', width=2)),
                         hoverlabel=dict(font_size=14), hovertemplate='<b>H Subtype:</b> %{label}<br><b>Count:</b> %{text}<br><b>Percentage:</b> %{percent}<extra></extra>', visible=False, meta=meta_dict
                     ), row=1, col=1)
 
                 for i, h in enumerate(valid_h_subtypes):
                     c_col = i + 2
                     sub_df = df_view[df_view['H_Subtype'] == h]
-                    sub_df = sub_df[~sub_df['Clade'].isin(invalid_clade_values)]
                     if len(sub_df) == 0: fig.add_trace(go.Pie(labels=["No Data"], values=[1], name=str(h), textinfo='none', hoverinfo='none', marker=dict(colors=['#f0f0f0']), visible=False, meta=meta_dict), row=1, col=c_col); continue
                     
                     orig_counts = sub_df.groupby(['Clade', 'Root_Clade']).size().reset_index(name='Count')
                     orig_counts['Hover_Detail'] = orig_counts.apply(lambda x: f"- {x['Clade']}: {x['Count']}/{len(sub_df)} ({x['Count']/len(sub_df):.1%})" if x['Count'] > 0 else "", axis=1)
                     root_grouped = orig_counts.groupby('Root_Clade').agg(Root_Count=('Count', 'sum'), Root_Hover_Details=('Hover_Detail', lambda x: "<br>".join([d for d in x if d]))).reset_index()
-                    root_grouped['Final_Label'] = root_grouped.apply(lambda x: "Others" if x['Root_Count']/len(sub_df) < 0.01 and str(x['Root_Clade']) not in ["Unassigned", "No dataset available"] else x['Root_Clade'], axis=1)
+                    root_grouped['Final_Label'] = root_grouped.apply(lambda x: "Others" if x['Root_Count']/len(sub_df) < 0.01 and "unassigned" not in str(x['Root_Clade']).lower() else x['Root_Clade'], axis=1)
                     final_grouped = root_grouped.groupby('Final_Label').agg(Final_Count=('Root_Count', 'sum'), Final_Hover_Details=('Root_Hover_Details', lambda x: "<br>".join([d for d in x if d]))).reset_index()
                     final_grouped['Hover_Extra'] = final_grouped.apply(lambda x: "<br><br><b>Clade Breakdown:</b><br>" + x['Final_Hover_Details'] if str(x['Final_Label']).endswith("-like") or str(x['Final_Label']) == "Others" else "", axis=1)
                     final_grouped['Text'] = final_grouped['Final_Count'].astype(str) + '/' + str(len(sub_df))
                     
+                    # Force light grey for any label containing "unassigned"
                     fig.add_trace(go.Pie(
                         labels=final_grouped['Final_Label'], values=final_grouped['Final_Count'], name=str(h), text=final_grouped['Text'], texttemplate='<b>%{label}</b><br><b>%{text}</b><br><b>%{percent}</b>',
-                        textposition='outside', rotation=270, automargin=True, insidetextorientation='horizontal', hole=0.35, marker=dict(colors=[global_color_map[f'clades_{h}'].get(str(lbl), '#888888') for lbl in final_grouped['Final_Label']], line=dict(color='#ffffff', width=2)),
+                        textposition='outside', rotation=270, automargin=True, insidetextorientation='horizontal', hole=0.35, marker=dict(colors=[global_color_map[f'clades_{h}'].get(str(lbl), '#d3d3d3' if 'unassigned' in str(lbl).strip().lower() or str(lbl) in ['No dataset available'] else '#888888') for lbl in final_grouped['Final_Label']], line=dict(color='#ffffff', width=2)),
                         hoverlabel=dict(font_size=14, align='left'), customdata=final_grouped['Hover_Extra'], hovertemplate='<b>Group:</b> %{label}<br><b>Total Count:</b> %{text}<br><b>Group Percentage:</b> %{percent}%{customdata}<extra></extra>', visible=False, meta=meta_dict
                     ), row=1, col=c_col)
 
@@ -421,14 +457,15 @@ process CladeGraphicReport {
                     if len(sub_df) == 0: fig.add_trace(go.Pie(labels=["No Data"], values=[1], name="Genotypes", textinfo='none', hoverinfo='none', marker=dict(colors=['#f0f0f0']), visible=False, meta=meta_dict), row=1, col=total_charts)
                     else:
                         orig_counts = sub_df.groupby(['Genotype', 'Sub-genotype']).size().reset_index(name='Count')
-                        orig_counts['Hover_Detail'] = orig_counts.apply(lambda x: f"- {x['Sub-genotype']}: {x['Count']}/{len(sub_df)} ({x['Count']/len(sub_df):.1%})" if str(x['Sub-genotype']) not in ["-", "None", "", "nan", "Unassigned"] else "", axis=1)
+                        orig_counts['Hover_Detail'] = orig_counts.apply(lambda x: f"- {x['Sub-genotype']}: {x['Count']}/{len(sub_df)} ({x['Count']/len(sub_df):.1%})" if "unassigned" not in str(x['Sub-genotype']).lower() and str(x['Sub-genotype']) not in ["-", "None", "", "nan"] else "", axis=1)
                         root_grouped = orig_counts.groupby('Genotype').agg(Final_Count=('Count', 'sum'), Hover_Details=('Hover_Detail', lambda x: "<br>".join([d for d in x if d]))).reset_index()
                         root_grouped['Hover_Extra'] = root_grouped.apply(lambda x: "<br><br><b>Sub-genotypes Breakdown:</b><br>" + x['Hover_Details'] if x['Hover_Details'] else "", axis=1)
                         root_grouped['Text'] = root_grouped['Final_Count'].astype(str) + '/' + str(len(sub_df))
 
+                        # Force light grey for any label containing "unassigned"
                         fig.add_trace(go.Pie(
                             labels=root_grouped['Genotype'], values=root_grouped['Final_Count'], name="Genotypes 2.3.4.4b", text=root_grouped['Text'], texttemplate='<b>%{label}</b><br><b>%{text}</b><br><b>%{percent}</b>',
-                            textposition='outside', rotation=270, automargin=True, insidetextorientation='horizontal', hole=0.35, marker=dict(colors=[global_color_map['genotypes'].get(str(lbl), '#888888') for lbl in root_grouped['Genotype']], line=dict(color='#ffffff', width=2)),
+                            textposition='outside', rotation=270, automargin=True, insidetextorientation='horizontal', hole=0.35, marker=dict(colors=[global_color_map['genotypes'].get(str(lbl), '#d3d3d3' if 'unassigned' in str(lbl).strip().lower() or str(lbl) in ['No dataset available'] else '#888888') for lbl in root_grouped['Genotype']], line=dict(color='#ffffff', width=2)),
                             hoverlabel=dict(font_size=14, align='left'), customdata=root_grouped['Hover_Extra'], hovertemplate='<b>Genotype:</b> %{label}<br><b>Total Count:</b> %{text}<br><b>Percentage:</b> %{percent}%{customdata}<extra></extra>', visible=False, meta=meta_dict
                         ), row=1, col=total_charts)
 
