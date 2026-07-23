@@ -22,7 +22,7 @@ nextflow_process {
             process {
                 """
                 input[0] = file("${projectDir}/tests/data/Graphs_test/relevant_mutations.xlsx")
-                input[1] = file("${projectDir}/tests/data/metadata.csv")
+                input[1] = file("${projectDir}/tests/data/Graphs_test/metadata.csv")
                 """
             }
         }

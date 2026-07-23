@@ -104,7 +104,6 @@ if not mutations_dataframe.empty:
     mutations_dataframe['POSITION'] = mutations_dataframe['POSITION'].astype(int)
     mutations_dataframe = mutations_dataframe.sort_values(['MARKER_ID', 'POSITION'])
 
-    
     name_map = {
         "NS-1": "NS1",
         "NS-2": "NS2"

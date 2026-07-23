@@ -120,7 +120,7 @@ for seg, prots in prot_dict.items():
         max_n_ratio = 0.5
         
         # Use MAFFT to align the query sequence with the reference sequence
-        cmd = f"(seqkit grep -r -p '{pattern}' {ref_fasta} | seqkit head -n 1; printf '\\n'; cat '{seg_fasta}') | mafft --localpair --maxiterate 1000 --op 1.53 --ep 0.123 --quiet -"
+        cmd = f"(seqkit grep -r -p '{pattern}' {ref_fasta} | seqkit head -n 1; printf '\\n'; cat '{seg_fasta}') | mafft --localpair --maxiterate 1000 --op 3 --ep 0.123 --quiet -"
         try:
             result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=True)
             

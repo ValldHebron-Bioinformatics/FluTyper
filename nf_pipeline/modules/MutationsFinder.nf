@@ -23,8 +23,9 @@ import os, csv
 from pathlib import Path
 from Bio import SeqIO
 
-# Set up paths and directories
-markers_input = Path("${markers}")
+markers_dir = Path("${markers}")
+if not markers_dir.exists():
+    markers_dir = Path(".")
 ha_dict = "${params.protocols[params.protocol].resources}/HA_DICT.csv"
 na_dict = "${params.protocols[params.protocol].resources}/NA_DICT.csv"
 out_dir = Path("samples/${sample_id}/mutations")
@@ -74,9 +75,10 @@ for aligned_prot in "${prot_files}".split():
     if "${params.protocol}" == "HUMAN" :
         if ref_tag == "H1N1": ref_tag = "A(H1N1)pdm09"
         elif ref_tag == "H3N2": ref_tag = "A(H3N2)"
-    # Determine the subtype value
+    
+    # --- SUBTYPE STRING FORMATTING ---
     subtype_val = "${h_tag}${n_tag}(${pathotype})" if "${pathotype}" != "" else "${h_tag}${n_tag}"
-
+    
     if "${params.protocol}" == "HUMAN":
         raw_sub = "${h_tag}${n_tag}"
         if raw_sub == "H1N1":
@@ -86,7 +88,6 @@ for aligned_prot in "${prot_files}".split():
         elif raw_sub.startswith("H") and "N" in raw_sub:
             subtype_val = f"A({raw_sub})"
 
-    # Build position lookup dictionaries for HA and NA based on the protocol and protein   
     pos_to_base = {}
     if "${params.protocol}" == "AVIAN":
         if prot_name.startswith("HA"):
@@ -103,14 +104,9 @@ for aligned_prot in "${prot_files}".split():
             ref_N = "${n_tag}" if "${n_tag}".startswith("N") else "N1"
             pos_to_base = build_pos_lookup(na_dict, f"{ref_N}_pos", "N1_pos")
 
-    # Markers information is stored in a dictionary keyed by marker ID, with values being sets of (position, amino acid) tuples
     markers_by_id, marker_info = {}, {}
-    # Handle whether Nextflow staged a directory or a list of files
-    if os.path.isdir(markers_input):
-        m_file = Path(markers_input) / f"{prot_name}_markers.csv"
-    else:
-        m_file = Path(f"{prot_name}_markers.csv")
-
+    m_file = markers_dir / f"{prot_name}_markers.csv"
+    
     if m_file.exists():
         with open(m_file, encoding='utf-8-sig') as f:
             for row in csv.DictReader(f):
@@ -147,21 +143,24 @@ for aligned_prot in "${prot_files}".split():
                 if info not in marker_info.setdefault(m_id, []): marker_info[m_id].append(info)
     else:
         if "${params.protocol}" == "AVIAN":
-                    with open("MFerrors.log", 'a') as f: f.write(f"WARNING: Marker file not found for protein {prot_name}: {m_file}\\n")
-    
-    # Build a set of observed mutations and their corresponding positions, using the reference and query sequences
+            with open("MFerrors.log", 'a') as f: f.write(f"WARNING: Marker file not found for protein {prot_name}: {m_file}\\n")
+
     observed_mutations, protein_pos = set(), 0
     for r_aa, q_aa in zip(ref_seq, query_seq):
-        if r_aa != "-": protein_pos += 1 # Increment position only when the reference amino acid is not a gap
-        standard_pos = pos_to_base.get(str(protein_pos), str(protein_pos))
+        if r_aa != "-": protein_pos += 1
+        pos_raw = str(protein_pos)
+        pos_ref = pos_to_base.get(pos_raw, pos_raw)
+        
+        # Decide which position to use for marker lookup based on the protocol
+        marker_pos = pos_ref if "${params.protocol}" == "AVIAN" else pos_raw
         
         # Avoid treating 'X' (unknown AA from NNN codons) as a valid target to prevent false wildcard marker triggers
         if q_aa != "X":
-            observed_mutations.add((standard_pos, q_aa))
+            observed_mutations.add((marker_pos, q_aa))
         
         # X acts as a wildcard only if the amino acid changed
         if r_aa != q_aa and "X" not in (r_aa, q_aa):
-            observed_mutations.add((standard_pos, "X"))
+            observed_mutations.add((marker_pos, "X"))
             
     # Check which observed mutations are part of any marker sets
     active_markers = {}
@@ -178,11 +177,14 @@ for aligned_prot in "${prot_files}".split():
         pos_raw = str(pos)
         pos_ref = pos_to_base.get(pos_raw, pos_raw)
         
+        # Decide which position to use for marker lookup based on the protocol
+        marker_pos = pos_ref if "${params.protocol}" == "AVIAN" else pos_raw
+
         is_mutation = r_aa != q_aa and "X" not in (r_aa, q_aa)
 
         # Look first for exact matches, then for "X" matches only if it is a true mutation
-        m_ids_exact = active_markers.get((pos_ref, q_aa), [])
-        m_ids_x = active_markers.get((pos_ref, "X"), []) if is_mutation else []
+        m_ids_exact = active_markers.get((marker_pos, q_aa), [])
+        m_ids_x = active_markers.get((marker_pos, "X"), []) if is_mutation else []
         combined_m_ids = list(dict.fromkeys(m_ids_exact + m_ids_x)) 
         
         is_marker = len(combined_m_ids) > 0

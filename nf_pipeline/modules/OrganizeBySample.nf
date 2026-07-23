@@ -2,9 +2,8 @@
 nextflow.enable.dsl=2
 
 process OrganizeBySample {
-    // This process is designed to organize sequences by sample ID, generate reverse complements, 
-    // and perform orientation checks using Nextclade. It also handles logging for missing segments and errors.
-    errorStrategy 'ignore' 
+    errorStrategy 'ignore'
+    debug true 
     
     input:
     val(sample_id)
@@ -62,7 +61,7 @@ process OrganizeBySample {
         fi
     done < <(grep "^>" "\$raw_sample" | tr -d '>')
 
-    # Missing segment logging
+    # Missing and Duplicate segment logging
     for seg in ${params.segments.join(' ')}; do
         target_fasta="samples/${sample_id}/segments/${sample_id}_\${seg}.fasta"
         

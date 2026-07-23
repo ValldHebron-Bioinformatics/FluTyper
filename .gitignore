@@ -16,5 +16,9 @@ nf_pipeline/bin
 lastyear/
 thisyear/
 tests/results
-RESULTS/
+RESULTS/*
+!RESULTS/TFM/
+RESULTS/TFM/*
+!RESULTS/TFM/**
 IDENTITY_STUDY*
+boxplots/

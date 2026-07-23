@@ -21,8 +21,10 @@ include { InteractiveMutationsTable } from './modules/InteractiveMutationsTable'
 include { DateGraphicReport         } from './modules/DateGraphicReport'
 include { MergeHistoricalData       } from './modules/MergeHistoricalData'
 include { GeographicReport          } from './modules/GeographicReport'
+include { MetadataMerge             } from './modules/MetadataMerge'
+include { MergeReports              } from './modules/MergeReports.nf'
 
-// Function to check if the metadata file contains a "LOCATION" column
+// Comprovació invisible per decidir si generem el mapa
 def check_location_column(metadata_path) {
     if (!metadata_path) return false
     def f = file(metadata_path)
@@ -169,8 +171,8 @@ workflow {
             tuple(sample_id, prot_files, h_tag, n_tag, pathotype)
         }
         
-    MutationsFinder(Mutations_ch, ch_markerfiles.collect()) // Markers are collected into a list for the process to use
-    ch_mut = MutationsFinder.out.results.map { _id, mut_files, combined_csv -> [mut_files, combined_csv] }.flatten() // Flatten the channel to emit individual mutation files and the combined CSV for downstream processing
+    MutationsFinder(Mutations_ch, ch_markerfiles.collect())
+    ch_mut = MutationsFinder.out.results.map { _id, mut_files, combined_csv -> [mut_files, combined_csv] }.flatten()
     
     MutationsCompiler_ch = MutationsFinder.out.results
         .map { _sample_id, _mut_files, combined_csv -> combined_csv }
@@ -199,6 +201,23 @@ workflow {
         final_metadata_ch   = params.metadata ? channel.fromPath(params.metadata, checkIfExists: true) : channel.of([]) // Create an empty channel if no metadata is provided
     }
 
+    // METADATA MERGE — runs in parallel, only affects published outputs
+    if (params.metadata) {
+        MetadataMerge(
+            final_subtypes_ch,
+            final_genotyping_ch,
+            final_mutations_ch,
+            final_metadata_ch
+        )
+        published_subtypes_ch   = MetadataMerge.out.subtypes
+        published_genotyping_ch = MetadataMerge.out.genotyping
+        published_mutations_ch  = MetadataMerge.out.mutations
+    } else {
+        published_subtypes_ch   = final_subtypes_ch
+        published_genotyping_ch = final_genotyping_ch
+        published_mutations_ch  = final_mutations_ch
+    }
+
     // AGGREGATED GRAPHIC REPORTS (Using Merged Data)
     CladeGraphicReport(final_genotyping_ch, final_metadata_ch)
     ch_clade_evolution_report = CladeGraphicReport.out.evolution_report
@@ -216,12 +235,13 @@ workflow {
         date_report_ch = channel.empty()
     }
 
-    // Conditionally generate the Geographic Report if metadata location is provided or if appending to existing data
+    // Avaluació i crida de l'informe geogràfic
     def run_geographic_report = check_location_column(params.metadata)
     if (run_geographic_report && params.coordinates) {
         GeographicReport(final_genotyping_ch, final_metadata_ch, file(params.coordinates, checkIfExists: true))
         ch_geo_report = GeographicReport.out.geo_report
     }
+
     // CONDITIONALLY RUN INDIVIDUAL GRAPHIC REPORTS
     if (params.get('IndividualReports', false).toString().toLowerCase() == 'true') {
         IndividualMutations_Ch = MutationsFinder.out.results.map { sample_id, _mut_files, combined_csv -> tuple(sample_id, combined_csv) }
@@ -256,25 +276,29 @@ workflow {
             name: 'pipeline_errors.log',
         )
 
+    all_reports_ch = CladeGraphicReport.out.report
+        .mix(ch_clade_evolution_report)
+        .mix(ch_mutations_graphic_report)
+        .mix(ch_interactive_mutations_table)
+        .mix(date_report_ch)
+        .mix(ch_geo_report)
+        .collect()
+
+    MergeReports(all_reports_ch)
     // PUBLISH DECLARATIONS
     publish:
     folder = OrganizeBySample.out.results.map { _id, path -> path }
-    subtype = final_subtypes_ch
+    subtype = published_subtypes_ch
     datasets = GetDatasets.out
     database = ch_database
     markerfiles = ch_markerfiles
-    results = final_genotyping_ch
+    results = published_genotyping_ch
     CDS = ch_cds
     prot = ch_prot
-    graphic_report = CladeGraphicReport.out.report
-    clade_evolution_report = ch_clade_evolution_report
-    mutations_graphic_report = ch_mutations_graphic_report
     individual_graphic_report = ch_individual_graphic_report
-    interactive_mutations_table = ch_interactive_mutations_table
-    date_report = date_report_ch
-    geo_report = ch_geo_report
     mut = ch_mut
-    mutations_report = final_mutations_ch
+    mutations_report = published_mutations_ch
+    index = MergeReports.out.index
     merged_metadata = final_metadata_ch
     errors = CompileErrors.out.map { _id, log -> log }
     errors_merged = ErrorsMerged_ch
@@ -325,32 +349,12 @@ output {
         path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
-    graphic_report {
-        path { "${projectDir}/../${params.outDir}/graphic_reports" }
-        mode "copy"
-    }
-    clade_evolution_report {
-        path { "${projectDir}/../${params.outDir}/graphic_reports" }
-        mode "copy"
-    }
-    mutations_graphic_report {
-        path { "${projectDir}/../${params.outDir}/graphic_reports" }
-        mode "copy"
-    }
     individual_graphic_report {
         path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
-    interactive_mutations_table {
-        path { "${projectDir}/../${params.outDir}/graphic_reports" }
-        mode "copy"
-    }
-    date_report {
-        path { "${projectDir}/../${params.outDir}/graphic_reports" }
-        mode "copy"
-    }
-    geo_report {
-        path { "${projectDir}/../${params.outDir}/graphic_reports" }
+    index {
+        path { "${projectDir}/../${params.outDir}" }
         mode "copy"
     }
     errors {

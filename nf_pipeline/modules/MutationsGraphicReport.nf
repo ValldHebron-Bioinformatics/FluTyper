@@ -2,41 +2,38 @@
 nextflow.enable.dsl=2
 
 process MutationsGraphicReport {
-    // This process generates a comprehensive HTML report visualizing mutation data using Plotly.
-    // It reads mutation data from an Excel file, processes it, and creates interactive scatter 
-    // plots for each protein group.
-    //errorStrategy 'ignore'
+    errorStrategy 'ignore'
     debug true
+    // This process generates an interactive HTML report visualizing the mutations detected in the samples.
 
     input:
     path(full_mutations)
-    path(metadata_file) // Nextflow safely ignores this if it receives an empty collection
+    path(metadata_file)
 
     output:
     path("MutationsReport.html"), emit: report
 
     script:
-    // Evaluate the Groovy variable. If it's an empty list, pass an empty string to Python.
     def meta_str = metadata_file ? metadata_file.toString() : ""
     """
     #!/usr/bin/env python3
-    import os
     import pandas as pd
     import plotly.graph_objects as go
     from plotly.subplots import make_subplots
     import json
 
-    # Load the mutations dataset, only first sheet (All_Proteins)
+    # Load the mutations dataset and guarantee clean string IDs immediately
     df = pd.read_excel("${full_mutations}", keep_default_na=False)
+    if 'SAMPLE_ID' in df.columns:
+        df['SAMPLE_ID'] = df['SAMPLE_ID'].astype(str).str.strip()
+
     lengths_df = pd.read_csv("${params.protocols[params.protocol].resources}/annotations.csv")
     lengths_dict = dict(zip(lengths_df['Protein'].astype(str), lengths_df['Length']))
 
-    metadata_param = "${meta_str}"
-
-    # Load metadata and prepare the Season column
-    if metadata_param and os.path.isfile(metadata_param):
-        df_meta = pd.read_csv(metadata_param, skipinitialspace=True)
-        
+    # Load metadata and prepare the Season, Age_Group, and Sex columns
+    df_meta = pd.read_csv("${meta_str}", skipinitialspace=True) if "${meta_str}" else pd.DataFrame()
+    
+    if not df_meta.empty:
         # Strip invisible characters and standardize to uppercase
         df_meta.columns = [str(c).replace('\\ufeff', '').strip().upper() for c in df_meta.columns]
         
@@ -49,16 +46,33 @@ process MutationsGraphicReport {
             df_meta = df_meta.dropna(subset=['SAMPLE_ID'])
             df_meta = df_meta.drop_duplicates(subset=['SAMPLE_ID'], keep='first')
 
+            # Extract demographic columns safely
+            if 'AGE GROUP' in df_meta.columns:
+                df_meta['Age_Group'] = df_meta['AGE GROUP'].fillna('Sense dades').astype(str).str.strip()
+            elif 'AGE_GROUP' in df_meta.columns:
+                df_meta['Age_Group'] = df_meta['AGE_GROUP'].fillna('Sense dades').astype(str).str.strip()
+            else:
+                df_meta['Age_Group'] = 'Sense dades'
+
+            if 'SEX' in df_meta.columns:
+                df_meta['Sex'] = df_meta['SEX'].fillna('Sense dades').astype(str).str.strip()
+            else:
+                df_meta['Sex'] = 'Sense dades'
+
             # Identify columns to merge and safely include DATE if present
-            merge_cols = ['SAMPLE_ID']
+            merge_cols = ['SAMPLE_ID', 'Age_Group', 'Sex']
             if 'DATE' in df_meta.columns:
                 merge_cols.append('DATE')
                 
-            # Ensure the main dataframe ID is also a stripped string before merging
-            if 'SAMPLE_ID' in df.columns:
-                df['SAMPLE_ID'] = df['SAMPLE_ID'].astype(str).str.strip()
-                
             df = pd.merge(df, df_meta[merge_cols], on='SAMPLE_ID', how='left')
+
+    # Fill missing demographic columns so the rest of the script can always reference them
+    if 'Age_Group' not in df.columns:
+        df['Age_Group'] = 'Sense dades'
+    if 'Sex' not in df.columns:
+        df['Sex'] = 'Sense dades'
+    df['Age_Group'] = df['Age_Group'].fillna('Sense dades')
+    df['Sex']       = df['Sex'].fillna('Sense dades')
 
     # Calculate the ISO season using a robust function to prevent NaN float errors
     if 'DATE' in df.columns:
@@ -75,22 +89,20 @@ process MutationsGraphicReport {
     else:
         df['Season'] = "Unknown Season"
 
-    # Add the All Time view by copying the dataframe and appending it
+    # Build the full cross-product of (season x age x sex) views so every
+    # combination of filters has its own set of traces in the figure.
     df_all_time = df.copy()
     df_all_time['Season'] = 'All Time'
-    df = pd.concat([df_all_time, df], ignore_index=True)
-    df = df[df['Season'].notna()]
+    df_expanded = pd.concat([df_all_time, df], ignore_index=True)
+    df_expanded = df_expanded[df_expanded['Season'].notna()]
 
     # Standardize missing values and replace pipes with a line break + spaces for indentation
-    df['EFFECT'] = df['EFFECT'].replace('', 'Unknown').fillna('Unknown').astype(str).str.replace(' | ', '<br>                 ')
-    df['FOUND_IN'] = df['FOUND_IN'].replace('', 'Unknown').fillna('Unknown').astype(str)
-    df['POSITION_REF'] = df['POSITION_REF'].replace('', 'Unknown').fillna('Unknown').astype(str)
-    df['POSITION'] = pd.to_numeric(df['POSITION'], errors='coerce')
-    
-    # Strip strings to avoid duplicate Plot Groups from trailing spaces
-    df['PROTEIN'] = df.get('PROTEIN', '').replace('', 'Unknown').fillna('Unknown').astype(str).str.strip()
-    df['SUBTYPE'] = df['SUBTYPE'].replace('', 'Unknown').fillna('Unknown').astype(str).str.strip()
-    df['REF_SUBTYPE'] = df['REF_SUBTYPE'].replace('', 'Unknown').fillna('Unknown').astype(str).str.strip()
+    df_expanded['EFFECT'] = df_expanded['EFFECT'].replace('', 'Unknown').fillna('Unknown').astype(str).str.replace(' | ', '<br>                 ')
+    df_expanded['SUBTYPE'] = df_expanded['SUBTYPE'].replace('', 'Unknown').fillna('Unknown').astype(str)
+    df_expanded['REF_SUBTYPE'] = df_expanded['REF_SUBTYPE'].replace('', 'Unknown').fillna('Unknown').astype(str)
+    df_expanded['FOUND_IN'] = df_expanded['FOUND_IN'].replace('', 'Unknown').fillna('Unknown').astype(str)
+    df_expanded['POSITION_REF'] = df_expanded['POSITION_REF'].replace('', 'Unknown').fillna('Unknown').astype(str)
+    df_expanded['POSITION'] = pd.to_numeric(df_expanded['POSITION'], errors='coerce')
 
     # Define the coloring logic based on mutation type or marker status
     def get_mutation_category(row):
@@ -101,28 +113,15 @@ process MutationsGraphicReport {
             return 'Marker'
         return str(row.get('MUTATION_TYPE', 'Unknown'))
 
-    df['Color_Category'] = df.apply(get_mutation_category, axis=1)
+    df_expanded['Color_Category'] = df_expanded.apply(get_mutation_category, axis=1)
 
     # Define color mapping 
     if "${params.colorblind}".lower() == "true":
-        # Colorblind-friendly palette
-        color_map = {
-            'Marker': '#D55E00',       
-            'Substitution': '#0072B2', 
-            'Deletion': '#000000',     
-            'Insertion': '#CC79A7'    
-        }
+        color_map = {'Marker': '#D55E00', 'Substitution': '#0072B2', 'Deletion': '#000000', 'Insertion': '#CC79A7'}
     else:
-        # Cris Colors Palette
-        color_map = {
-            'Marker': '#C84630',       
-            'Substitution': '#94B0DA', 
-            'Deletion': '#3A2D32',     
-            'Insertion': '#F9DC5C'    
-        }
-    df['ColorCode'] = df['Color_Category'].map(lambda x: color_map.get(x, '#aaaaaa'))
+        color_map = {'Marker': '#C84630', 'Substitution': '#94B0DA', 'Deletion': '#3A2D32', 'Insertion': '#F9DC5C'}
+    df_expanded['ColorCode'] = df_expanded['Color_Category'].map(lambda x: color_map.get(x, '#aaaaaa'))
 
-    # Define plot groups based on the selected Nextflow protocol
     def get_plot_group(row):
         '''
         Determines the plot group for each mutation based on the protein and subtype.
@@ -133,28 +132,47 @@ process MutationsGraphicReport {
         subtype = str(row.get('REF_SUBTYPE', 'Unknown'))
         
         if "${params.protocol}" == "HUMAN":
-            # For HUMAN, strictly separate all proteins by subtype to avoid H1N1/H3N2 mixing
             return f"{protein} - {subtype}"
         else:
-            # For AVIAN, keep original behavior: only separate HA and NA surface proteins
             if protein in ['HA1', 'HA2', 'NA']:
                 return f"{protein} - {subtype}"
             return protein
 
-    df['Plot_Group'] = df.apply(get_plot_group, axis=1).astype(str)
+    df_expanded['Plot_Group'] = df_expanded.apply(get_plot_group, axis=1).astype(str)
 
-    # Calculate total samples accurately
-    subtype_totals = df.groupby(['REF_SUBTYPE', 'Season'])['SAMPLE_ID'].nunique().reset_index()
-    subtype_totals.rename(columns={'SAMPLE_ID': 'Subtype_Total'}, inplace=True)
-    
-    pg_map = df[['Plot_Group', 'REF_SUBTYPE', 'Season']].drop_duplicates()
-    pg_totals = pd.merge(pg_map, subtype_totals, on=['REF_SUBTYPE', 'Season'])
-    
-    # Sum the totals for each Plot_Group to accommodate internal genes shared across subtypes
-    total_samples_per_group = pg_totals.groupby(['Plot_Group', 'Season'])['Subtype_Total'].sum().reset_index()
-    total_samples_per_group.rename(columns={'Subtype_Total': 'Total_Group_Samples'}, inplace=True)
+    # Build the complete list of filter values including Sense dades
+    age_order = {'0-2': 0, '3-4': 1, '5-14': 2, '15-65': 3, '>65': 4}
+    age_groups = ['All'] + sorted(
+        [a for a in df_expanded['Age_Group'].unique() if str(a).strip() not in ['nan', '', 'None']],
+        key=lambda x: age_order.get(str(x).strip(), 99)
+    )
+    sexs = ['All'] + sorted(
+        [g for g in df_expanded['Sex'].unique() if str(g).strip() not in ['nan', '', 'None']]
+    )
 
-    # Define the relevant columns for grouping and aggregation
+    # Calculate total unique samples based on Subtype rather than individual Plot Group
+    def totals_for_view(age_val, sex_val):
+        view = df_expanded.copy()
+        if age_val != 'All':
+            view = view[view['Age_Group'] == age_val]
+        if sex_val != 'All':
+            view = view[view['Sex'] == sex_val]
+            
+        t = view.groupby(['REF_SUBTYPE', 'Season'])['SAMPLE_ID'].nunique().reset_index()
+        t.rename(columns={'SAMPLE_ID': 'Subtype_Total'}, inplace=True)
+        
+        pg_map = view[['Plot_Group', 'REF_SUBTYPE', 'Season']].drop_duplicates()
+        t = pd.merge(pg_map, t, on=['REF_SUBTYPE', 'Season'])
+        t.rename(columns={'Subtype_Total': 'Total_Group_Samples'}, inplace=True)
+        t['Age_Filter'] = age_val
+        t['Sex_Filter'] = sex_val
+        return t[['Plot_Group', 'Season', 'Total_Group_Samples', 'Age_Filter', 'Sex_Filter']]
+
+    all_totals = pd.concat(
+        [totals_for_view(a, g) for a in age_groups for g in sexs],
+        ignore_index=True
+    )
+
     group_cols = ['Plot_Group', 'Season', 'POSITION', 'POSITION_REF', 'AA_MUTATION', 'Color_Category', 'ColorCode']
     
     def list_unique_items(data_column, joiner=', '):
@@ -167,37 +185,40 @@ process MutationsGraphicReport {
                 valid_items.append(str(item))
         return joiner.join(valid_items)
 
-    # Group the data and calculate metrics
-    df_grouped = df.groupby(group_cols, dropna=False).agg(
-        Sample_Count=('SAMPLE_ID', 'nunique'),
-        Sample_IDs=('SAMPLE_ID', list_unique_items),
-        Subtypes=('SUBTYPE', list_unique_items),
-        EFFECT=('EFFECT', lambda x: list_unique_items(x, '<br>                 ')),
-        FOUND_IN=('FOUND_IN', list_unique_items)
-    ).reset_index()
+    def grouped_for_view(age_val, sex_val):
+        view = df_expanded.copy()
+        if age_val != 'All':
+            view = view[view['Age_Group'] == age_val]
+        if sex_val != 'All':
+            view = view[view['Sex'] == sex_val]
 
-    # Bring in the total sample numbers to calculate percentages
-    df_grouped = pd.merge(df_grouped, total_samples_per_group, on=['Plot_Group', 'Season'], how='left')
-    
-    # Calculate the percentage
-    df_grouped['Percentage'] = (df_grouped['Sample_Count'] / df_grouped['Total_Group_Samples']) * 100
-    df_grouped['Percentage'] = df_grouped['Percentage'].round(2)
-    
-    # Define biological segment mapping for sorting
+        g = view.groupby(group_cols, dropna=False).agg(
+            Sample_Count=('SAMPLE_ID', 'nunique'),
+            Sample_IDs=('SAMPLE_ID', list_unique_items),
+            Subtypes=('SUBTYPE', list_unique_items),
+            EFFECT=('EFFECT', lambda x: list_unique_items(x, '<br>                 ')),
+            FOUND_IN=('FOUND_IN', list_unique_items)
+        ).reset_index()
+
+        totals = all_totals[
+            (all_totals['Age_Filter'] == age_val) &
+            (all_totals['Sex_Filter'] == sex_val)
+        ][['Plot_Group', 'Season', 'Total_Group_Samples']]
+
+        g = pd.merge(g, totals, on=['Plot_Group', 'Season'], how='left')
+        g['Percentage'] = (g['Sample_Count'] / g['Total_Group_Samples'] * 100).round(2)
+        g['Age_Filter']    = age_val
+        g['Sex_Filter'] = sex_val
+        return g
+
+    df_grouped = pd.concat(
+        [grouped_for_view(a, ge) for a in age_groups for ge in sexs],
+        ignore_index=True
+    )
+
     segment_mapping = {
-        'PB2': 1,
-        'PB1': 2,
-        'PB1-F2': 2,
-        'PA': 3,
-        'PA-X': 3,
-        'HA1': 4,
-        'HA2': 4,
-        'NP': 5,
-        'NA': 6,
-        'M1': 7,
-        'M2': 7,
-        'NS1': 8,
-        'NS2': 8,
+        'PB2': 1, 'PB1': 2, 'PB1-F2': 2, 'PA': 3, 'PA-X': 3, 'HA1': 4,
+        'HA2': 4, 'NP': 5, 'NA': 6, 'M1': 7, 'M2': 7, 'NS1': 8, 'NS2': 8,
     }
 
     def custom_sort_key(group_name):
@@ -205,26 +226,18 @@ process MutationsGraphicReport {
         Custom sorting key for plot groups based on biological segment order.
         '''
         base_protein = group_name.split(' - ')[0]
-        segment_num = segment_mapping.get(base_protein, 99)
-        return (segment_num, group_name)
+        return (segment_mapping.get(base_protein, 99), group_name)
 
-    # Prepare subplots using the custom segment order
     groups = sorted(df_grouped['Plot_Group'].unique(), key=custom_sort_key)
     rows_count = len(groups)
     
-    # Calculate vertical spacing to avoid overlap
     row_height = 400
     vert_spacing = 80
     total_figure_height = max(row_height * rows_count, 600)
-    
-    if rows_count > 1:
-        spacing = vert_spacing / total_figure_height
-    else:
-        spacing = 0
+    spacing = vert_spacing / total_figure_height if rows_count > 1 else 0
 
     fig = make_subplots(rows=rows_count, cols=1, subplot_titles=groups, vertical_spacing=spacing)
 
-    # Epitope definitions for the HUMAN protocol
     epitope_definitions = {
         'HA1 - A(H3N2)': [
             {'name': 'RBD', 'positions': [98, 152, 153, 154, 155, 156], 'color': '#E41A1C'},
@@ -247,8 +260,7 @@ process MutationsGraphicReport {
         ]
     }
 
-    # Extract valid seasons for the dropdown menu
-    available_seasons = df['Season'].unique()
+    available_seasons = df_expanded['Season'].unique()
     valid_seasons = [str(s) for s in available_seasons if str(s) not in ['All Time', 'Unknown Season', 'nan']]
     sorted_seasons = sorted(valid_seasons, reverse=True)
     if 'Unknown Season' in available_seasons:
@@ -256,10 +268,8 @@ process MutationsGraphicReport {
     sorted_seasons.append('All Time')
     default_season = sorted_seasons[0]
 
-    # Make scatter plots for each group
     for i, group in enumerate(groups, start=1):
-        
-        # Add epitope background bars for HUMAN protocol before rendering the actual mutations
+
         if "${params.protocol}" == "HUMAN" and group in epitope_definitions:
             for epitope in epitope_definitions[group]:
                 if 'positions' in epitope:
@@ -285,80 +295,87 @@ process MutationsGraphicReport {
                 )
 
         group_df = df_grouped[df_grouped['Plot_Group'] == group]
-        
+
         for season in available_seasons:
-            season_df = group_df[group_df['Season'] == season]
-            if season_df.empty:
-                continue
+            for age_val in age_groups:
+                for sex_val in sexs:
+                    season_df = group_df[
+                        (group_df['Season']        == season) &
+                        (group_df['Age_Filter']    == age_val) &
+                        (group_df['Sex_Filter'] == sex_val)
+                    ]
+                    if season_df.empty:
+                        continue
 
-            for mut_type in season_df['Color_Category'].unique():
-                mut_df = season_df[season_df['Color_Category'] == mut_type]
-                
-                # Pack aggregated data
-                hover_data = mut_df[['Sample_IDs', 'Subtypes', 'AA_MUTATION', 'EFFECT', 'Sample_Count', 'Percentage', 'FOUND_IN', 'POSITION_REF', 'Total_Group_Samples']].values
-                
-                # Set mode and text for Markers only to add labels above/below the points
-                if mut_type == 'Marker':
-                    scatter_mode = 'markers+text'
-                    scatter_text = ["<b>" + str(x) + "</b>" for x in mut_df['AA_MUTATION']]
-                    text_pos_array = ['top center' if idx % 2 == 0 else 'bottom center' for idx in range(len(mut_df))]
-                else:
-                    scatter_mode = 'markers'
-                    scatter_text = None
-                    text_pos_array = None
+                    for mut_type in season_df['Color_Category'].unique():
+                        mut_df = season_df[season_df['Color_Category'] == mut_type]
 
-                if "${params.protocol}" == "AVIAN":
-                    hover_template_str = (
-                        "<b>Position:</b> %{x}<br>"
-                        "<b>Reference Position (H5N1 numbering):</b> %{customdata[7]}<br>"
-                        "<b>Mutation:</b> %{customdata[2]}<br>"
-                        "<b>Effect(s):</b> %{customdata[3]}<br>"
-                        "                  <b>Found in:</b>  %{customdata[6]}<br>"
-                        "<b>Occurrence:</b> %{customdata[4]}/%{customdata[8]} sample(s) (%{customdata[5]}%)<br>"
-                        "<extra></extra>"
-                    )
-                else:
-                    hover_template_str = (
-                        "<b>Position:</b> %{x}<br>"
-                        "<b>Mutation:</b> %{customdata[2]}<br>"
-                        "<b>Effect(s):</b> %{customdata[3]}<br>"
-                        "                  <b>Found in:</b>  %{customdata[6]}<br>"
-                        "<b>Occurrence:</b> %{customdata[4]}/%{customdata[8]} sample(s) (%{customdata[5]}%)<br>"
-                        "<extra></extra>"
-                    )
+                        hover_data = mut_df[['Sample_IDs','Subtypes','AA_MUTATION','EFFECT','Sample_Count','Percentage','FOUND_IN','POSITION_REF','Total_Group_Samples']].values
 
-                trace_meta = json.dumps({
-                    'season': str(season)
-                })
-                
-                trace_visibility = (str(season) == default_season)
+                        if mut_type == 'Marker':
+                            scatter_mode   = 'markers+text'
+                            scatter_text   = ["<b>" + str(x) + "</b>" for x in mut_df['AA_MUTATION']]
+                            text_pos_array = ['top center' if idx % 2 == 0 else 'bottom center' for idx in range(len(mut_df))]
+                        else:
+                            scatter_mode   = 'markers'
+                            scatter_text   = None
+                            text_pos_array = None
 
-                # Plotly scatter trace for the mutation type
-                fig.add_trace(
-                    go.Scatter(
-                        x=mut_df['POSITION'],
-                        y=mut_df['Percentage'],
-                        mode=scatter_mode,
-                        text=scatter_text,
-                        textposition=text_pos_array,
-                        textfont=dict(size=11, color="black"),
-                        name=mut_type,
-                        marker=dict(
-                            color=mut_df['ColorCode'].tolist(), 
-                            size=12, 
-                            line=dict(width=1, color='DarkSlateGrey')
-                        ),
-                        customdata=hover_data,
-                        hovertemplate=hover_template_str,
-                        legendgroup=mut_type,
-                        showlegend=False,
-                        visible=trace_visibility,
-                        meta=trace_meta
-                    ),
-                    row=i, col=1
-                )
+                        if "${params.protocol}" == "AVIAN":
+                            hover_template_str = (
+                                "<b>Position:</b> %{x}<br>"
+                                "<b>Reference Position (H5N1 numbering):</b> %{customdata[7]}<br>"
+                                "<b>Mutation:</b> %{customdata[2]}<br>"
+                                "<b>Effect(s):</b> %{customdata[3]}<br>"
+                                "                 <b>Found in:</b>  %{customdata[6]}<br>"
+                                "<b>Occurrence:</b> %{customdata[4]}/%{customdata[8]} sample(s) (%{customdata[5]}%)<br>"
+                                "<extra></extra>"
+                            )
+                        else:
+                            hover_template_str = (
+                                "<b>Position:</b> %{x}<br>"
+                                "<b>Mutation:</b> %{customdata[2]}<br>"
+                                "<b>Effect(s):</b> %{customdata[3]}<br>"
+                                "                 <b>Found in:</b>  %{customdata[6]}<br>"
+                                "<b>Occurrence:</b> %{customdata[4]}/%{customdata[8]} sample(s) (%{customdata[5]}%)<br>"
+                                "<extra></extra>"
+                            )
 
-        # Force the X-axis range based on the reference lengths file
+                        trace_meta = json.dumps({
+                            'season': str(season),
+                            'age':    age_val,
+                            'sex': sex_val
+                        })
+                        trace_visibility = (
+                            str(season) == default_season and
+                            age_val     == 'All' and
+                            sex_val  == 'All'
+                        )
+
+                        fig.add_trace(
+                            go.Scatter(
+                                x=mut_df['POSITION'],
+                                y=mut_df['Percentage'],
+                                mode=scatter_mode,
+                                text=scatter_text,
+                                textposition=text_pos_array,
+                                textfont=dict(size=11, color="black"),
+                                name=mut_type,
+                                marker=dict(
+                                    color=mut_df['ColorCode'].tolist(),
+                                    size=12,
+                                    line=dict(width=1, color='DarkSlateGrey')
+                                ),
+                                customdata=hover_data,
+                                hovertemplate=hover_template_str,
+                                legendgroup=mut_type,
+                                showlegend=False,
+                                visible=trace_visibility,
+                                meta=trace_meta
+                            ),
+                            row=i, col=1
+                        )
+
         base_protein = group.split(' - ')[0]
         max_length = lengths_dict.get(group, lengths_dict.get(base_protein, None))
         
@@ -369,22 +386,19 @@ process MutationsGraphicReport {
             
         fig.update_yaxes(range=[0, 115], title_text="Frequency (%)", row=i, col=1)
     
-    # Graph layout adjustments (showlegend=False because we use an html sticky legend)
     fig.update_layout(
-        barmode='overlay',
+        barmode='overlay', 
         height=total_figure_height, 
         showlegend=False, 
         hovermode="closest",
         hoverlabel=dict(align="left"), 
         margin=dict(t=40, b=80, l=80, r=80),
-        plot_bgcolor='#ececec'
+        plot_bgcolor='#ececec', 
     )
 
-    # Plotly graph to HTML
     graph_html = fig.to_html(full_html=False, include_plotlyjs='cdn', div_id="plotly-graphs")
     default_val = ${params.threshold}*100
 
-    # Sticky legend in html
     legend_html = '<div style="display: flex; justify-content: center; flex-wrap: wrap; gap: 20px; margin-top: 15px; font-size: 14px; padding-top: 10px; border-top: 1px solid #eaeaea;">'
     for mut_type, color in color_map.items():
         legend_html += f'<div style="display: flex; align-items: center;"><span style="display: inline-block; width: 14px; height: 14px; background-color: {color}; border-radius: 50%; margin-right: 6px; border: 1px solid #555;"></span>{mut_type}</div>'
@@ -409,7 +423,6 @@ process MutationsGraphicReport {
         
         legend_html += '</div>'
 
-    # Determine JavaScript filtering logic and subtitle text based on protocol
     current_protocol = "${params.protocol}".upper()
     if current_protocol == "AVIAN":
         subtitle_text = "Markers are always displayed."
@@ -419,8 +432,9 @@ process MutationsGraphicReport {
         js_marker_bypass = "false"
 
     season_options = "".join([f'<option value="{s}">{s}</option>' for s in sorted_seasons])
+    age_options    = "".join([f'<option value="{a}">{a}</option>' for a in age_groups])
+    sex_options = "".join([f'<option value="{g}">{g}</option>' for g in sexs])
 
-    # Create the full HTML template with embedded graph, dropdown, and slider
     html_template = f'''
     <!DOCTYPE html>
     <html>
@@ -428,24 +442,11 @@ process MutationsGraphicReport {
         <meta charset="utf-8">
         <title>Mutations Summary</title>
         <style>
-            /* CSS handles the visual presentation. The sticky-header keeps the controls visible when scrolling down a large graph. */
-            body {{
-                font-family: arial; 
-                text-align: center; 
-                margin: 0; 
-                padding: 0;
+            body {{ font-family: arial; text-align: center; margin: 0; padding: 0; }}
+            .sticky-header {{
+                position: sticky; top: 0; background-color: rgba(255, 255, 255, 0.96);
+                padding: 15px 20px; z-index: 1000; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); border-bottom: 1px solid #eaeaea;
             }}
-            /* This class makes the header with the controls and legend stick to the top */
-            .sticky-header {{ 
-                position: sticky;
-                top: 0;
-                background-color: rgba(255, 255, 255, 0.96); 
-                padding: 15px 20px;
-                z-index: 1000; /* Ensures the header stays on top of the graph elements */
-                box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); 
-                border-bottom: 1px solid #eaeaea;
-            }}
-            /* This class centers and aligns the dropdown and slider */
             .controls-container {{
                 display: flex; justify-content: center; align-items: flex-end; gap: 30px;
                 margin: 15px auto 5px auto; flex-wrap: wrap; max-width: 1000px;
@@ -476,6 +477,20 @@ process MutationsGraphicReport {
                     </select>
                 </div>
 
+                <div class="control-group">
+                    <label>AGE GROUP</label>
+                    <select id="ageSel" onchange="applyFilters()">
+                        {age_options}
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label>SEX</label>
+                    <select id="sexSel" onchange="applyFilters()">
+                        {sex_options}
+                    </select>
+                </div>
+
                 <div class="control-group slider-group">
                     <label>MINIMUM FREQUENCY THRESHOLD: <span id="sliderValue">{default_val}%</span></label>
                     <input type="range" id="freqSlider" min="0" max="100" value="{default_val}"
@@ -498,49 +513,29 @@ process MutationsGraphicReport {
             var checkGraphReady = setInterval(function() {{
                 var graphContainer = document.getElementById('plotly-graphs');
                 
-                // If the graph is loaded and has data, we can parse the meta properties and store the original Y values.
                 if (graphContainer && graphContainer.data && graphContainer.data.length > 0) {{
-                    clearInterval(checkGraphReady); // Stop the checking loop once we confirm the graph exists
+                    clearInterval(checkGraphReady);
 
                     graphContainer.parsedMeta       = [];
                     graphContainer.originalYValues  = [];
-                    
                     for (var si = 0; si < graphContainer.data.length; si++) {{
                         var raw = graphContainer.data[si].meta;
-                        var parsed = null;
-                        
-                        if (raw === 'Any') {{
-                            parsed = 'Any';
-                        }} else if (typeof raw === 'string') {{
-                            try {{ parsed = JSON.parse(raw); }} catch(e) {{ parsed = raw; }}
-                        }} else {{
-                            parsed = raw;
-                        }}
-                        graphContainer.parsedMeta.push(parsed);
-
+                        try {{ graphContainer.parsedMeta.push(JSON.parse(raw)); }}
+                        catch(e) {{ graphContainer.parsedMeta.push(raw); }}
                         var yArr = graphContainer.data[si].y;
-                        if (yArr) {{
-                            var clonedY = [];
-                            for (var k = 0; k < yArr.length; k++) {{
-                                clonedY.push(yArr[k]);
-                            }}
-                            graphContainer.originalYValues.push(clonedY);
-                        }} else {{
-                            graphContainer.originalYValues.push(null);
-                        }}
+                        graphContainer.originalYValues.push(yArr ? Array.from(yArr) : null);
                     }}
                     
-                    // Initial plot update to apply the default threshold upon loading
                     applyFilters();
                 }}
             }}, 200);
 
             function applyFilters() {{
-                var sliderElement    = document.getElementById('freqSlider');
-                var minimumFrequency = sliderElement ? parseFloat(sliderElement.value) : 0;
+                var minimumFrequency = parseFloat(document.getElementById('freqSlider').value);
                 var activeSeason     = document.getElementById('seasonSel').value;
+                var activeAge        = document.getElementById('ageSel').value;
+                var activeSex     = document.getElementById('sexSel').value;
 
-                // Update the text label next to the slider to show the current number
                 document.getElementById('sliderValue').innerText = minimumFrequency + '%';
 
                 var titleLabel = activeSeason === 'All Time' ? 'All Time' : 'Season ' + activeSeason;
@@ -548,8 +543,6 @@ process MutationsGraphicReport {
                     'Mutation Summary per Protein - ' + titleLabel;
 
                 var graphContainer = document.getElementById('plotly-graphs');
-                
-                // If the graph hasn't been properly saved to memory yet, exit silently to avoid browser errors
                 if (!graphContainer || !graphContainer.originalYValues) return;
 
                 var newY          = [];
@@ -572,9 +565,11 @@ process MutationsGraphicReport {
                         continue;
                     }}
 
-                    var seasonMatch = meta && meta.season === activeSeason;
+                    var seasonMatch = meta.season === activeSeason;
+                    var ageMatch    = meta.age    === activeAge;
+                    var sexMatch = meta.sex === activeSex;
 
-                    if (!seasonMatch) {{
+                    if (!seasonMatch || !ageMatch || !sexMatch) {{
                         newVisibility.push(false);
                         newY.push(baselineY); 
                         continue;
@@ -582,23 +577,14 @@ process MutationsGraphicReport {
 
                     newVisibility.push(true);
 
-                    // Apply conditional bypass logic based on the Nextflow protocol injection
                     if ({js_marker_bypass}) {{
-                        // If bypass is true, just push the original data back without filtering
                         newY.push(baselineY);
                     }} else {{
                         var filteredY = [];
                         for (var pi = 0; pi < baselineY.length; pi++) {{
-                            // Safely check that the extra custom data (injected by Python) exists before trying to read the percentage
                             if (dataSeries.customdata && dataSeries.customdata[pi]) {{
-                                // Index [5] corresponds to the exact column where you stored the percentage in your Python dataframe logic
-                                var pctRaw = dataSeries.customdata[pi][5];
-                                var pct = typeof pctRaw === 'string' ? parseFloat(pctRaw.replace(',', '.')) : parseFloat(pctRaw);
-                                if (pct >= minimumFrequency) {{
-                                    filteredY.push(baselineY[pi]); // Keep the point
-                                }} else {{
-                                    filteredY.push(null); // Setting it to null tells Plotly to visually hide this specific point
-                                }}
+                                var pct = dataSeries.customdata[pi][5];
+                                filteredY.push(pct >= minimumFrequency ? baselineY[pi] : null);
                             }} else {{
                                 filteredY.push(null);
                             }}
@@ -607,7 +593,6 @@ process MutationsGraphicReport {
                     }}
                 }}
 
-                // Send all coordinate and visibility updates to the graph at once for a smooth visual transition.
                 Plotly.restyle(graphContainer, {{ y: newY, visible: newVisibility }});
             }}
         </script>

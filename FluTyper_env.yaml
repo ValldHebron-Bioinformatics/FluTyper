@@ -5,7 +5,7 @@ channels:
   - defaults
 dependencies:
   - python=3.9.15
-  - nextflow=26.04.1
+  - nextflow=26.04.6
   - nextclade=3.18.0
   - seqkit=2.10.1
   - mafft=7.525
