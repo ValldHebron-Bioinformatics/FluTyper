@@ -158,12 +158,9 @@ process MutationsGraphicReport {
         if sex_val != 'All':
             view = view[view['Sex'] == sex_val]
             
-        t = view.groupby(['REF_SUBTYPE', 'Season'])['SAMPLE_ID'].nunique().reset_index()
-        t.rename(columns={'SAMPLE_ID': 'Subtype_Total'}, inplace=True)
+        t = view.groupby(['Plot_Group', 'Season'])['SAMPLE_ID'].nunique().reset_index()
+        t.rename(columns={'SAMPLE_ID': 'Total_Group_Samples'}, inplace=True)
         
-        pg_map = view[['Plot_Group', 'REF_SUBTYPE', 'Season']].drop_duplicates()
-        t = pd.merge(pg_map, t, on=['REF_SUBTYPE', 'Season'])
-        t.rename(columns={'Subtype_Total': 'Total_Group_Samples'}, inplace=True)
         t['Age_Filter'] = age_val
         t['Sex_Filter'] = sex_val
         return t[['Plot_Group', 'Season', 'Total_Group_Samples', 'Age_Filter', 'Sex_Filter']]
