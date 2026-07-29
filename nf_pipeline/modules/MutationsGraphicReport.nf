@@ -134,11 +134,28 @@ process MutationsGraphicReport {
         if "${params.protocol}" == "HUMAN":
             return f"{protein} - {subtype}"
         else:
-            if protein in ['HA1', 'HA2', 'NA']:
+            if protein in ['HA1', 'HA2', 'NA ']:
                 return f"{protein} - {subtype}"
             return protein
 
     df_expanded['Plot_Group'] = df_expanded.apply(get_plot_group, axis=1).astype(str)
+
+    # Canonical key linking each mutation to its Frequency-Evolution report.
+    # MUST replicate get_plot_name()'s branching in DateGraphicReport.nf EXACTLY:
+    # HUMAN protocol -> every protein gets a subtype suffix.
+    # AVIAN protocol -> only HA1/HA2/NA (surface proteins) get a subtype suffix;
+    #                   internal proteins (PB2, PB1, PA, NP, M1/M2, NS1/NS2) are
+    #                   pooled across subtypes into one report, e.g. "PB2" not "PB2_H5N1".
+    def make_evo_key(protein, subtype):
+        clean_subtype = str(subtype).replace('/', '_').strip()
+        if "${params.protocol}" == "HUMAN" or protein in ['HA1', 'HA2', 'NA ']:
+            return f"{protein}_{clean_subtype}"
+        return protein
+
+    df_expanded['EVO_KEY'] = df_expanded.apply(
+        lambda r: make_evo_key(str(r.get('PROTEIN', 'Unknown')), str(r.get('REF_SUBTYPE', 'Unknown'))),
+        axis=1
+    )
 
     # Build the complete list of filter values including Sense dades
     age_order = {'0-2': 0, '3-4': 1, '5-14': 2, '15-65': 3, '>65': 4}
@@ -170,7 +187,7 @@ process MutationsGraphicReport {
         ignore_index=True
     )
 
-    group_cols = ['Plot_Group', 'Season', 'POSITION', 'POSITION_REF', 'AA_MUTATION', 'Color_Category', 'ColorCode']
+    group_cols = ['Plot_Group', 'Season', 'POSITION', 'POSITION_REF', 'AA_MUTATION', 'Color_Category', 'ColorCode', 'EVO_KEY']
     
     def list_unique_items(data_column, joiner=', '):
         '''
@@ -215,7 +232,7 @@ process MutationsGraphicReport {
 
     segment_mapping = {
         'PB2': 1, 'PB1': 2, 'PB1-F2': 2, 'PA': 3, 'PA-X': 3, 'HA1': 4,
-        'HA2': 4, 'NP': 5, 'NA': 6, 'M1': 7, 'M2': 7, 'NS1': 8, 'NS2': 8,
+        'HA2': 4, 'NP': 5, 'NA ': 6, 'M1': 7, 'M2': 7, 'NS1': 8, 'NS2': 8,
     }
 
     def custom_sort_key(group_name):
@@ -307,7 +324,7 @@ process MutationsGraphicReport {
                     for mut_type in season_df['Color_Category'].unique():
                         mut_df = season_df[season_df['Color_Category'] == mut_type]
 
-                        hover_data = mut_df[['Sample_IDs','Subtypes','AA_MUTATION','EFFECT','Sample_Count','Percentage','FOUND_IN','POSITION_REF','Total_Group_Samples']].values
+                        hover_data = mut_df[['Sample_IDs','Subtypes','AA_MUTATION','EFFECT','Sample_Count','Percentage','FOUND_IN','POSITION_REF','Total_Group_Samples','EVO_KEY']].values
 
                         if mut_type == 'Marker':
                             scatter_mode   = 'markers+text'
@@ -524,6 +541,22 @@ process MutationsGraphicReport {
                     }}
                     
                     applyFilters();
+
+                    // Marker click -> ask the parent dashboard (index.html) to open the matching
+                    // Frequency Evolution report with this mutation isolated.
+                    graphContainer.on('plotly_click', function(evt) {{
+                        var pt = evt.points && evt.points[0];
+                        if (!pt || pt.data.name !== 'Marker' || !pt.customdata) return;
+
+                        var mutation = pt.customdata[2];
+                        var evoKey   = pt.customdata[9];
+                        if (!evoKey) return;
+
+                        window.parent.postMessage(
+                            {{ type: 'openEvolution', evoKey: evoKey, mutation: mutation }},
+                            '*'
+                        );
+                    }});
                 }}
             }}, 200);
 

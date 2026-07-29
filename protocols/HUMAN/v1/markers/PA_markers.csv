@@ -2,7 +2,6 @@ MARKER_ID,POSITION,AA,EFFECT,FOUND_IN,REFERENCE
 410,23,G,Resistance to Baloxavir,H1N1,Gubareva et al. 2019 | Takashita et al. 2020 | Govorkova et al. 2022 | Jones et al. 2022
 411,23,K,Resistance to Baloxavir,H1N1,Govorkova et al. 2022 | Jones et al. 2022 | Takashita et al. 2020
 412,23,R,Resistance to Baloxavir,H1N1,Jones et al. 2022
-445,24,C,Resistance to Baloxavir,H1N1,Patel et al. 2025
 413,34,R,Low Resistance to Baloxavir,H1N1,Govorkova et al. 2022
 414,37,T,Resistance to Baloxavir,H1N1,Sato et al. 2021
 415,38,F,Resistance to Baloxavir,H1N1,Koszalka et al. 2019 | Jones et al. 2020
@@ -12,8 +11,6 @@ MARKER_ID,POSITION,AA,EFFECT,FOUND_IN,REFERENCE
 419,38,S,Resistance to Baloxavir,H1N1,Govorkova et al. 2022 | Takashita et al. 2020 | Chesnokov et al. 2020 | Sato et al. 2020
 420,38,T,Resistance to Baloxavir,H1N1,Govorkova et al. 2022 | Takashita et al. 2020 | Koszalka et al. 2019 | Jones et al. 2020 | Chesnokov et al. 2020 | Checkmahomed et al. 2020 | Imai et al. 2020 | Takashieta et al . 2025
 421,38,V,Low Resistance to Baloxavir,H1N1,Gubareva et al. 2019  | Govorkova et al. 2022
-446,106,R,Resistance to Baloxavir,H1N1,Chen et al. 2024
-447,122,A,Resistance to Baloxavir,H1N1,Patel et al. 2025
 422,198,K,Low Resistance to Baloxavir,H1N1,Takizawa & Momose 2022
 423,199,D,Low Resistance to Baloxavir,H1N1,Hickerson et al. 2022
 424,199,G,Low Resistance to Baloxavir,H1N1,Govorkova et al. 2022 | Kiso et al. 2020 | Hussain et al. 2025
@@ -37,3 +34,6 @@ MARKER_ID,POSITION,AA,EFFECT,FOUND_IN,REFERENCE
 442,198,K,Resistance to Baloxavir,H3N2,Takizawa & Momose 2022
 443,199,G,Resistance to Baloxavir,H3N2,Omoto et al. 2018 | Takashita et al. 2023 | Hussain et al. 2025
 444,199,K,Resistance to Baloxavir,H3N2,Hussain et al. 2025 | Takashita et al. 2025
+445,24,C,Resistance to Baloxavir,H1N1,Patel et al. 2025
+446,106,R,Resistance to Baloxavir,H1N1,Chen et al. 2024
+447,122,A,Resistance to Baloxavir,H1N1,Patel et al. 2025

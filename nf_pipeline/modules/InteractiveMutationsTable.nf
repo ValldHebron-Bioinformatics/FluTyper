@@ -37,6 +37,17 @@ process InteractiveMutationsTable {
 
     results = {}
 
+    # Canonical key linking each mutation to its Frequency-Evolution report.
+    # Must replicate get_plot_name()'s branching in DateGraphicReport.nf EXACTLY:
+    # HUMAN protocol -> every protein gets a subtype suffix.
+    # AVIAN protocol -> only HA1/HA2/NA get a subtype suffix; internal proteins
+    #                   are pooled across subtypes into one report, e.g. "PB2" not "PB2_H5N1".
+    def make_evo_key(protein, subtype):
+        clean_subtype = str(subtype).replace('/', '_').strip()
+        if protocol_type == "HUMAN" or protein in ['HA1', 'HA2', 'NA ']:
+            return f"{protein}_{clean_subtype}"
+        return protein
+
     # Function to determine the color of the mutation tag based on subtype match
     def get_color_class(protein, sample_subtype, found_in):
         inf_h = set(re.findall(r'H(\\d+)', str(sample_subtype)))
@@ -50,7 +61,7 @@ process InteractiveMutationsTable {
                 return 'green'
             else:
                 return 'red'
-        elif protein == 'NA':
+        elif protein == 'NA ':
             if inf_n and (inf_n & found_n):
                 return 'green'
             else:
@@ -88,6 +99,7 @@ process InteractiveMutationsTable {
         sample_subtype = str(row.get('SUBTYPE', ''))
         found_in = str(row.get('FOUND_IN', ''))
         ref_info = str(row.get('POSITION_REF', ''))
+        ref_subtype = str(row.get('REF_SUBTYPE', ''))
         color_class = get_color_class(protein, sample_subtype, found_in)
         
         mut_obj = {
@@ -96,7 +108,8 @@ process InteractiveMutationsTable {
             "found_in": found_in,
             "reference": str(row.get('REFERENCE', '')),
             "ref_pos": ref_info,
-            "color": color_class
+            "color": color_class,
+            "evo_key": make_evo_key(protein, ref_subtype)
         }
         
         if protein == 'PB2':
@@ -105,7 +118,7 @@ process InteractiveMutationsTable {
             results[sample_id]["ha1_mutations"].append(mut_obj)
         elif protein == 'HA2':
             results[sample_id]["ha2_mutations"].append(mut_obj)
-        elif protein == 'NA':
+        elif protein == 'NA ':
             results[sample_id]["na_mutations"].append(mut_obj)
 
     # Convert dict to list for easier handling in the HTML template
@@ -172,7 +185,7 @@ process InteractiveMutationsTable {
                 padding: 4px 8px;
                 border-radius: 4px;
                 margin: 2px;
-                cursor: help;
+                cursor: pointer;
                 font-weight: bold;
                 border: 1px solid #bbdefb;
                 background: #e3f2fd;
@@ -290,6 +303,7 @@ process InteractiveMutationsTable {
             <div class="legend-item"><strong>Effect:</strong> Effects found for that particular mutation.</div>
             <div class="legend-item"><strong>FOUND IN:</strong> In which subtypes those effects were found.</div>
             <div class="legend-item"><strong>REFERENCE:</strong> Articles where those effects are mentioned.</div>
+            <div class="legend-item">Click any mutation tag to open its Frequency Evolution report.</div>
             
             <div class="legend-title" style="margin-top: 15px;">Mutation Match Definitions</div>
             <div class="legend-item"><span class="mutation-tag green" style="cursor:default; padding: 2px 6px;">Full Match</span> Both H and N match (PB2), only H matches (HA1/HA2), or only N matches (NA).</div>
@@ -304,7 +318,7 @@ process InteractiveMutationsTable {
             function createMutationTags(mutations) {{
                 if (mutations.length === 0) return '-';
                 return mutations.map(function(m) {{
-                    return '<div class="tooltip mutation-tag ' + m.color + '">' + m.mutation + 
+                    return '<div class="tooltip mutation-tag ' + m.color + '" data-evo-key="' + m.evo_key + '" data-mutation="' + m.mutation + '">' + m.mutation + 
                            '<div class="tooltiptext">' + 
                            '<strong>Reference Position (H5N1 numbering):</strong> ' + m.ref_pos + '<br><br>' + 
                            '<strong>Effect:</strong> ' + m.effect + '<br><br>' + 
@@ -348,6 +362,23 @@ process InteractiveMutationsTable {
                 
                 // Add the row to the table body
                 tbody.appendChild(tr);
+            }});
+
+            // Click a marker tag -> ask the parent dashboard (index.html) to open the matching
+            // Frequency Evolution report with this mutation isolated. Delegated on tbody since
+            // tags are created dynamically above.
+            tbody.addEventListener('click', function(evt) {{
+                var tag = evt.target.closest('.mutation-tag');
+                if (!tag) return;
+
+                var evoKey   = tag.getAttribute('data-evo-key');
+                var mutation = tag.getAttribute('data-mutation');
+                if (!evoKey) return;
+
+                window.parent.postMessage(
+                    {{ type: 'openEvolution', evoKey: evoKey, mutation: mutation }},
+                    '*'
+                );
             }});
         </script>
     </body>

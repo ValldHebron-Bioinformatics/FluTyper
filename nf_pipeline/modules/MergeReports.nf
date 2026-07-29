@@ -21,6 +21,7 @@ process MergeReports {
         
         category = "General Analysis"
         subcategory = ""
+        evo_key = ""
         
         # Strictly ensure the filename starts with 'evolution' to exclude clade reports
         if clean_name.lower().startswith('evolution'):
@@ -30,6 +31,12 @@ process MergeReports {
             # Extract the protein segment (e.g., HA1, PB1) to create the nested folder
             if len(parts) >= 2:
                 subcategory = parts[1].upper()
+
+            # Raw key exactly as emitted by DateGraphicReport.nf's {plot_name}, e.g.
+            # "evolution_HA1_A(H3N2).html" -> "HA1_A(H3N2)". This must match the EVO_KEY
+            # computed in MutationsGraphicReport.nf / InteractiveMutationsTable.nf verbatim.
+            if file_path.stem.lower().startswith('evolution_'):
+                evo_key = file_path.stem[len('evolution_'):]
             
         content = file_path.read_bytes()
         b64_content = base64.b64encode(content).decode('utf-8')
@@ -38,6 +45,7 @@ process MergeReports {
             "title": clean_name,
             "category": category,
             "subcategory": subcategory,
+            "evo_key": evo_key,
             "b64": b64_content
         })
 
@@ -203,6 +211,32 @@ process MergeReports {
                 const text = document.getElementById('search-input').value;
                 renderList(text);
             }}
+
+            // Cross-report navigation broker. MutationsReport.html and MutationsTable.html
+            // run inside data: URI iframes with an opaque origin, so they cannot navigate
+            // each other directly - they postMessage up to us instead, and we mediate.
+            function openEvolutionReport(evoKey, mutation) {{
+                var match = catalog.find(function(item) {{ return item.evo_key === evoKey; }});
+                if (!match) {{
+                    console.warn('No Frequency Evolution report found for key:', evoKey);
+                    return;
+                }}
+
+                // Forward the target mutation into the new report only after it has
+                // actually finished loading (its own Plotly render happens on load too).
+                iframe.onload = function() {{
+                    iframe.contentWindow.postMessage(
+                        {{ type: 'selectMutation', mutation: mutation }}, '*'
+                    );
+                    iframe.onload = null;
+                }};
+                iframe.src = "data:text/html;base64," + match.b64;
+            }}
+
+            window.addEventListener('message', function(event) {{
+                if (!event.data || event.data.type !== 'openEvolution') return;
+                openEvolutionReport(event.data.evoKey, event.data.mutation);
+            }});
 
             renderList();
             if (catalog.length > 0) iframe.src = "data:text/html;base64," + catalog[0].b64;
