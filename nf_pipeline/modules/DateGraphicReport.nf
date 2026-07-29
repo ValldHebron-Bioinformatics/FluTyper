@@ -131,7 +131,7 @@ def generate_plots(mut_file, meta_file):
         if "${params.protocol}" == "HUMAN":
             return f"{prot}_{subtype}"
         else:
-            if prot in ['HA1', 'HA2', 'NA']:
+            if prot in ['HA1', 'HA2', 'NA ']:
                 return f"{prot}_{subtype}"
             return prot
         
@@ -143,7 +143,7 @@ def generate_plots(mut_file, meta_file):
     hover_info['EFFECT'] = hover_info['EFFECT'].astype(str).str.replace(' | ', '<br>                 ')
 
     prot_dict = {
-        "HA":  ["HA1", "HA2"], "NA":  ["NA"], "PB2": ["PB2"],
+        "HA":  ["HA1", "HA2"], "NA ":  ["NA "], "PB2": ["PB2"],
         "PB1": ["PB1", "PB1-F2"], "PA":  ["PA", "PA-X"], "NP":  ["NP"],
         "MP":  ["M1", "M2"], "NS":  ["NS1", "NS2"]
     }
@@ -556,6 +556,36 @@ function applyFilters() {{
 
     Plotly.update(gd, view.data_update, view.layout_update);
 }}
+
+// Called by index.html after it routes here from a MutationsReport/MutationsTable click.
+// Resets filters to "All Time / All / All" (guaranteeing the mutation is in range), then
+// isolates that mutation's traces while leaving the sample-total context traces untouched.
+function selectMutation(mutationName) {{
+    var gd = document.getElementById('plotly-graph');
+    if (!gd || !gd.data) {{
+        // Graph hasn't finished rendering yet (e.g. slow CDN load) - retry briefly.
+        setTimeout(function() {{ selectMutation(mutationName); }}, 150);
+        return;
+    }}
+
+    document.getElementById('seasonSel').value = 'All Time';
+    document.getElementById('ageSel').value    = 'All';
+    document.getElementById('sexSel').value    = 'All';
+    applyFilters();
+
+    var visibility = gd.data.map(function(trace) {{
+        if (trace.name === 'Total Samples (n)') return trace.visible;
+        return trace.name === mutationName ? true : 'legendonly';
+    }});
+    Plotly.restyle(gd, {{ visible: visibility }});
+
+    gd.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+}}
+
+window.addEventListener('message', function(event) {{
+    if (!event.data || event.data.type !== 'selectMutation') return;
+    selectMutation(event.data.mutation);
+}});
 </script>
 </body>
 </html>'''
