@@ -21,4 +21,4 @@ RESULTS/*
 RESULTS/TFM/*
 !RESULTS/TFM/**
 IDENTITY_STUDY*
-boxplots/
+boxplots/examples/
