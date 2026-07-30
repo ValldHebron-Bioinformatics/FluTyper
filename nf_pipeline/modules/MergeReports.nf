@@ -90,6 +90,7 @@ process MergeReports {
             }}
             .report-link.sub-link {{ padding-left: 50px; }}
             .report-link:hover {{ background: #e9ecef; color: #007BFF; }}
+            .report-link.loading {{ color: #999; font-style: italic; }}
             
             #viewer-container {{ flex: 1; display: flex; flex-direction: column; background: #fff; }}
             iframe {{ flex: 1; width: 100%; border: none; }}
@@ -110,6 +111,36 @@ process MergeReports {
             const catalog = {catalog_json};
             const listContainer = document.getElementById('report-list');
             const iframe = document.getElementById('report-frame');
+
+            // Cache blob URLs 
+            function getReportUrl(item) {{
+                if (item._blobUrl) return item._blobUrl;
+
+                const byteChars = atob(item.b64);
+                const len = byteChars.length;
+                const bytes = new Uint8Array(len);
+                for (let i = 0; i < len; i++) {{
+                    bytes[i] = byteChars.charCodeAt(i);
+                }}
+                const blob = new Blob([bytes], {{ type: 'text/html' }});
+                item._blobUrl = URL.createObjectURL(blob);
+                return item._blobUrl;
+            }}
+
+            function openReport(item, linkEl) {{
+                if (linkEl) {{
+                    const originalText = linkEl.textContent;
+                    linkEl.classList.add('loading');
+                    // Decoding tens of MB of base64 can take a beat; defer to
+                    // the next frame so the "loading" state actually paints.
+                    requestAnimationFrame(() => {{
+                        iframe.src = getReportUrl(item);
+                        linkEl.classList.remove('loading');
+                    }});
+                }} else {{
+                    iframe.src = getReportUrl(item);
+                }}
+            }}
 
             function renderList(filterText = '') {{
                 listContainer.innerHTML = '';
@@ -164,7 +195,7 @@ process MergeReports {
                         const link = document.createElement('a');
                         link.className = 'report-link';
                         link.textContent = item.title;
-                        link.onclick = () => {{ iframe.src = "data:text/html;base64," + item.b64; }};
+                        link.onclick = () => openReport(item, link);
                         catContent.appendChild(link);
                     }});
 
@@ -192,7 +223,7 @@ process MergeReports {
                             const link = document.createElement('a');
                             link.className = 'report-link sub-link';
                             link.textContent = item.title;
-                            link.onclick = () => {{ iframe.src = "data:text/html;base64," + item.b64; }};
+                            link.onclick = () => openReport(item, link);
                             subContent.appendChild(link);
                         }});
 
@@ -213,7 +244,7 @@ process MergeReports {
             }}
 
             // Cross-report navigation broker. MutationsReport.html and MutationsTable.html
-            // run inside data: URI iframes with an opaque origin, so they cannot navigate
+            // run inside blob: URI iframes with an opaque-ish origin, so they cannot navigate
             // each other directly - they postMessage up to us instead, and we mediate.
             function openEvolutionReport(evoKey, mutation) {{
                 var match = catalog.find(function(item) {{ return item.evo_key === evoKey; }});
@@ -230,7 +261,7 @@ process MergeReports {
                     );
                     iframe.onload = null;
                 }};
-                iframe.src = "data:text/html;base64," + match.b64;
+                iframe.src = getReportUrl(match);
             }}
 
             window.addEventListener('message', function(event) {{
@@ -239,7 +270,7 @@ process MergeReports {
             }});
 
             renderList();
-            if (catalog.length > 0) iframe.src = "data:text/html;base64," + catalog[0].b64;
+            if (catalog.length > 0) iframe.src = getReportUrl(catalog[0]);
         </script>
     </body>
     </html>'''
