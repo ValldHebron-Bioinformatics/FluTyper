@@ -71,7 +71,7 @@ process GeographicReport {
         if pd.isna(s): return ""
         s = str(s).strip().lower()
         s = ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn') # Delete "accents"
-        s = s.replace("l'", " ").replace("d'", " ") # Handle contractions like "L'Escala" -> "Escala"
+        s = s.replace("l'", " ").replace("d'", " ").replace("l\\u2019", " ").replace("d\\u2019", " ") # Handle contractions like "L'Escala" -> "Escala" (straight or curly apostrophe)
         s = re.sub(r'\\b(?:el|la|els|les)\\b', ' ', s) # Remove common articles
         s = re.sub(r'[^a-z0-9]', ' ', s) # Replace non-alphanumeric with space
         return " ".join(s.split()) # Normalize whitespace
@@ -97,6 +97,15 @@ process GeographicReport {
 
     if not df_meta.empty:
         df_meta.columns = [str(c).strip().upper() for c in df_meta.columns]
+
+        # Remove overlapping columns from genotyping data to avoid conflicts
+        geno_overlap = [
+            c for c in df_geno.columns
+            if c.strip().upper() in df_meta.columns.tolist() and c.strip().upper() != 'SAMPLEID'
+        ]
+        if geno_overlap:
+            df_geno = df_geno.drop(columns=geno_overlap)
+
         if 'LOCATION' in df_meta.columns:
             def extract_location(loc):
                 if pd.isna(loc): return pd.Series(['Sense dades', 'Sense dades'])
@@ -148,7 +157,11 @@ process GeographicReport {
     # Establish columns for resolution layers and demographics
     df['Poblacion'] = df['TOWN_GROUP'] if 'TOWN_GROUP' in df.columns else 'Sense dades'
     df['Provincia'] = df['PROV_GROUP'] if 'PROV_GROUP' in df.columns else 'Sense dades'
-    df['Originating Lab'] = df['ORIGINATING_LAB'] if 'ORIGINATING_LAB' in df.columns else 'Sense dades'
+    df['Originating Lab'] = df['ORIGINATING_LAB'].fillna('Sense dades').astype(str).str.strip() if 'ORIGINATING_LAB' in df.columns else 'Sense dades'
+    # Normalize laboratory names using the town_mapping dictionary
+    df['Originating Lab'] = df['Originating Lab'].apply(
+        lambda v: town_mapping.get(normalize_str(v), v)
+    )
     
     if 'AGE GROUP' in df.columns:
         df['Age_Group'] = df['AGE GROUP'].fillna('Sense dades').astype(str).str.strip()
