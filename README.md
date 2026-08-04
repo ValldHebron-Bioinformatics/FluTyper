@@ -83,8 +83,6 @@ To generate date-based frequency reports per protein and full demographic filter
 ```csv
 ID,DATE,LOCATION,AGE GROUP,SEX,ORIGINATING LAB
 Sample01,YYYY-MM-DD,Municipality Name,15-65,F,LabName
-
-
 ```
 
 ---
@@ -131,8 +129,6 @@ You may use "X" in the `AA` column as a wildcard, which forces the pipeline to t
 MARKER_ID,POSITION,AA,PROTEIN,EFFECT,FOUND_IN,REFERENCE
 1000,631,L,PB2,Increased pandemic risk,H5N1,Capalastegui & Goldhill 2025
 1001,141,X,HA1,RBD,H5N1 | H7N9, Luczo & Spackman 2024
-
-
 ```
 
 ---
@@ -186,6 +182,8 @@ Mutation markers are matched using unified reference numbering based on H5 for H
 ### Interactive HTML Reports
 
 The pipeline compiles its core interactive visualizations into a single, unified `index.html` file rather than generating separate reports across different folders. Examples of the `index.html` generated for both the avian and human protocols are available in `@examples.zip`.
+
+> **Note:** `index.html` must be opened from a fully extracted copy of `examples.zip`. Browsers enforce local file access restrictions under the `file://` protocol, so opening the dashboard directly from within the compressed archive will cause `"Access to the file was denied"` errors when it attempts to load linked report files.
 
 Within the dashboard, there is deep cross-report linkage of the markers. Clicking on a specific mutation marker from the tables or summary graphs will automatically open the time-series frequency evolution view for that exact mutation.
 
