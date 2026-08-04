@@ -7,16 +7,24 @@ FluTyper is a modular, reproducible Nextflow pipeline for genotyping influenza v
 
 ## ✨ Features
 
-- Automated organization of input samples and extraction of individual segments.
-- Subtype detection (H/N typing and pathotype inference) from sequence data.
-- Reference dataset selection and download based on detected subtypes.
-- Genotyping using Nextclade with per-sample and merged reports.
-- Extraction of coding sequences (CDS) and translation to protein sequences.
-- Mutation detection and annotation with standardized cross-subtype numbering (optional, configurable).
-- Aggregate, per-sample, and time-series HTML mutation reports.
-- Comprehensive error reporting and logging.
-- Support for avian and human influenza workflows (SWINE protocol is still in development).
-- Modular, reproducible workflow built with Nextflow DSL2.
+* Automated organization of input samples and extraction of individual segments.
+* Subtype detection (H/N typing and pathotype inference) from sequence data.
+* Reference dataset selection and download based on detected subtypes.
+* Genotyping using Nextclade with per-sample and merged reports.
+* Extraction of coding sequences (CDS) and translation to protein sequences.
+* Mutation detection and annotation with standardized cross-subtype numbering (optional, configurable).
+* Aggregate, per-sample, and time-series HTML mutation reports compiled into a single `index.html` interactive dashboard.
+
+
+* Deep linkage of markers, allowing you to click a marker to open its frequency evolution automatically.
+
+
+* Continuous surveillance support via an `--append` mode for longitudinal tracking without reprocessing old data.
+
+
+* Comprehensive error reporting and logging.
+* Support for avian and human influenza workflows (SWINE protocol is still in development).
+* Modular, reproducible workflow built with Nextflow DSL2.
 
 ---
 
@@ -51,8 +59,10 @@ nextflow run nf_pipeline/main.nf \
   --extraMarkers <extra_markers.csv> \
   --metadata <metadata.csv> \
   --threshold 0.25 \
-  --colorblind true
-  --IndividualReports true
+  --colorblind true \
+  --IndividualReports true \
+  --append <path/to/previous_results>
+
 ```
 
 ---
@@ -67,10 +77,13 @@ MultiFASTA headers must use either an underscore (`_`) or a pipe (`|`) as a sepa
 *   **Pipe Example:** `>Sample01|NA|Hebei_SJ27`
 
 ### Metadata CSV (Optional)
-To generate date-based frequency reports per protein, you must provide a metadata CSV file using the `--metadata` flag. The file requires strict headers, such as the `ID` and `DATE` columns shown below. You also have the option to include a `LOCATION` column, which is required if you intend for the `GeographicReport.nf` process to run and generate the interactive map of Catalonia.
+
+To generate date-based frequency reports per protein and full demographic filtering, you must provide a metadata CSV file using the `--metadata` flag. The new metadata structure allows you to provide the `ID`, `DATE`, `LOCATION`, `AGE GROUP`, `SEX`, and `ORIGINATING LAB`. The `ORIGINATING LAB` field serves as an extra geographical level for deeper spatial resolution. The file requires strict headers. You have the option to include a `LOCATION` column, which is required if you intend for the `GeographicReport.nf` process to run and generate the interactive map. Please note that the entries provided for both the `LOCATION` and `ORIGINATING LAB` fields must appear in the `RESOURCES/coordenades_cat.tsv` file, which is currently only available for locations within Catalunya.
+
 ```csv
-ID,DATE,LOCATION
-Sample01,YYYY-MM-DD,Municipality Name
+ID,DATE,LOCATION,AGE GROUP,SEX,ORIGINATING LAB
+Sample01,YYYY-MM-DD,Municipality Name,15-65,F,LabName
+
 
 ```
 
@@ -79,7 +92,7 @@ Sample01,YYYY-MM-DD,Municipality Name
 ## 🛠️ Command-Line Parameters
 
 | Parameter | Type | Default | Description |
-| :--- | :--- | :--- | :--- |
+| --- | --- | --- | --- |
 | `inputFasta` | Required | `docs/fastas/prova.fasta` | Path to the input FASTA file containing your sequences. |
 | `outDir` | Required | `RESULTS` | Destination directory where all pipeline results and reports will be saved. |
 | `protocol` | Optional | `AVIAN` | Defines the viral protocol. Supported options are `AVIAN` and `HUMAN`. |
@@ -88,50 +101,24 @@ Sample01,YYYY-MM-DD,Municipality Name
 | `metadata` | Optional | *None* | Path to a metadata CSV to enable time-series frequency tracking. |
 | `colorblind` | Optional | `false` | Set to `true` to apply an Okabe-Ito colorblind-friendly palette to all HTML charts. |
 | `IndividualReports` | Optional | `false` | Set to `true` to make the Individual genomic barcode for each sample. |
+| `append` | Optional | *None* | Path to an existing results directory to integrate new data without reprocessing historical files.
+
+ |
 
 ---
 
 ## 🔬 Advanced Configuration & Behaviors
 
+### Continuous Monitoring (Append Mode)
+
+Furthermore, an `--append` mode supports continuous monitoring by directly adding new sequencing runs to previous outputs. Because it does not require reprocessing old data, laboratories can effortlessly extend their longitudinal tracking of both viral mutations and clade distributions as new samples are collected.
+
 ### Threshold Parameter Behavior
+
 The threshold parameter establishes a baseline frequency cutoff that impacts data visualization. This threshold value initializes the slider in the `MutationsReport.html` interactive plot, allowing users to dynamically adjust the view without needing to re-execute the pipeline. The frequency denominator used for this calculation is the number of samples containing that specific protein, rather than the total number of samples in the entire run.
 
-### H Subtype Threshold Summary
-
-| H subtype | HA1 threshold (%) | HA2 threshold (%) | Samples (n) |
-| :--- | ---: | ---: | ---: |
-| 1 | 68.46 | 76.57 | 17 |
-| 2 | 78.83 | 83.15 | 21 |
-| 3 | 73.89 | 80.53 | 18 |
-| 4 | 76.91 | 81.13 | 24 |
-| 5 | 73.59 | 79.86 | 49 |
-| 6 | 72.40 | 79.86 | 27 |
-| 7 | 70.77 | 77.44 | 50 |
-| 8 | 79.97 | 83.45 | 8 |
-| 9 | 77.71 | 81.53 | 30 |
-| 10 | 76.00 | 80.08 | 34 |
-| 11 | 75.82 | 77.86 | 29 |
-| 12 | 78.63 | 80.76 | 18 |
-| 13 | 72.50 | 78.01 | 9 |
-| 14 | 85.48 | 87.14 | 6 |
-| 15 | 86.22 | 88.18 | 4 |
-| 16 | 89.04 | 92.59 | 3 |
-
-### N Subtype Threshold Summary
-
-| N subtype | NA threshold (%) | Samples (n) |
-| :--- | ---: | ---: |
-| 1 | 75.87 | 41 |
-| 2 | 77.36 | 78 |
-| 3 | 70.20 | 34 |
-| 4 | 80.59 | 19 |
-| 5 | 76.57 | 21 |
-| 6 | 76.06 | 31 |
-| 7 | 72.32 | 30 |
-| 8 | 74.36 | 31 |
-| 9 | 79.05 | 62 |
-
 ### HUMAN Protocol Notes
+
 The HUMAN protocol utilizes dedicated resources located under `protocols/HUMAN/v1` and introduces marker annotations specifically tailored to human seasonal influenza. It supports genotyping for `H1` (using Nextclade dataset `flu_h1n1pdm_ha`) and `H3` (using Nextclade dataset `flu_h3n2_ha`). Marker files are read directly from the protocol's marker directory rather than querying FluMutDB. When metadata is provided, the human protocol fully supports generating time-evolution frequency reports.
 
 ### Integrating Extra Markers
@@ -145,6 +132,7 @@ MARKER_ID,POSITION,AA,PROTEIN,EFFECT,FOUND_IN,REFERENCE
 1000,631,L,PB2,Increased pandemic risk,H5N1,Capalastegui & Goldhill 2025
 1001,141,X,HA1,RBD,H5N1 | H7N9, Luczo & Spackman 2024
 
+
 ```
 
 ---
@@ -154,7 +142,7 @@ MARKER_ID,POSITION,AA,PROTEIN,EFFECT,FOUND_IN,REFERENCE
 ![FluTyper pipeline walkthrough](docs/images/FluTyper.drawio.svg)
 
 | Step | Process Name | Description |
-| :--- | :--- | :--- |
+| --- | --- | --- |
 | **1** | **OrganizeBySample** | Organizes input sequences, detects orientation, extracts segments, and builds directories. |
 | **2** | **SubtypeDetection** | Uses minimizer-based subtyping via Nextclade to infer H/N subtypes and pathotypes. |
 | **3** | **DB & Dataset Prep** | Fetches the latest FluMutDB, generates protein-specific markers, and downloads references. |
@@ -165,7 +153,9 @@ MARKER_ID,POSITION,AA,PROTEIN,EFFECT,FOUND_IN,REFERENCE
 | **8** | **MutationsFinder** | Compares samples to references, annotates mutations, and flags known marker hits. |
 | **9** | **MutationsCompiler** | Compiles all mutation data into a comprehensive Excel report. |
 | **10** | **CompileErrors** | Aggregates and formats all operational error logs into a final text report. |
-| **11-15** | **Graphic Reports** | Generates interactive HTML dashboards for clades, overall mutations, markers, and timelines. |
+| **11-15** | **Graphic Reports** | Generates interactive HTML dashboards for clades, overall mutations, markers, and timelines, finally merging them into `index.html`.
+
+ |
 
 ---
 
@@ -173,8 +163,8 @@ MARKER_ID,POSITION,AA,PROTEIN,EFFECT,FOUND_IN,REFERENCE
 
 Mutation markers are matched using unified reference numbering based on H5 for HA proteins and N1 for NA proteins. During the mutation finding step, the pipeline invokes a specialized dictionary script for any sample whose detected subtype differs from the reference. The script performs a lookup in the corresponding dictionary and populates a dual-coordinate system in the final output. The `POSITION_SUBTYPE` column receives the native subtype-specific residue number, while the `POSITION` column retains the standardized H5 or N1 coordinate. This mechanism ensures results can be interpreted natively while remaining directly comparable against published literature across different influenza subtypes.
 
-| Dictionary | Reference | Subtypes Covered 
-| :--- | :--- | :--- | 
+| Dictionary | Reference | Subtypes Covered |
+| --- | --- | --- |
 | **HA_DICT.csv** | H5 | H1, H2, H3, H4, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18 |
 | **NA_DICT.csv** | N1 | N2, N3, N4, N5, N6, N7, N8, N9, N10, N11 |
 
@@ -185,25 +175,34 @@ Mutation markers are matched using unified reference numbering based on H5 for H
 ![FluTyper output folder organization](docs/images/Folderorganization.drawio.svg)
 
 ### Core Data Files
+
 | File Name | Description |
-| :--- | :--- |
-| `final_genotyping_results.csv` | Summary of subtype inference, clade assignments and genotyping for clade 2.3.4.4b.
+| --- | --- |
+| `final_genotyping_results.csv` | Summary of subtype inference, clade assignments and genotyping for clade 2.3.4.4b. |
 | `final_mutations_report.xlsx` | Exhaustive record of all detected mutations, organized by protein sheets. |
 | `pipeline_errors.log` | Aggregated error and warning log detailing any operational issues during the run. |
 | `samples/<sample_id>/` | Individual directories containing intermediate sequences, alignments, and specific data. |
 
 ### Interactive HTML Reports
-| Report Path | Description |
-| :--- | :--- |
-| `graphic_reports/CladeGraphicReport.html` | Interactive visualization of subtype and clade distributions. |
-| `graphic_reports/MutationsReport.html` | Aggregate per-protein mutation frequencies with dynamic threshold controls. |
-| `graphic_reports/MutationsTable.html` | Interactive table detailing marker effects, subtypes, and references. |
-| `graphic_reports/FrequencyEvolution/**/*.html` | Time-series plots showing marker frequency over time (requires metadata). |
-| `samples/<id>/<id>_MutationsReport.html` | Per-sample mutation barcode plots for rapid visual inspection. |
+
+The pipeline compiles its core interactive visualizations into a single, unified `index.html` file rather than generating separate reports across different folders. Examples of the `index.html` generated for both the avian and human protocols are available in `@examples.zip`.
+
+Within the dashboard, there is deep cross-report linkage of the markers. Clicking on a specific mutation marker from the tables or summary graphs will automatically open the time-series frequency evolution view for that exact mutation.
+
+| Report View | Description |
+| --- | --- |
+| `index.html` | The master unified dashboard providing a searchable sidebar to access all individual report categories. |
+| **Clades** | Interactive visualization of subtype and clade distributions over time. |
+| **Mutations** | Aggregate per-protein mutation frequencies with dynamic threshold controls. |
+| **Markers Table** | Interactive table detailing marker effects, subtypes, and references. |
+| **Frequency Evolution** | Time-series plots showing marker frequency over time (requires metadata). |
+| **Geographic Report** | Interactive maps based on the configured geographical levels. |
+| **Sample Barcodes** | Per-sample mutation barcode plots for rapid visual inspection. These do not appear in the `index.html` dashboard, but are generated as separate HTML files inside each individual sample's directory. |
 
 ### Excel Data Schema (`final_mutations_report.xlsx`)
+
 | Column Header | Description |
-| :--- | :--- |
+| --- | --- |
 | `SAMPLE_ID` | The unique identifier of the sample. |
 | `SUBTYPE` | The complete detected subtype (e.g., H5N1(HPAI)). |
 | `PROTEIN` | The specific viral protein where the mutation occurs. |
@@ -227,16 +226,16 @@ Mutation markers are matched using unified reference numbering based on H5 for H
 
 FluTyper is strictly verified using `nf-test`. The repository utilizes GitHub Actions to execute automated Continuous Integration (CI) on `ubuntu-latest` environments for every push and pull request. The CI handles the installation of all necessary bioinformatics dependencies and executes both individual module unit tests and comprehensive end-to-end integration tests against reference datasets.
 
-*   **Run all tests:** `nf-test test tests/main.nf.test`
-*   **Run module tests:** `nf-test test tests/modules/*.nf.test`
-*   **Run specific module:** `nf-test test tests/modules/<module_name>.nf.test`
+* **Run all tests:** `nf-test test tests/main.nf.test`
+* **Run module tests:** `nf-test test tests/modules/*.nf.test`
+* **Run specific module:** `nf-test test tests/modules/<module_name>.nf.test`
 
 ---
 
 ## 🧩 Dependencies & Acknowledgments
 
 | Software / Library | Usage |
-| :--- | :--- |
+| --- | --- |
 | **[Nextflow](https://docs.seqera.io/nextflow/?__hstc=247481240.afc94a4be2e71d336bddb8a957545fad.1771512569721.1777885792784.1778573663745.21&__hssc=247481240.1.1778573663745&__hsfp=e02a5757d31090b6dc84c4b8b9f6ddac)** | Core workflow execution and orchestration engine. |
 | **[Nextclade](https://docs.nextstrain.org/projects/nextclade/en/stable/)** | Sequence genotyping, alignment, and clade assignment. |
 | **[Genin2](https://izsvenezie-virology.github.io/genin2/)** | Genotype prediction for clade 2.3.4.4b. |
