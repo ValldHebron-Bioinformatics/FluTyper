@@ -5,6 +5,34 @@ FluTyper is a modular, reproducible Nextflow pipeline for genotyping influenza v
 
 ---
 
+## 📑 Table of Contents
+
+- [✨ Features](#-features)
+- [🚀 Quick Start](#-quick-start)
+  - [Installation](#installation)
+  - [Basic Execution](#basic-execution)
+  - [Advanced Execution](#advanced-execution)
+- [📥 Input Data Preparation](#-input-data-preparation)
+  - [FASTA Headers](#fasta-headers)
+  - [Metadata CSV (Optional)](#metadata-csv-optional)
+- [🛠️ Command-Line Parameters](#️-command-line-parameters)
+- [🔬 Advanced Configuration & Behaviors](#-advanced-configuration--behaviors)
+  - [Continuous Monitoring (Append Mode)](#continuous-monitoring-append-mode)
+  - [Threshold Parameter Behavior](#threshold-parameter-behavior)
+  - [HUMAN Protocol Notes](#human-protocol-notes)
+  - [Integrating Extra Markers](#integrating-extra-markers)
+- [🔄 Pipeline Architecture](#-pipeline-architecture)
+- [🔢 Standardized Cross-Subtype Numbering](#-standardized-cross-subtype-numbering)
+- [📂 Outputs](#-outputs)
+  - [Core Data Files](#core-data-files)
+  - [Interactive HTML Reports](#interactive-html-reports)
+  - [Excel Data Schema](#excel-data-schema-final_mutations_reportxlsx)
+- [🧪 Testing & Continuous Integration](#-testing--continuous-integration)
+- [🧩 Dependencies & Acknowledgments](#-dependencies--acknowledgments)
+- [📖 Citation](#-citation)
+
+---
+
 ## ✨ Features
 
 * Automated organization of input samples and extraction of individual segments.
@@ -14,14 +42,8 @@ FluTyper is a modular, reproducible Nextflow pipeline for genotyping influenza v
 * Extraction of coding sequences (CDS) and translation to protein sequences.
 * Mutation detection and annotation with standardized cross-subtype numbering (optional, configurable).
 * Aggregate, per-sample, and time-series HTML mutation reports compiled into a single `index.html` interactive dashboard.
-
-
 * Deep linkage of markers, allowing you to click a marker to open its frequency evolution automatically.
-
-
 * Continuous surveillance support via an `--append` mode for longitudinal tracking without reprocessing old data.
-
-
 * Comprehensive error reporting and logging.
 * Support for avian and human influenza workflows (SWINE protocol is still in development).
 * Modular, reproducible workflow built with Nextflow DSL2.
@@ -36,7 +58,7 @@ Clone the repository to your local machine:
 git clone https://github.com/ValldHebron-Bioinformatics/FluTyper.git
 cd FluTyper
 ```
-To ensure full reproducibility of the analysis and provide all necessary dependencies, a Conda environment file is included. You can set up and activate this isolated environment using the provided configuration file before running the pipeline.
+To ensure full reproducibility of the analysis and provide all necessary dependencies, a Conda environment file is included. You can set up and activate this isolated environment using the provided configuration file before running the pipeline. All software requirements and their pinned versions are listed in `FluTyper_env.yaml`.
 ```bash
 conda env create -f FluTyper_env.yaml
 conda activate FluTyper
@@ -70,7 +92,7 @@ nextflow run nf_pipeline/main.nf \
 ## 📥 Input Data Preparation
 
 ### FASTA Headers
-MultiFASTA headers must use either an underscore (`_`) or a pipe (`|`) as a separator to ensure the pipeline correctly parses the sequence identity and segment. 
+MultiFASTA headers must use either an underscore (`_`) or a pipe (`|`) as a separator to ensure the pipeline correctly parses the sequence identity and segment.
 
 **Format:** `{SequenceID}_{Segment}_{OptionalInformation}` or `{SequenceID}|{Segment}|{OptionalInformation}`
 *   **Underscore Example:** `>Sample01_HA_2024_Spain`
@@ -101,9 +123,7 @@ Sample01,YYYY-MM-DD,Municipality Name,15-65,F,LabName
 | `metadata` | Optional | *None* | Path to a metadata CSV to enable time-series frequency tracking. |
 | `colorblind` | Optional | `false` | Set to `true` to apply an Okabe-Ito colorblind-friendly palette to all HTML charts. |
 | `IndividualReports` | Optional | `false` | Set to `true` to make the Individual genomic barcode for each sample. |
-| `append` | Optional | *None* | Path to an existing results directory to integrate new data without reprocessing historical files.
-
- |
+| `append` | Optional | *None* | Path to an existing results directory to integrate new data without reprocessing historical files. |
 
 ---
 
@@ -130,7 +150,7 @@ You may use "X" in the `AA` column as a wildcard, which forces the pipeline to t
 ```csv
 MARKER_ID,POSITION,AA,PROTEIN,EFFECT,FOUND_IN,REFERENCE
 1000,631,L,PB2,Increased pandemic risk,H5N1,Capalastegui & Goldhill 2025
-1001,141,X,HA1,RBD,H5N1 | H7N9, Luczo & Spackman 2024
+1001,141,X,HA1,RBD,H5N1 | H7N9,Luczo & Spackman 2024
 ```
 
 ---
@@ -151,9 +171,7 @@ MARKER_ID,POSITION,AA,PROTEIN,EFFECT,FOUND_IN,REFERENCE
 | **8** | **MutationsFinder** | Compares samples to references, annotates mutations, and flags known marker hits. |
 | **9** | **MutationsCompiler** | Compiles all mutation data into a comprehensive Excel report. |
 | **10** | **CompileErrors** | Aggregates and formats all operational error logs into a final text report. |
-| **11-15** | **Graphic Reports** | Generates interactive HTML dashboards for clades, overall mutations, markers, and timelines, finally merging them into `index.html`.
-
- |
+| **11-15** | **Graphic Reports** | Generates interactive HTML dashboards for clades, overall mutations, markers, and timelines, finally merging them into `index.html`. |
 
 ---
 
@@ -245,3 +263,9 @@ FluTyper is strictly verified using `nf-test`. The repository utilizes GitHub Ac
 | **[nf-test](https://www.nf-test.com/docs/getting-started/)** | Pipeline testing and validation framework. |
 
 *The minimizer indices used by this pipeline were generated using the methodology and tools developed by the Nextstrain team for the [nextclade_data](https://github.com/nextstrain/nextclade_data.git) repository.*
+
+---
+
+## 📖 Citation
+
+A manuscript describing FluTyper is currently in preparation and has not yet been published. In the meantime, if you use FluTyper in your work, please cite the repository directly.
