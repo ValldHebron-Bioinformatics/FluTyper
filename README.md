@@ -80,6 +80,8 @@ MultiFASTA headers must use either an underscore (`_`) or a pipe (`|`) as a sepa
 
 To generate date-based frequency reports per protein and full demographic filtering, you must provide a metadata CSV file using the `--metadata` flag. The new metadata structure allows you to provide the `ID`, `DATE`, `LOCATION`, `AGE GROUP`, `SEX`, and `ORIGINATING LAB`. The `ORIGINATING LAB` field serves as an extra geographical level for deeper spatial resolution. The file requires strict headers. You have the option to include a `LOCATION` column, which is required if you intend for the `GeographicReport.nf` process to run and generate the interactive map. Please note that the entries provided for both the `LOCATION` and `ORIGINATING LAB` fields must appear in the `RESOURCES/coordenades_cat.tsv` file, which is currently only available for locations within Catalunya.
 
+> **Note:** Coordinate data in `coordenades_cat.tsv` was originally compiled from [businessintelligence.info](https://www.businessintelligence.info/varios/longitud-latitud-pueblos-espana). Users wishing to extend geographic coverage beyond Catalunya should populate this file with entries in the same format.
+
 ```csv
 ID,DATE,LOCATION,AGE GROUP,SEX,ORIGINATING LAB
 Sample01,YYYY-MM-DD,Municipality Name,15-65,F,LabName
