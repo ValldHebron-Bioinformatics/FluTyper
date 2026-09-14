@@ -51,6 +51,24 @@ process MergeReports {
 
     catalog_json = json.dumps(report_catalog)
 
+    segment_mapping = {
+        'PB2': 1,
+        'PB1': 2,
+        'PB1-F2': 2,
+        'PA': 3,
+        'PA-X': 3,
+        'HA1': 4,
+        'HA2': 4,
+        'NP': 5,
+        'NA': 6,
+        'M1': 7,
+        'M2': 7,
+        'NS1': 8,
+        'NS2': 8,
+    }
+
+    segment_order_json = json.dumps(segment_mapping)
+
     html_content = f'''<!DOCTYPE html>
     <html lang="en">
     <head>
@@ -109,6 +127,7 @@ process MergeReports {
 
         <script>
             const catalog = {catalog_json};
+            const segmentOrder = {segment_order_json};
             const listContainer = document.getElementById('report-list');
             const iframe = document.getElementById('report-frame');
 
@@ -199,11 +218,20 @@ process MergeReports {
                         catContent.appendChild(link);
                     }});
 
-                    // Sort subcategories alphabetically before appending them
-                    const sortedSubcategories = Object.keys(data.subcategories).sort();
+                    // Sort subcategories by segment order (genome position); unmapped segments fall to the end, alphabetically among themselves
+                    const sortedSubcategories = Object.keys(data.subcategories).sort((a, b) => {{
+                        const orderA = segmentOrder[a] !== undefined ? segmentOrder[a] : 999;
+                        const orderB = segmentOrder[b] !== undefined ? segmentOrder[b] : 999;
+                        if (orderA !== orderB) return orderA - orderB;
+                        return a.localeCompare(b);
+                    }});
                     
                     for (const subcat of sortedSubcategories) {{
-                        const subitems = data.subcategories[subcat];
+                        const subitems = data.subcategories[subcat].slice().sort((a, b) => {{
+                            const numA = parseInt((a.title.match(/H(\\d+)\\s*\$/i) || [])[1] || '999', 10);
+                            const numB = parseInt((b.title.match(/H(\\d+)\\s*\$/i) || [])[1] || '999', 10);
+                            return numA - numB;
+                        }});
                         const subWrapper = document.createElement('div');
                         
                         const subHeader = document.createElement('div');
