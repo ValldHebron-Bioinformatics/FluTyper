@@ -169,11 +169,11 @@ nextflow run nf_pipeline/main.nf \
 
 For production or repeated runs, avoid retyping the key by keeping it in a local, gitignored config file (e.g. `secrets.config`) and layering it on top of the default config:
 ```groovy
-// secrets.config — do not commit
+// secrets.config
 params.carto_api_key = 'your_carto_key'
 ```
 ```bash
-nextflow run nf_pipeline/main.nf -c secrets.config --metadata <metadata.csv>
+nextflow run nf_pipeline/main.nf -c secrets.config --protocol sarscov2 --inputFasta <input.fasta> --metadata <metadata.csv>
 ```
 ---
 
