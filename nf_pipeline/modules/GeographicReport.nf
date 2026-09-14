@@ -227,7 +227,12 @@ process GeographicReport {
         global_color_map[classification['id']] = view_map
 
     # MAP CREATION
-    m = folium.Map(location=[41.7, 1.8], zoom_start=8, tiles='Cartodb Positron')
+    m = folium.Map(
+        location=[41.7, 1.8],
+        zoom_start=8,
+        tiles='https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?key=${params.carto_api_key}',
+        attr='&copy; <a href="https://carto.com/attributions">CARTO</a>'
+    )
     m.get_root().html.add_child(folium.Element("<h3 align='center' style='font-family: Arial; font-weight: bold; margin-top: 15px; color: #333;'>Influenza Geographic Distribution</h3>"))
 
     # Registry to keep track of layer names and colors
