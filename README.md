@@ -103,6 +103,7 @@ MultiFASTA headers must use either an underscore (`_`) or a pipe (`|`) as a sepa
 To generate date-based frequency reports per protein and full demographic filtering, you must provide a metadata CSV file using the `--metadata` flag. The new metadata structure allows you to provide the `ID`, `DATE`, `LOCATION`, `AGE GROUP`, `SEX`, and `ORIGINATING LAB`. The `ORIGINATING LAB` field serves as an extra geographical level for deeper spatial resolution. The file requires strict headers. You have the option to include a `LOCATION` column, which is required if you intend for the `GeographicReport.nf` process to run and generate the interactive map. Please note that the entries provided for both the `LOCATION` and `ORIGINATING LAB` fields must appear in the `RESOURCES/coordenades_cat.tsv` file, which is currently only available for locations within Catalunya.
 
 > **Note:** Coordinate data in `coordenades_cat.tsv` was originally compiled from [businessintelligence.info](https://www.businessintelligence.info/varios/longitud-latitud-pueblos-espana). Users wishing to extend geographic coverage beyond Catalunya should populate this file with entries in the same format.
+> Rendering the resulting map also requires a free CARTO API key, see [Geographic Report Basemap](#geographic-report-basemap-carto-api-key) below.
 
 ```csv
 ID,DATE,LOCATION,AGE GROUP,SEX,ORIGINATING LAB
@@ -124,7 +125,7 @@ Sample01,YYYY-MM-DD,Municipality Name,15-65,F,LabName
 | `colorblind` | Optional | `false` | Set to `true` to apply an Okabe-Ito colorblind-friendly palette to all HTML charts. |
 | `IndividualReports` | Optional | `false` | Set to `true` to make the Individual genomic barcode for each sample. |
 | `append` | Optional | *None* | Path to an existing results directory to integrate new data without reprocessing historical files. |
-
+| `carto_api_key` | Optional | *None* | Free CARTO Maps API key required to render basemap tiles in the Geographic Report. Get one at [carto.com/basemaps/apikey](https://carto.com/basemaps/apikey/). Required only if a `LOCATION` column triggers `GeographicReport.nf`. |
 ---
 
 ## 🔬 Advanced Configuration & Behaviors
@@ -152,7 +153,28 @@ MARKER_ID,POSITION,AA,PROTEIN,EFFECT,FOUND_IN,REFERENCE
 1000,631,L,PB2,Increased pandemic risk,H5N1,Capalastegui & Goldhill 2025
 1001,141,X,HA1,RBD,H5N1 | H7N9,Luczo & Spackman 2024
 ```
+### Geographic Report Basemap (CARTO API Key)
 
+If your metadata includes a `LOCATION` column, the pipeline automatically triggers `GeographicReport.nf` to build an interactive map of sample distribution. As of 2026, CARTO requires a free API key to serve its basemap tiles, without one, the map renders with an "API key required" watermark instead of the actual basemap.
+
+Getting a key is free and takes about a minute — request one at [carto.com/basemaps/apikey](https://carto.com/basemaps/apikey/). 
+
+Pass it to the pipeline with `--carto_api_key`:
+```bash
+nextflow run nf_pipeline/main.nf \
+  --inputFasta <input.fasta> \
+  --metadata <metadata.csv> \
+  --carto_api_key <your_carto_key>
+```
+
+For production or repeated runs, avoid retyping the key by keeping it in a local, gitignored config file (e.g. `secrets.config`) and layering it on top of the default config:
+```groovy
+// secrets.config — do not commit
+params.carto_api_key = 'your_carto_key'
+```
+```bash
+nextflow run nf_pipeline/main.nf -c secrets.config --metadata <metadata.csv>
+```
 ---
 
 ## 🔄 Pipeline Architecture
