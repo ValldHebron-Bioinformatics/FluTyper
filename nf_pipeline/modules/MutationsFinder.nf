@@ -14,7 +14,8 @@ process MutationsFinder {
     path markers
 
     output:
-    tuple val(sample_id), path("samples/${sample_id}/mutations/${sample_id}_*_mutations.csv"), path("samples/${sample_id}/${sample_id}_mutations.csv"), emit: results
+    // Optional so that a sample where no protein could be analysed still publishes its MFerrors.log instead of failing silently
+    tuple val(sample_id), path("samples/${sample_id}/mutations/${sample_id}_*_mutations.csv"), path("samples/${sample_id}/${sample_id}_mutations.csv"), optional: true, emit: results
     tuple val(sample_id), path("MFerrors.log"), optional: true, emit: errors
 
     script:

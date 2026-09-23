@@ -21,4 +21,5 @@ RESULTS/*
 RESULTS/TFM/*
 !RESULTS/TFM/**
 IDENTITY_STUDY*
+secrets.config
 boxplots/examples/
