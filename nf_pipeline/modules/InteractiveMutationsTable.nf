@@ -131,7 +131,8 @@ process InteractiveMutationsTable {
         pass
 
     # List to JSON string for embedding in the HTML
-    json_data_string = json.dumps(output_data)
+    # '</' is escaped as '<\\/' (same value once parsed) so marker text cannot close the <script> block
+    json_data_string = json.dumps(output_data).replace('</', '<\\\\/')
 
     # Conditionally generate the subtitle
     subtitle_html = ""
@@ -314,16 +315,20 @@ process InteractiveMutationsTable {
         <script>
             const data = {json_data_string};
 
+            // Neutralise '<' (and '"' in attributes) so marker text cannot inject HTML; '&' is left as-is so existing entities render unchanged
+            function escText(s) {{ return String(s).replace(/</g, '&lt;'); }}
+            function escAttr(s) {{ return escText(s).replace(/"/g, '&quot;'); }}
+
             // Function to generate the HTML tags for each mutation
             function createMutationTags(mutations) {{
                 if (mutations.length === 0) return '-';
                 return mutations.map(function(m) {{
-                    return '<div class="tooltip mutation-tag ' + m.color + '" data-evo-key="' + m.evo_key + '" data-mutation="' + m.mutation + '">' + m.mutation + 
-                           '<div class="tooltiptext">' + 
-                           '<strong>Reference Position (H5N1 numbering):</strong> ' + m.ref_pos + '<br><br>' + 
-                           '<strong>Effect:</strong> ' + m.effect + '<br><br>' + 
-                           '<strong>FOUND IN:</strong> ' + m.found_in + '<br><br>' + 
-                           '<strong>REFERENCE:</strong> ' + m.reference + 
+                    return '<div class="tooltip mutation-tag ' + escAttr(m.color) + '" data-evo-key="' + escAttr(m.evo_key) + '" data-mutation="' + escAttr(m.mutation) + '">' + escText(m.mutation) +
+                           '<div class="tooltiptext">' +
+                           '<strong>Reference Position (H5N1 numbering):</strong> ' + escText(m.ref_pos) + '<br><br>' +
+                           '<strong>Effect:</strong> ' + escText(m.effect) + '<br><br>' +
+                           '<strong>FOUND IN:</strong> ' + escText(m.found_in) + '<br><br>' +
+                           '<strong>REFERENCE:</strong> ' + escText(m.reference) +
                            '</div></div>';
                 }}).join(' ');
             }}

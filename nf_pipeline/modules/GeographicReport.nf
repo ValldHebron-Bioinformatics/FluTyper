@@ -152,6 +152,10 @@ process GeographicReport {
     else:
         df_geno['Root_Clade'] = df_geno['Clade']
 
+    # One metadata row per sample (as in the other reports) so duplicated IDs are not counted twice on the map
+    if not df_meta.empty and 'ID' in df_meta.columns:
+        df_meta = df_meta.drop_duplicates(subset=['ID'], keep='first')
+
     df = pd.merge(df_geno, df_meta, left_on='SampleID', right_on='ID') if not df_meta.empty else df_geno.copy()
     
     # Establish columns for resolution layers and demographics

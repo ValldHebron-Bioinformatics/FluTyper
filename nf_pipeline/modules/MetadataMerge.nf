@@ -4,6 +4,9 @@ nextflow.enable.dsl=2
 process MetadataMerge {
     // This process merges metadata information into the inferred subtypes, genotyping results, and mutations report.
     errorStrategy 'ignore'
+    // Outputs share the input file names: copy inputs so writing them does not overwrite, through the
+    // staged symlinks, the upstream files that the report processes read in parallel
+    stageInMode 'copy'
 
     input:
     path(subtype_csv)
@@ -26,7 +29,7 @@ process MetadataMerge {
         for col in df.columns:
             if col.lower().replace('_', '').replace(' ', '') in ('id', 'sampleid'):
                 return col
-        return None
+        raise ValueError(f"MetadataMerge: no sample ID column ('ID', 'Sample_ID' or 'SampleID') found. Columns: {list(df.columns)}")
 
     def get_season(d):
         if pd.isna(d):
@@ -40,6 +43,8 @@ process MetadataMerge {
     meta_id_col = find_id_col(meta)
     meta = meta.rename(columns={meta_id_col: '_MERGE_KEY'})
     meta['_MERGE_KEY'] = meta['_MERGE_KEY'].astype(str).str.strip()
+    # One metadata row per sample (keep the first, as the reports do) so duplicated IDs do not duplicate result rows
+    meta = meta.drop_duplicates(subset=['_MERGE_KEY'], keep='first')
 
     if 'DATE' in meta.columns:
         meta['Season'] = pd.to_datetime(meta['DATE'], errors='coerce').apply(get_season)
