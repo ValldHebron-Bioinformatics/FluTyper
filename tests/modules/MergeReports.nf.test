@@ -1,0 +1,49 @@
+nextflow_process {
+
+    name "Test Process MergeReports"
+    script "nf_pipeline/modules/MergeReports.nf"
+    process "MergeReports"
+
+    test("Should build an interactive index.html that embeds and references every given report") {
+
+        when {
+            process {
+                """
+                input[0] = [
+                    file("${projectDir}/tests/data/MergeReports_test/Sample_Report_One.html", checkIfExists: true),
+                    file("${projectDir}/tests/data/MergeReports_test/Sample_Report_Two.html", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            assert process.out.index != null : "Output channel 'index' is null"
+            assert process.out.index.size() > 0 : "index.html was not generated"
+
+            def indexFile = path(process.out.index.get(0))
+            assert indexFile.exists() : "index.html was not created at the expected location"
+            assert indexFile.toString().endsWith('index.html') : "The output file is not named index.html"
+
+            def indexText = indexFile.text
+
+            // The dashboard catalog must list both reports, using the filename (underscores
+            // turned into spaces) as the human-readable title
+            assert indexText.contains('"title": "Sample Report One"') : "Report One is not referenced in index.html's catalog"
+            assert indexText.contains('"title": "Sample Report Two"') : "Report Two is not referenced in index.html's catalog"
+
+            // And it must actually embed each report's content (base64-encoded) so it can be
+            // opened offline from the single generated index.html
+            def reportOneBytes = file("${projectDir}/tests/data/MergeReports_test/Sample_Report_One.html").bytes
+            def reportTwoBytes = file("${projectDir}/tests/data/MergeReports_test/Sample_Report_Two.html").bytes
+            def expectedB64One = reportOneBytes.encodeBase64().toString()
+            def expectedB64Two = reportTwoBytes.encodeBase64().toString()
+
+            assert indexText.contains(expectedB64One) : "Report One's content was not embedded (base64) in index.html"
+            assert indexText.contains(expectedB64Two) : "Report Two's content was not embedded (base64) in index.html"
+        }
+    }
+
+}
