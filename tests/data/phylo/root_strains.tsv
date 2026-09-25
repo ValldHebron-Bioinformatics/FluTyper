@@ -1,0 +1,6 @@
+strain	tip_id	segments_present	segments_missing
+A/Darwin/6/2021	REF_A_Darwin_6_2021	PB2,PB1,HA,NP,NA,MP,NS	PA
+A/Massachusetts/18/2022	REF_A_Massachusetts_18_2022	PB2,PB1,PA,HA,NP,NA,MP,NS	
+A/Croatia/10136RV/2023	REF_A_Croatia_10136RV_2023	PB2,PB1,PA,HA,NP,NA,MP,NS	
+A/Singapore/GP20238/2024	REF_A_Singapore_GP20238_2024	PB2,PB1,PA,HA,NP,NA,MP,NS	
+A/Sydney/1359/2024	REF_A_Sydney_1359_2024	PB2,PB1,PA,HA,NP,NA,MP,NS	

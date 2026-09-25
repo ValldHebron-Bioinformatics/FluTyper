@@ -1,0 +1,14 @@
+cluster	subclade	mrca_node	gene	position	parent_aa	mrca_aa	mutation	n_cluster_with	n_cluster	n_other_subclade_with	n_other_subclade	exclusive_in_subclade
+K_C1	K	NODE_0000009	HA1	2	K	N	K2N	3	3	0	0	yes
+K_C1	K	NODE_0000009	HA1	144	S	N	S144N	3	3	0	0	yes
+K_C1	K	NODE_0000009	HA1	158	N	D	N158D	3	3	0	0	yes
+K_C1	K	NODE_0000009	HA1	160	I	K	I160K	3	3	0	0	yes
+K_C1	K	NODE_0000009	HA1	173	Q	R	Q173R	3	3	0	0	yes
+K_C1	K	NODE_0000009	HA1	328	T	A	T328A	3	3	0	0	yes
+K_C1	K	NODE_0000009	HA2	49	S	N	S49N	3	3	0	0	yes
+K_C1	K	NODE_0000009	M2	88	D	A	D88A	3	3	0	0	yes
+K_C1	K	NODE_0000009	NA	346	D	G	D346G	3	3	0	0	yes
+K_C1	K	NODE_0000009	NA	358	N	D	N358D	3	3	0	0	yes
+K_C1	K	NODE_0000009	NA	468	H	R	H468R	3	3	0	0	yes
+K_C1	K	NODE_0000009	NS1	185	L	F	L185F	3	3	0	0	yes
+K_C1	K	NODE_0000009	PB1-F2	55	T	I	T55I	3	3	0	0	yes

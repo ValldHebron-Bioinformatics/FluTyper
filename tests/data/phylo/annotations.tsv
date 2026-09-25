@@ -1,0 +1,9 @@
+id	tip_type	subclade	cluster	source_group	period	HA1:62	HA1:145	HA1:239
+01816372	sample	K	K_C1	NA	2024-11	G	S	P
+01818936	sample	K	K_C1	NA	2024-08	G	S	P
+198353883	sample	K	K_C1	NA	2024-11	G	S	P
+REF_A_Croatia_10136RV_2023	root_strain	J.2	NA	NA	NA	G	N	P
+REF_A_Darwin_6_2021	root_strain	G.1	NA	NA	NA	G	S	P
+REF_A_Massachusetts_18_2022	root_strain	J	NA	NA	NA	G	S	P
+REF_A_Singapore_GP20238_2024	root_strain	J.2.4	NA	NA	NA	G	S	P
+REF_A_Sydney_1359_2024	root_strain	J.2.4	NA	NA	NA	G	S	P
