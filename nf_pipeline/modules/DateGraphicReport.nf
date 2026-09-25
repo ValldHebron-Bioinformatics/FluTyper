@@ -5,7 +5,7 @@ process DateGraphicReport {
     // This process generates a frequency evolution report for each protein and subtype combination over time, 
     // based on the provided Excel mutation data and metadata CSV file. It creates interactive HTML plots using Plotly, 
     // showing both weekly and cumulative frequencies of mutations, along with total sample counts. 
-    // The report includes dropdowns for selecting different time ranges (all time or specific seasons).
+    // The report includes dropdowns for selecting different time ranges (all time or a range of seasons).
     errorStrategy 'ignore'
     debug true
     input:
@@ -62,7 +62,8 @@ def generate_plots(mut_file, meta_file):
     iso_cal = df_meta['DATE'].dt.isocalendar()
     s_year = iso_cal.year.where(iso_cal.week >= 40, iso_cal.year - 1)
     df_meta['Season'] = s_year.astype(str) + "-" + (s_year + 1).astype(str)
-    df_meta['Season'] = df_meta['Season'].replace('nan-nan', 'Unknown Season').fillna("Unknown Season")
+    # Undated samples give 'nan-nan' or, with nullable integer years, '<NA>-<NA>'
+    df_meta['Season'] = df_meta['Season'].replace(['nan-nan', '<NA>-<NA>'], 'Unknown Season').fillna("Unknown Season")
 
     # Age Group column
     if 'AGE GROUP' in df_meta.columns:
@@ -470,7 +471,21 @@ def generate_plots(mut_file, meta_file):
 
                 all_view_sets_js = json.dumps(all_view_sets, cls=NumpyEncoder)
 
-                season_options = "".join([f'<option value="{s}">{s}</option>' for s in (seasons + ["All Time"])])
+                # Season range selectors (chronological). The page opens on the same view as before
+                # (default_season, i.e. the latest season, or All Time when there are no dated samples).
+                # Single seasons and All Time use the precomputed views above; a multi-season range is
+                # re-aggregated in the browser from the All Time weekly counts (see buildRangeView).
+                seasons_chrono = sorted(seasons)
+                season_from_options = "".join(
+                    [f'<option value="{s}"{" selected" if s == default_season else ""}>{s}</option>'
+                     for s in (["All Time"] + seasons_chrono)])
+                season_to_options = "".join(
+                    [f'<option value="{s}"{" selected" if s == default_season else ""}>{s}</option>'
+                     for s in seasons_chrono])
+                season_to_disabled = " disabled" if default_season == "All Time" else ""
+                season_order_js  = json.dumps(seasons_chrono)
+                season_ranges_js = json.dumps(season_ranges)
+                display_name_js  = json.dumps(display_name)
                 age_options = "".join([f'<option value="{a}">{a}</option>' for a in age_groups])
                 sex_options = "".join([f'<option value="{g}">{g}</option>' for g in sexes])
 
@@ -515,9 +530,15 @@ body {{ font-family: Arial, sans-serif; text-align: center; margin: 0; padding: 
     <h2 style="margin: 0 0 4px 0;">Frequency in Time Report: {display_name}</h2>
     <div class="controls-container">
         <div class="control-group">
-            <label>SEASON</label>
-            <select id="seasonSel" onchange="applyFilters()">
-                {season_options}
+            <label>SEASON FROM</label>
+            <select id="seasonFromSel" onchange="onSeasonFromChange()">
+                {season_from_options}
+            </select>
+        </div>
+        <div class="control-group">
+            <label>SEASON TO</label>
+            <select id="seasonToSel" onchange="onSeasonToChange()"{season_to_disabled}>
+                {season_to_options}
             </select>
         </div>
         <div class="control-group">
@@ -541,15 +562,106 @@ body {{ font-family: Arial, sans-serif; text-align: center; margin: 0; padding: 
 
 <script>
 var allDataSets = {all_view_sets_js};
+var seasonOrder  = {season_order_js};
+var seasonRanges = {season_ranges_js};
+var displayName  = {display_name_js};
 
-function applyFilters() {{
-    var activeSeason = document.getElementById('seasonSel').value;
+// Keeps SEASON TO consistent with SEASON FROM: disabled while FROM is "All Time",
+// and never earlier than FROM.
+function syncSeasonTo() {{
+    var fromSel = document.getElementById('seasonFromSel');
+    var toSel   = document.getElementById('seasonToSel');
+    if (fromSel.value === 'All Time') {{ toSel.disabled = true; return; }}
+    toSel.disabled = false;
+    if (seasonOrder.indexOf(toSel.value) < seasonOrder.indexOf(fromSel.value)) {{
+        toSel.value = fromSel.value;
+    }}
+}}
+
+function onSeasonFromChange() {{ syncSeasonTo(); applyFilters(); }}
+function onSeasonToChange()   {{ syncSeasonTo(); applyFilters(); }}
+
+// Builds the view for a multi-season range (seasons fromS..toS inclusive) from the weekly
+// counts of the precomputed All Time view of the same age/sex filter. Mirrors the per-season
+// Python aggregation: weekly and cumulative frequencies are recomputed from summed marker and
+// sample counts over the weeks of the range (never averaged across seasons).
+function buildRangeView(fromS, toS, age, sex) {{
+    var base = allDataSets['All Time|||' + age + '|||' + sex];
+    if (!base || !seasonRanges[fromS] || !seasonRanges[toS]) return null;
+    var start = seasonRanges[fromS][0];
+    var end   = seasonRanges[toS][1];
+    var d = base.data_update;
+    var inRange = function(w) {{ return w >= start && w <= end; }};
+
+    var weeks = [], sampW = [], sampC = [], run = 0;
+    for (var i = 0; i < d.x[0].length; i++) {{
+        if (!inRange(d.x[0][i])) continue;
+        run += d.y[0][i];
+        weeks.push(d.x[0][i]); sampW.push(d.y[0][i]); sampC.push(run);
+    }}
+    var visible = [true, true];
+    var xs = [weeks, weeks.slice()];
+    var ys = [sampW, sampC];
+    var cds = [[], []];
+
+    // Mutation traces come in (weekly, cumulative) pairs after the two sample-total traces.
+    for (var t = 2; t + 1 < d.visible.length; t += 2) {{
+        var rows = d.customdata[t] || [];
+        var mx = [], fw = [], fc = [], cw = [], cc = [];
+        var mCum = 0, sCum = 0, mSum = 0;
+        for (var j = 0; j < rows.length; j++) {{
+            if (!inRange(d.x[t][j])) continue;
+            var r = rows[j];
+            var m = r[3], s = r[4];
+            mCum += m; sCum += s; mSum += m;
+            var fWeek = s > 0 ? (m / s) * 100 : NaN;
+            var fCum  = sCum > 0 ? (mCum / sCum) * 100 : NaN;
+            mx.push(d.x[t][j]); fw.push(fWeek); fc.push(fCum);
+            cw.push([r[0], r[1], r[2], m, s, fWeek, r[6]]);
+            cc.push([r[0], r[1], r[2], mCum, sCum, fCum, r[6]]);
+        }}
+        var present = d.visible[t] === true && mSum > 0;
+        visible.push(present, present);
+        xs.push(present ? mx : [], present ? mx.slice() : []);
+        ys.push(present ? fw : [], present ? fc : []);
+        cds.push(present ? cw : [], present ? cc : []);
+    }}
+
+    var wMax = sampW.length ? Math.max.apply(null, sampW) : 0;
+    var cMax = sampC.length ? Math.max.apply(null, sampC) : 0;
+    var xRange = [start, end];
+    return {{
+        data_update: {{ visible: visible, x: xs, y: ys, customdata: cds }},
+        layout_update: {{
+            'title.text': '<b>Frequency in Time Report: ' + displayName + ' - Seasons ' + fromS + ' to ' + toS + '</b>',
+            'xaxis.range':  xRange,
+            'xaxis2.range': xRange.slice(),
+            'yaxis2.range': [0, wMax > 0 ? wMax * 1.1 : 10],
+            'yaxis4.range': [0, cMax > 0 ? cMax * 1.1 : 10]
+        }}
+    }};
+}}
+
+function getActiveView() {{
+    var fromS = document.getElementById('seasonFromSel').value;
+    var toS   = document.getElementById('seasonToSel').value;
     var activeAge = document.getElementById('ageSel').value;
     var activeSex = document.getElementById('sexSel').value;
-    var comboKey  = activeSeason + "|||" + activeAge + "|||" + activeSex;
+    // "All Time" and single seasons (FROM == TO) use the precomputed views.
+    if (fromS === 'All Time' || fromS === toS || !toS) {{
+        var comboKey = fromS + "|||" + activeAge + "|||" + activeSex;
+        var v = allDataSets[comboKey];
+        if (!v) console.warn('No view set for', comboKey);
+        return v;
+    }}
+    var rv = buildRangeView(fromS, toS, activeAge, activeSex);
+    if (!rv) console.warn('No range view for', fromS, toS, activeAge, activeSex);
+    return rv;
+}}
 
-    var view = allDataSets[comboKey];
-    if (!view) {{ console.warn('No view set for', comboKey); return; }}
+function applyFilters() {{
+    var view = getActiveView();
+    if (!view) return;
 
     var gd = document.getElementById('plotly-graph');
     if (!gd || !gd.data) return;
@@ -568,9 +680,10 @@ function selectMutation(mutationName) {{
         return;
     }}
 
-    document.getElementById('seasonSel').value = 'All Time';
+    document.getElementById('seasonFromSel').value = 'All Time';
     document.getElementById('ageSel').value    = 'All';
     document.getElementById('sexSel').value    = 'All';
+    syncSeasonTo();
     applyFilters();
 
     var visibility = gd.data.map(function(trace) {{

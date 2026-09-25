@@ -68,4 +68,53 @@ nextflow_process {
 
     }
 
+    // Test 3: Verify both reports offer a season RANGE (SEASON FROM / SEASON TO) and embed per-season data
+    test("Should offer a season range selector with per-season data when the metadata spans several seasons") {
+
+        when {
+            process {
+                """
+                input[0] = file("${projectDir}/tests/data/Graphs_test/final_genotyping_results.csv")
+                input[1] = file("${projectDir}/tests/data/Graphs_seasons/metadata.csv")
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def pieHtml = path(process.out.report[0]).text
+            def evoHtml = path(process.out.evolution_report[0]).text
+            def seasons = ['2022-2023', '2023-2024', '2024-2025']
+
+            [pie: pieHtml, evo: evoHtml].each { rt, html ->
+                // The single season dropdown is replaced by SEASON FROM / SEASON TO
+                assert html.contains("id=\"sel_season_from_${rt}\"") : "SEASON FROM select missing in the ${rt} report"
+                assert html.contains("id=\"sel_season_to_${rt}\"") : "SEASON TO select missing in the ${rt} report"
+                assert !html.contains("id=\"sel_season_${rt}\"") : "Old single season select still present in the ${rt} report"
+                assert html.contains('>SEASON FROM</label>') && html.contains('>SEASON TO</label>')
+                assert html.contains("id=\"sel_age_${rt}\"") && html.contains("id=\"sel_sex_${rt}\"")
+
+                // FROM = All Time + seasons in chronological order, TO = seasons; the latest season is preselected in both
+                def fromSel = (html =~ /(?s)<select id="sel_season_from_${rt}"[^>]*>(.*?)<\/select>/)[0][1]
+                def toSel = (html =~ /(?s)<select id="sel_season_to_${rt}"[^>]*>(.*?)<\/select>/)[0][1]
+                assert (fromSel =~ /value="([^"]+)"/).collect { it[1] } == ['All Time'] + seasons
+                assert (toSel =~ /value="([^"]+)"/).collect { it[1] } == seasons
+                assert fromSel.contains('<option value="2024-2025" selected>') && toSel.contains('<option value="2024-2025" selected>')
+
+                // Titles for a range
+                assert html.contains("'Seasons ' + r.from + ' to ' + r.to") : "Range title missing in the ${rt} report"
+            }
+
+            // Pie report: per-season sample counts are embedded so any range is summed in the page (Unknown Season kept for All Time)
+            def recs = new groovy.json.JsonSlurper().parseText((pieHtml =~ /var pieRecords = (.*);/)[0][1])
+            def perSeason = recs.groupBy { it[0] }.collectEntries { k, v -> [(k): v.sum { it[8] }] }
+            assert perSeason == ['2022-2023': 12, '2023-2024': 12, '2024-2025': 12, 'Unknown Season': 2]
+            assert (pieHtml =~ /var pieSeasons = (.*);/)[0][1] == '["2022-2023", "2023-2024", "2024-2025"]'
+
+            // Evolution report: week span of every season, used for the From..To x-axis range
+            assert evoHtml.contains('var seasonRanges = {"2022-2023": ["2022-10-03", "2023-10-01"], "2023-2024": ["2023-10-02", "2024-09-29"], "2024-2025": ["2024-09-30", "2025-09-28"]};')
+        }
+    }
+
 }

@@ -35,4 +35,74 @@ nextflow_process {
 
     }
 
+    test("Season range selectors on multi-season metadata (with undated samples)") {
+
+        when {
+            process {
+                """
+                input[0] = file("${projectDir}/tests/data/Graphs_test/relevant_mutations.xlsx")
+                input[1] = file("${projectDir}/tests/data/Graphs_seasons/metadata.csv")
+                """
+            }
+        }
+
+        then {
+            // Two samples have no date: the module must still produce the reports
+            assert process.success
+            def raw_output = process.out.metadata.get(0)
+            def html_reports = raw_output instanceof Collection ? raw_output : [raw_output]
+            assert html_reports.size() > 0
+            def pb2 = html_reports.find { it.toString().endsWith('evolution_PB2.html') }
+            assert pb2 != null : "evolution_PB2.html not produced"
+            def html = new File(pb2.toString()).text
+            def lines = html.readLines()
+
+            // The single season dropdown is replaced by a FROM/TO range
+            assert !html.contains('id="seasonSel"')
+            assert html.contains('<label>SEASON FROM</label>')
+            assert html.contains('<label>SEASON TO</label>')
+            def fromSel = (html =~ /(?s)<select id="seasonFromSel"[^>]*>(.*?)<\/select>/)[0][1]
+            def toMatch = (html =~ /(?s)<select id="seasonToSel"([^>]*)>(.*?)<\/select>/)[0]
+            // FROM: "All Time" then every season chronologically; TO: every season chronologically
+            assert (fromSel =~ /<option value="([^"]+)"/).collect { it[1] } == ['All Time', '2022-2023', '2023-2024', '2024-2025']
+            assert (toMatch[2] =~ /<option value="([^"]+)"/).collect { it[1] } == ['2022-2023', '2023-2024', '2024-2025']
+            // Page opens on the latest season (FROM = TO = latest), as the previous single dropdown did
+            assert fromSel.contains('<option value="2024-2025" selected>')
+            assert toMatch[2].contains('<option value="2024-2025" selected>')
+            assert !toMatch[1].contains('disabled')
+            assert html.contains('<b>Frequency in Time Report: PB2 - Season 2024-2025</b>')
+
+            // Season bounds used for the range x-axis (ISO week 40 Monday .. ISO week 39 Sunday)
+            def slurper = new groovy.json.JsonSlurper()
+            def rangesLine = lines.find { it.startsWith('var seasonRanges = ') }
+            def ranges = slurper.parseText(rangesLine.substring('var seasonRanges = '.length(), rangesLine.lastIndexOf(';')))
+            assert ranges['2022-2023'] == ['2022-10-03', '2023-10-01']
+            assert ranges['2023-2024'] == ['2023-10-02', '2024-09-29']
+            assert ranges['2024-2025'] == ['2024-09-30', '2025-09-28']
+
+            // Range aggregation input: the All Time weekly counts, restricted to 2022-2023..2023-2024,
+            // must pool numerators/denominators of both seasons (PB2 89V: 12/12 + 11/12 -> 23/24)
+            def viewsLine = lines.find { it.startsWith('var allDataSets = ') }
+            def views = slurper.parseText(viewsLine.substring('var allDataSets = '.length(), viewsLine.lastIndexOf(';')).replaceAll(/\bNaN\b/, 'null'))
+            def inRange = { String w -> w >= '2022-10-03' && w <= '2024-09-29' }
+            def allTime = views['All Time|||All|||All'].data_update
+            def rangeSamples = (0..<allTime.x[0].size()).findAll { inRange(allTime.x[0][it]) }.sum { allTime.y[0][it] }
+            assert rangeSamples == 24
+            assert views['2022-2023|||All|||All'].data_update.y[1].last() == 12
+            assert views['2023-2024|||All|||All'].data_update.y[1].last() == 12
+            def t89V = (2..<allTime.customdata.size()).step(2).find { t -> allTime.customdata[t] && allTime.customdata[t][0][6] == '89V' }
+            assert t89V != null
+            def rows89V = allTime.customdata[t89V].withIndex().findAll { row, j -> inRange(allTime.x[t89V][j]) }.collect { it[0] }
+            assert rows89V.sum { it[3] } == 23
+            assert rows89V.sum { it[4] } == 24
+
+            // Range views are built client-side from those counts, and the season selectors drive them
+            assert html.contains('function buildRangeView(fromS, toS, age, sex)')
+            assert html.contains("' - Seasons ' + fromS + ' to ' + toS")
+            assert html.contains('onchange="onSeasonFromChange()"')
+            assert html.contains('onchange="onSeasonToChange()"')
+        }
+
+    }
+
 }
