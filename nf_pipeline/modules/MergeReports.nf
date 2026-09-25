@@ -23,6 +23,11 @@ process MergeReports {
         subcategory = ""
         evo_key = ""
         
+        # Interactive tree of the optional phylogenetics module gets its own section
+        if file_path.stem.lower().startswith('phylogenetic'):
+            category = "Phylogenetics"
+            clean_name = "Phylogenetic Tree"
+
         # Strictly ensure the filename starts with 'evolution' to exclude clade reports
         if clean_name.lower().startswith('evolution'):
             category = "Frequency Evolution"
