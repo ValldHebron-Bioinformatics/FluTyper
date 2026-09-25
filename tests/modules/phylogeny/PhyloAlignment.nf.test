@@ -1,0 +1,108 @@
+nextflow_process {
+
+    name "Test Process PhyloAlignment"
+    script "nf_pipeline/modules/phylogeny/PhyloAlignment.nf"
+    process "PhyloAlignment"
+
+    test("Should build a 13426bp whole-genome alignment ordered PB2,PB1,PA,HA,NP,NA,MP,NS") {
+
+        when {
+            process {
+                """
+                input[0] = [
+                    file("${projectDir}/tests/data/phylo/samples/01816372", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/samples/01818936", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/samples/198353883", checkIfExists: true)
+                ]
+                input[1] = file("${projectDir}/tests/data/phylo/phylo_references.fasta", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/reference_segments.fasta", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/reference_segments.tsv", checkIfExists: true)
+                input[4] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
+                input[5] = "PB2,PB1,PA,HA,NP,NA,MP,NS"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def alignmentFile = path(process.out.alignment.get(0))
+            def lines = alignmentFile.text.readLines()
+            // 5 root strains + 3 samples = 8 tips, each with a header and one sequence line
+            assert lines.size() == 16 : "expected 8 FASTA records (16 lines), got ${lines.size()}"
+
+            def headers = lines.findAll { it.startsWith(">") }.collect { it.substring(1) }
+            assert headers.toSet() == [
+                "REF_A_Darwin_6_2021", "REF_A_Massachusetts_18_2022", "REF_A_Croatia_10136RV_2023",
+                "REF_A_Singapore_GP20238_2024", "REF_A_Sydney_1359_2024",
+                "01816372", "01818936", "198353883"
+            ].toSet()
+
+            // Every tip's concatenated sequence must be 13426 sites long
+            def seqLengths = [:]
+            String currentHeader = null
+            StringBuilder currentSeq = new StringBuilder()
+            lines.each { line ->
+                if (line.startsWith(">")) {
+                    if (currentHeader != null) seqLengths[currentHeader] = currentSeq.length()
+                    currentHeader = line.substring(1)
+                    currentSeq = new StringBuilder()
+                } else {
+                    currentSeq.append(line)
+                }
+            }
+            if (currentHeader != null) seqLengths[currentHeader] = currentSeq.length()
+            seqLengths.each { id, len -> assert len == 13426 : "${id} alignment length is ${len}, expected 13426" }
+
+            // Segment order and coordinates
+            def segmentsText = path(process.out.segments.get(0)).text
+            def segLines = segmentsText.readLines()
+            assert segLines[0] == "segment\treference_strain\tstart\tend\tlength\tinsertion_columns_removed"
+            def order = segLines.drop(1).collect { it.split("\t")[0] }
+            assert order == ["PB2", "PB1", "PA", "HA", "NP", "NA", "MP", "NS"]
+            assert segmentsText.contains("PA\tA/Massachusetts/18/2022\t4633\t6840\t2208")
+
+            // Darwin (missing PA in the protocol references) has only gaps over the PA interval (columns 4633-6840, 1-based)
+            def darwinSeq = new StringBuilder()
+            currentHeader = null
+            lines.each { line ->
+                if (line.startsWith(">")) {
+                    currentHeader = line.substring(1)
+                } else if (currentHeader == "REF_A_Darwin_6_2021") {
+                    darwinSeq.append(line)
+                }
+            }
+            def darwinPaSlice = darwinSeq.toString().substring(4633 - 1, 6840)
+            assert darwinPaSlice.chars().allMatch { (char) it == '-' as char } : "Darwin's PA interval should be all gaps"
+        }
+    }
+
+    test("Should fail requiring at least 3 samples when fewer than 3 passed coverage QC") {
+
+        when {
+            process {
+                """
+                input[0] = [
+                    file("${projectDir}/tests/data/phylo/samples/01816372", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/samples/01818936", checkIfExists: true)
+                ]
+                input[1] = file("${projectDir}/tests/data/phylo/phylo_references.fasta", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/reference_segments.fasta", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/reference_segments.tsv", checkIfExists: true)
+                input[4] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
+                input[5] = "PB2,PB1,PA,HA,NP,NA,MP,NS"
+                """
+            }
+        }
+
+        then {
+            // errorStrategy 'ignore': the task fails internally (exit 1) but the process/workflow
+            // as a whole is reported successful, simply emitting nothing.
+            assert process.success
+            assert process.out.alignment.size() == 0 : "no alignment should be emitted when fewer than 3 samples passed QC"
+            assert process.out.segments.size() == 0
+            assert process.stdout.join("\\n").contains("at least 3 are needed")
+        }
+    }
+
+}
