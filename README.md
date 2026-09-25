@@ -21,6 +21,7 @@ FluTyper is a modular, reproducible Nextflow pipeline for genotyping influenza v
   - [Threshold Parameter Behavior](#threshold-parameter-behavior)
   - [HUMAN Protocol Notes](#human-protocol-notes)
   - [Integrating Extra Markers](#integrating-extra-markers)
+  - [Phylogenetics Module (Optional)](#phylogenetics-module-optional)
 - [🔄 Pipeline Architecture](#-pipeline-architecture)
 - [🔢 Standardized Cross-Subtype Numbering](#-standardized-cross-subtype-numbering)
 - [📂 Outputs](#-outputs)
@@ -126,6 +127,7 @@ Sample01,YYYY-MM-DD,Municipality Name,15-65,F,LabName
 | `IndividualReports` | Optional | `false` | Set to `true` to make the Individual genomic barcode for each sample. |
 | `append` | Optional | *None* | Path to an existing results directory to integrate new data without reprocessing historical files. |
 | `carto_api_key` | Optional | *None* | Free CARTO Maps API key required to render basemap tiles in the Geographic Report. Get one at [carto.com/basemaps/apikey](https://carto.com/basemaps/apikey/). Required only if a `LOCATION` column triggers `GeographicReport.nf`. |
+| `phylogenetics` | Optional | `false` | Set to `true` (or pass `--phylogenetics`) to build the annotated whole-genome phylogeny of the HUMAN H3N2 samples. See [Phylogenetics Module](#phylogenetics-module-optional) for its own parameters. |
 ---
 
 ## 🔬 Advanced Configuration & Behaviors
@@ -177,6 +179,80 @@ nextflow run nf_pipeline/main.nf -c secrets.config --protocol AVIAN --inputFasta
 ```
 ---
 
+### Phylogenetics Module (Optional)
+
+With `--phylogenetics`, FluTyper builds an annotated whole-genome maximum likelihood tree of the A(H3N2) samples of a HUMAN run, reproducing the analysis and Fig. 2 of Koumaty *et al.* (2026, see [Citation](#-citation)): a rectangular tree with aligned heatmap panels to the right, in the order `subclade | source | period | one column per requested amino acid position`.
+
+**Worked example (the paper's figure, HA1 62, 145 and 239):**
+
+```bash
+nextflow run nf_pipeline/main.nf \
+  --protocol HUMAN \
+  --inputFasta sequences.fasta \
+  --metadata metadata.csv \
+  --outDir RESULTS \
+  --phylogenetics \
+  --aa-positions HA1:62,HA1:145,HA1:239 \
+  --lab-map lab_map.tsv
+```
+
+`tests/data/humanmetadata_labs.csv` and `tests/data/lab_map_cat.tsv` are ready-made examples (dummy metadata whose originating labs come from `RESOURCES/coordenades_cat.tsv`, grouped into a hospital vs community split).
+
+**Steps.** The analysis is the `PHYLOGENETICS` subworkflow (`nf_pipeline/subworkflows/Phylogenetics.nf`), made of seven processes in `nf_pipeline/modules/phylogeny/`:
+
+| Process | Method |
+| --- | --- |
+| `PhyloPreflight` | Stops the run if a tool or R package is missing (names it and the expected version; a different version only warns), builds the codon map of every protein on the coordinate references and validates `--aa-positions` against it. Every other step waits for it. |
+| `PhyloCoverageQC` | Per sample, in parallel: the sample enters the tree only if **every** segment covers ≥ `--phyloMinCoverage` (0.95) of the reference with non-N bases. Missing segments and segments with several records fail the sample. |
+| `PhyloAlignment` | MAFFT `--auto` per segment against A/Darwin/6/2021, trimmed to reference columns (no manual curation), concatenated PB2, PB1, PA, HA, NP, NA, MP, NS. |
+| `PhyloTree` | IQ-TREE, `--model GTR+G4`, `--bootstrap 1000` ultrafast bootstraps, `--seed`, rooted on the `--phyloOutgroup` WHO reference / vaccine strain. |
+| `PhyloSubclades` | Nextclade `subclade` column (per-sample results; root strains run against the same dataset). |
+| `PhyloPostTree` | TreeTime parsimony ancestral states, translated through the codon map so internal nodes carry amino acid states; TreeCluster single linkage within each subclade, `--clusterThreshold 0.005` subs/site, tips outside a cluster stay `unclustered`; amino acid changes on the branch into each cluster. |
+| `PhyloReport` | `annotations.tsv`, the R/ggtree figure (SVG/PNG) and `run_manifest.json`. |
+
+Only `PhyloReport` depends on the figure options, so with `-resume` a change of `--aa-positions`, panels, lab map or figure size reruns the preflight check and the report but reuses the alignment, tree, ancestral states and clusters.
+
+**Amino acid positions.** `--aa-positions` takes a comma-separated list of `GENE:POS` (`HA1:62,HA1:145`) and/or bare integers, which use `--aa-gene` (default `HA1`). Columns follow the order given; omit it for no amino acid columns. Numbering follows FluTyper's protein references (HA1 = mature HA1 numbering). Positions are checked at startup: an out-of-range position stops the run naming the valid range, and a position with the same residue in every sample only warns. Nextflow keeps only the last value of a repeated flag, so give several positions as one comma-separated list (or as a YAML list in a `-params-file`). Residue colours are fixed per amino acid letter, so they are identical across positions and runs. Amino acid states come from the ancestral reconstruction for internal nodes; tips keep their observed sequence, and ambiguous or missing codons are shown as `NA`.
+
+**Metadata.** The module reads the `--metadata` CSV used by the rest of the pipeline. Nothing is imputed: missing or unparseable values stay `NA` (grey), and reference strains never receive metadata.
+
+| Column | Required | Used for | When absent |
+| --- | --- | --- | --- |
+| `ID` | Yes (if metadata is given) | Joining metadata to tree tips | — |
+| `ORIGINATING_LAB` | No | **source** panel (grouped with `--lab-map`) | Panel omitted, INFO line logged |
+| `DATE` (`YYYY-MM-DD`) | No | **period** panel (binned by `--period-bin`), **season** panel and the season filter of the interactive tree | Panels omitted, INFO line logged; filter disabled |
+| `AGE GROUP`, `SEX` | No | **age group** / **sex** panels and filters of the interactive tree | Panels omitted, INFO line logged; filters disabled |
+| `LOCATION` | No | Not used by this module | — |
+
+The source and period panels are drawn only when their field exists and is non-missing for at least `--min-panel-coverage` (0.8) of the samples; otherwise the panel is left out, an INFO line gives the field and its coverage, the remaining panels close the gap, and the reason is recorded in `run_manifest.json`. The subclade panel is always drawn. A `YYYY-MM` date is placed in its month but has no week. Panels are declared in `RESOURCES/phylo_panels.tsv` (`panel`, `column`, `scale`, `required`), so adding a panel is a new row there.
+
+**Parameters** (kebab-case also works, e.g. `--aa-positions` = `--aaPositions`):
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `phylogenetics` | `false` | Enable the module (HUMAN protocol only). |
+| `phyloSubtype` | `H3N2` | Subtype of the samples placed in the tree (only H3N2 is supported). |
+| `phyloReference` | `A/Darwin/6/2021` | Alignment coordinate reference. |
+| `phyloReferenceFallback` | `A/Massachusetts/18/2022` | Coordinate reference for segments missing from `phyloReference` (PA). |
+| `phyloRootStrains` | Darwin/6/2021, Massachusetts/18/2022, Croatia/10136RV/2023, Singapore/GP20238/2024, Sydney/1359/2024 | WHO reference / vaccine strains added as tips. |
+| `phyloOutgroup` | `A/Darwin/6/2021` | Root strain used to root the tree. |
+| `phyloSegmentOrder` | `PB2,PB1,PA,HA,NP,NA,MP,NS` | Concatenation order. |
+| `phyloMinCoverage` | `0.95` | Minimum coverage in every segment. |
+| `model` | `GTR+G4` | IQ-TREE substitution model. |
+| `bootstrap` | `1000` | Ultrafast bootstrap replicates (`0` = none, otherwise ≥ 1000). |
+| `seed` | `12345` | Random seed. |
+| `clusterThreshold` | `0.005` | Single-linkage cluster threshold (substitutions/site). |
+| `aaPositions` | *None* | Amino acid heatmap columns. |
+| `aaGene` | `HA1` | Gene for bare positions. |
+| `minPanelCoverage` | `0.8` | Minimum sample coverage for the source and period panels. |
+| `labMap` | *None* | TSV `ORIGINATING_LAB<TAB>display_group` (optional header, case-insensitive match); unmapped labs become `Other`, without a map raw lab names are shown. |
+| `periodBin` | `month` | `month`, `week` or `none`. |
+| `width` / `height` / `dpi` | `12` / `10` / `300` | Figure size (inches) and PNG resolution. |
+
+**Outputs** (`<outDir>/phylogeny/`): `phylo_coverage_qc.tsv`, `phylo_alignment.fasta` (trimmed concatenated alignment) and `phylo_segments.tsv`, `phylo.treefile` (IQ-TREE tree with support values) and `phylo_tree.nwk` / `node_support.tsv` (named internal nodes), `ancestral_nt.fasta`, `ancestral_aa/`, `aa_states.tsv`, `annotated_tree.nexus`, `subclades.tsv`, `clusters.tsv`, `cluster_mutations.tsv`, `annotations.tsv` (one row per tip: id, subclade, cluster, source group, period, season, age group, sex and the residue at each requested position), `phylo_tree.svg` / `phylo_tree.png`, `PhylogeneticTreeReport.html` (interactive tree with season / age group / sex filters, also in `index.html`), `panels_status.tsv` and `run_manifest.json` (tool versions, resolved parameters, input checksums, method choices, QC outcome, panels rendered and skipped with the reason).
+
+**Notes and differences from the paper.** The protocol references have no PA segment for A/Darwin/6/2021, so PA coordinates use A/Massachusetts/18/2022 and Darwin's PA is treated as missing data in the tree. IQ-TREE 2.3.6 is pinned (2.0 is no longer on bioconda). Alignments are not manually curated (the paper used AliView). Clades for non-HA segments are not assigned separately. The tools are pinned in `FluTyper_env.yaml`; with `conda`, create the environment from that file (it uses the `conda-forge` and `bioconda` channels only).
+
 ## 🔄 Pipeline Architecture
 
 ![FluTyper pipeline walkthrough](docs/images/FluTyper.drawio.svg)
@@ -227,6 +303,8 @@ The pipeline compiles its core interactive visualizations into a single, unified
 
 > **Note:** `index.html` must be opened from a fully extracted copy of `examples.zip`. Browsers enforce local file access restrictions under the `file://` protocol, so opening the dashboard directly from within the compressed archive will cause `"Access to the file was denied"` errors when it attempts to load linked report files.
 
+When metadata is provided, the Clades, Mutations, Frequency Evolution, Geographic and Phylogenetic Tree reports can be filtered by season, age group and sex. Seasons start in ISO week 40 (season `2024-2025` runs from week 40 of 2024 to week 39 of 2025). The season filter has two dropdowns: **Season from** (with an **All Time** option showing every sample, including undated ones) and **Season to**; choose the same season in both for a single season, or two different seasons for a range. Counts are added up over the selected seasons and frequencies are recalculated from the combined counts.
+
 Within the dashboard, there is deep cross-report linkage of the markers. Clicking on a specific mutation marker from the tables or summary graphs will automatically open the time-series frequency evolution view for that exact mutation.
 
 | Report View | Description |
@@ -237,6 +315,7 @@ Within the dashboard, there is deep cross-report linkage of the markers. Clickin
 | **Markers Table** | Interactive table detailing marker effects, subtypes, and references. |
 | **Frequency Evolution** | Time-series plots showing marker frequency over time (requires metadata). |
 | **Geographic Report** | Interactive maps based on the configured geographical levels. |
+| **Phylogenetic Tree** | Interactive whole-genome tree of the optional [phylogenetics module](#phylogenetics-module-optional); filters prune the tree to the selected samples. |
 | **Sample Barcodes** | Per-sample mutation barcode plots for rapid visual inspection. These do not appear in the `index.html` dashboard, but are generated as separate HTML files inside each individual sample's directory. |
 
 ### Excel Data Schema (`final_mutations_report.xlsx`)
@@ -269,6 +348,7 @@ FluTyper is strictly verified using `nf-test`. The repository utilizes GitHub Ac
 * **Run all tests:** `nf-test test tests/main.nf.test`
 * **Run module tests:** `nf-test test tests/modules/*.nf.test`
 * **Run specific module:** `nf-test test tests/modules/<module_name>.nf.test`
+* **Run phylogenetics tests:** `nf-test test tests/modules/phylogeny/*.nf.test tests/phylogeny.nf.test` (needs the tools from `FluTyper_env.yaml`; CI runs them in a separate job)
 
 ---
 
@@ -283,6 +363,10 @@ FluTyper is strictly verified using `nf-test`. The repository utilizes GitHub Ac
 | **[MAFFT](https://mafft.cbrc.jp/alignment/software/)** | Multiple sequence alignment for accurate CDS mapping. |
 | **Python 3** | Data manipulation and reporting ([`pandas`](https://pandas.pydata.org/docs/user_guide/index.html#user-guide), [`biopython`](https://biopython.org/docs/latest/index.html), [`openpyxl`](https://openpyxl.readthedocs.io/en/stable/), [`sqlite3`](https://docs.python.org/3/library/sqlite3.html), [`plotly`](https://plotly.com/python/), [`folium`](https://python-visualization.github.io/folium/latest/user_guide.html).) |
 | **[nf-test](https://www.nf-test.com/docs/getting-started/)** | Pipeline testing and validation framework. |
+| **[IQ-TREE](http://www.iqtree.org/)** | Maximum likelihood tree and ultrafast bootstrap (phylogenetics module). |
+| **[TreeTime](https://treetime.readthedocs.io/)** | Ancestral state reconstruction (phylogenetics module). |
+| **[TreeCluster](https://github.com/niemasd/TreeCluster)** | Genetic-distance clustering (phylogenetics module). |
+| **R / [ggtree](https://bioconductor.org/packages/ggtree/)** | Annotated tree figure (phylogenetics module; `ape`, `ggplot2`, `ggnewscale`, `svglite`). |
 
 *The minimizer indices used by this pipeline were generated using the methodology and tools developed by the Nextstrain team for the [nextclade_data](https://github.com/nextstrain/nextclade_data.git) repository.*
 
@@ -291,3 +375,5 @@ FluTyper is strictly verified using `nf-test`. The repository utilizes GitHub Ac
 ## 📖 Citation
 
 A manuscript describing FluTyper is currently in preparation and has not yet been published. In the meantime, if you use FluTyper in your work, please cite the repository directly.
+
+The phylogenetics module reproduces the analysis of: Koumaty L, Dan S, De Clercq A, Destras G, Regue H, Oblette A, Le Meur A, Gaymard A, Escuret V, Bouscambert-Duchamp M, Chanard E, Fabre M, Vieillefond V, Visseaux B, Bal A, Josset L. *Emergence of a genetically distinct cluster of influenza A(H3N2) viruses within subclade J.2.2 associated with hospitalization during the 2024–2025 season in Auvergne–Rhône–Alpes, France.* Microbial Genomics 2026;12:001810. [doi:10.1099/mgen.0.001810](https://doi.org/10.1099/mgen.0.001810) (open access, CC-BY). Please also cite IQ-TREE, TreeTime, TreeCluster, MAFFT, Nextclade and ggtree when you use it.
