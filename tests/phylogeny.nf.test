@@ -1,0 +1,168 @@
+import groovy.json.JsonSlurper
+
+nextflow_pipeline {
+
+    name "Test Pipeline Phylogenetics"
+    script "nf_pipeline/main.nf"
+
+    test("Should skip the source panel (no ORIGINATING_LAB in humanmetadata.csv) and report 6 QC candidates / 3 passed") {
+
+        when {
+            params {
+                protocol = "HUMAN"
+                protocols = [
+                    HUMAN: [
+                        directory: "${projectDir}/protocols/HUMAN",
+                        resources: "${projectDir}/protocols/HUMAN/v1"
+                    ]
+                ]
+                inputFasta = "${projectDir}/tests/data/HUMAN.fasta"
+                outDir = "tests/results/phylo_test_1"
+                metadata = "${projectDir}/tests/data/humanmetadata.csv"
+                phylogenetics = true
+                aaPositions = "HA1:62,HA1:145,HA1:239"
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def outputDir = path("$baseDir/tests/results/phylo_test_1")
+            def manifestFile = outputDir.resolve("phylogeny/run_manifest.json")
+            assert manifestFile.exists() : "run_manifest.json was not published under phylogeny/"
+
+            def manifest = new JsonSlurper().parse(manifestFile.toFile())
+            assert manifest.qc.candidates == 6 : "expected 6 QC candidates, got ${manifest.qc.candidates}"
+            assert manifest.qc.passed == 3 : "expected 3 passed, got ${manifest.qc.passed}"
+
+            def skippedPanels = manifest.panels.skipped.collect { it.panel }
+            assert skippedPanels.contains("source") : "source panel should be skipped (humanmetadata.csv has no ORIGINATING_LAB column): ${manifest.panels}"
+
+            def htmlReport = outputDir.resolve("phylogeny/PhylogeneticTreeReport.html")
+            assert htmlReport.exists() : "PhylogeneticTreeReport.html was not published under phylogeny/"
+
+            def dashboard = outputDir.resolve("index.html")
+            assert dashboard.exists() : "index.html was not published"
+            assert dashboard.text.contains('"title": "Phylogenetic Tree"') : "index.html's catalog does not list the Phylogenetic Tree report"
+        }
+    }
+
+    test("Should render the source panel and group labs with --labMap; season/age/sex come from humanmetadata_labs.csv") {
+
+        when {
+            params {
+                protocol = "HUMAN"
+                protocols = [
+                    HUMAN: [
+                        directory: "${projectDir}/protocols/HUMAN",
+                        resources: "${projectDir}/protocols/HUMAN/v1"
+                    ]
+                ]
+                inputFasta = "${projectDir}/tests/data/HUMAN.fasta"
+                outDir = "tests/results/phylo_test_2"
+                metadata = "${projectDir}/tests/data/humanmetadata_labs.csv"
+                labMap = "${projectDir}/tests/data/lab_map_cat.tsv"
+                phylogenetics = true
+                aaPositions = "HA1:62,HA1:145,HA1:239"
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def outputDir = path("$baseDir/tests/results/phylo_test_2")
+            def manifestFile = outputDir.resolve("phylogeny/run_manifest.json")
+            def manifest = new JsonSlurper().parse(manifestFile.toFile())
+            def renderedPanels = manifest.panels.rendered
+            assert renderedPanels.contains("source") : "source panel should be rendered with --labMap: ${manifest.panels}"
+
+            def annotationsFile = outputDir.resolve("phylogeny/annotations.tsv")
+            assert annotationsFile.exists()
+            def lines = annotationsFile.text.readLines()
+            def header = lines[0].split("\t", -1)
+            def byId = lines.drop(1).collectEntries { line -> def f = line.split("\t", -1); [(f[0]): f] }
+            def col = { String name -> header.toList().indexOf(name) }
+            def sourceIdx = col("source_group")
+            def seasonIdx = col("season")
+            def ageIdx = col("age_group")
+            def sexIdx = col("sex")
+
+            // lab_map_cat.tsv: CAP El Carmel -> Community, Hospital Universitari Vall d'Hebron -> Hospital,
+            // Hospital Universitari Germans Trias i Pujol -> Hospital
+            assert byId["01816372"][sourceIdx] == "Community" : "01816372 should be grouped as Community: ${byId['01816372']}"
+            assert byId["01818936"][sourceIdx] == "Hospital" : "01818936 should be grouped as Hospital: ${byId['01818936']}"
+            assert byId["198353883"][sourceIdx] == "Hospital" : "198353883 should be grouped as Hospital: ${byId['198353883']}"
+
+            // humanmetadata_labs.csv DATEs: 01816372=2024-11-08 and 198353883=2024-11-23 (season 2024-2025);
+            // 01818936=2024-08-23 (season 2023-2024)
+            assert byId["01818936"][seasonIdx] == "2023-2024" : "01818936 should be season 2023-2024: ${byId['01818936']}"
+            assert byId["01816372"][seasonIdx] == "2024-2025" : "01816372 should be season 2024-2025: ${byId['01816372']}"
+            assert byId["198353883"][seasonIdx] == "2024-2025" : "198353883 should be season 2024-2025: ${byId['198353883']}"
+
+            assert byId["01816372"][ageIdx] == "15-65" && byId["01816372"][sexIdx] == "F"
+            assert byId["01818936"][ageIdx] == "65+" && byId["01818936"][sexIdx] == "M"
+            assert byId["198353883"][ageIdx] == "65+" && byId["198353883"][sexIdx] == "M"
+
+            def htmlReport = outputDir.resolve("phylogeny/PhylogeneticTreeReport.html")
+            assert htmlReport.exists() : "PhylogeneticTreeReport.html was not published under phylogeny/"
+
+            def dashboard = outputDir.resolve("index.html")
+            assert dashboard.exists()
+            assert dashboard.text.contains('"title": "Phylogenetic Tree"') : "index.html's catalog does not list the Phylogenetic Tree report"
+        }
+    }
+
+    test("Should fail when an amino acid position is out of range (HA1:400)") {
+
+        when {
+            params {
+                protocol = "HUMAN"
+                protocols = [
+                    HUMAN: [
+                        directory: "${projectDir}/protocols/HUMAN",
+                        resources: "${projectDir}/protocols/HUMAN/v1"
+                    ]
+                ]
+                inputFasta = "${projectDir}/tests/data/HUMAN.fasta"
+                outDir = "tests/results/phylo_test_3"
+                metadata = "${projectDir}/tests/data/humanmetadata.csv"
+                phylogenetics = true
+                aaPositions = "HA1:400"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            assert workflow.stdout.join("\n").contains("valid positions for HA1 are 1-329")
+        }
+    }
+
+    test("Should fail fast, before any process runs, when --periodBin is 'year'") {
+
+        when {
+            params {
+                protocol = "HUMAN"
+                protocols = [
+                    HUMAN: [
+                        directory: "${projectDir}/protocols/HUMAN",
+                        resources: "${projectDir}/protocols/HUMAN/v1"
+                    ]
+                ]
+                inputFasta = "${projectDir}/tests/data/HUMAN.fasta"
+                outDir = "tests/results/phylo_test_4"
+                metadata = "${projectDir}/tests/data/humanmetadata.csv"
+                phylogenetics = true
+                aaPositions = "HA1:62,HA1:145,HA1:239"
+                periodBin = "year"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            assert workflow.stdout.join("\n").contains("--periodBin must be one of month, week or none")
+            // Parameter validation happens before the input FASTA is even parsed: no process should have run
+            assert workflow.trace.succeeded().size() == 0
+        }
+    }
+
+}

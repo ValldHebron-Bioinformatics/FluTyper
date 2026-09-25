@@ -23,6 +23,7 @@ include { MergeHistoricalData       } from './modules/MergeHistoricalData'
 include { GeographicReport          } from './modules/GeographicReport'
 include { MetadataMerge             } from './modules/MetadataMerge'
 include { MergeReports              } from './modules/MergeReports.nf'
+include { PHYLOGENETICS; parseAaPositions; validatePhyloParams } from './subworkflows/Phylogenetics'
 
 // Comprovació invisible per decidir si generem el mapa
 def check_location_column(metadata_path) {
@@ -48,6 +49,17 @@ workflow {
     } else if (params.protocol != "AVIAN" && params.protocol != "HUMAN") {
         def available = params.protocols.keySet() 
         exit 1, "PROTOCOL ERROR: Invalid protocol specified ('${params.protocol}'). Available protocols are: ${available}."
+    }
+
+    // PHYLOGENETICS PARAMETER VALIDATION: fail fast, before any process runs
+    def run_phylogenetics = params.get('phylogenetics', false).toString().toLowerCase() == 'true'
+    def phylo_positions = []
+    if (run_phylogenetics) {
+        def phylo_errors = validatePhyloParams(params)
+        if (phylo_errors) {
+            exit 1, "PHYLOGENETICS ERROR:\n  " + phylo_errors.join("\n  ")
+        }
+        phylo_positions = parseAaPositions(params.aaPositions, params.aaGene)
     }
 
     // INPUT & INITIAL FOLDER ORGANIZATION
@@ -248,6 +260,24 @@ workflow {
         ch_geo_report = GeographicReport.out.geo_report
     }
 
+    // PHYLOGENETICS (OPTIONAL, --phylogenetics): annotated whole-genome tree of the phyloSubtype samples
+    ch_phylogeny = channel.empty()
+    ch_phylo_errors = channel.empty()
+    ch_phylo_report = channel.empty()
+    if (run_phylogenetics) {
+        PHYLOGENETICS(
+            GenotypingInfo_ch,
+            OrganizeBySample.out.results,
+            GenotypingNextclade.out.results,
+            GetDatasets.out,
+            final_metadata_ch,
+            phylo_positions.collect { pos -> pos.label }
+        )
+        ch_phylogeny = PHYLOGENETICS.out.outputs
+        ch_phylo_errors = PHYLOGENETICS.out.errors
+        ch_phylo_report = PHYLOGENETICS.out.report
+    }
+
     // CONDITIONALLY RUN INDIVIDUAL GRAPHIC REPORTS
     if (params.get('IndividualReports', false).toString().toLowerCase() == 'true') {
         IndividualMutations_Ch = MutationsFinder.out.results.map { sample_id, _mut_files, combined_csv -> tuple(sample_id, combined_csv) }
@@ -263,7 +293,8 @@ workflow {
             GenotypingResults.out.errors,
             GetCDS.out.errors,
             TranslateToProtein.out.errors,
-            MutationsFinder.out.errors
+            MutationsFinder.out.errors,
+            ch_phylo_errors
         )
         
     Errors_ch = BaseErrors_ch.groupTuple()
@@ -288,6 +319,7 @@ workflow {
         .mix(ch_interactive_mutations_table)
         .mix(date_report_ch)
         .mix(ch_geo_report)
+        .mix(ch_phylo_report)
         .collect()
 
     MergeReports(all_reports_ch)
@@ -308,6 +340,7 @@ workflow {
     merged_metadata = final_metadata_ch
     errors = CompileErrors.out.map { _id, log -> log }
     errors_merged = ErrorsMerged_ch
+    phylogeny = ch_phylogeny
 
     onComplete:
     // Processes use errorStrategy 'ignore', so a failed task silently drops its outputs: make that visible
@@ -375,6 +408,10 @@ output {
     }
     errors_merged {
         path { "${projectDir}/../${params.outDir}" }
+        mode "copy"
+    }
+    phylogeny {
+        path { "${projectDir}/../${params.outDir}/phylogeny" }
         mode "copy"
     }
 }
