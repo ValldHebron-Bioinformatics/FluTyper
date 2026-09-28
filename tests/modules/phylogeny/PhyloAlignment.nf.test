@@ -101,7 +101,12 @@ nextflow_process {
             assert process.success
             assert process.out.alignment.size() == 0 : "no alignment should be emitted when fewer than 3 samples passed QC"
             assert process.out.segments.size() == 0
-            assert process.stdout.join("\\n").contains("at least 3 are needed")
+            // Read the task's own stderr: Nextflow's console only prints a one-line NOTE for an ignored failure
+            def taskErr = ""
+            new File("${launchDir}/work").eachFileRecurse(groovy.io.FileType.FILES) {
+                if (it.name == ".command.err") taskErr += it.text
+            }
+            assert taskErr.contains("at least 3 are needed")
         }
     }
 
