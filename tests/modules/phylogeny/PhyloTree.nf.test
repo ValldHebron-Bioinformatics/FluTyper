@@ -113,4 +113,27 @@ nextflow_process {
         }
     }
 
+    test("Should cap IQ-TREE threads at the available cores when more cpus are requested") {
+
+        config "./PhyloTree_many_cpus.config"
+
+        when {
+            process {
+                """
+                input[0] = file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true)
+                input[1] = "REF_A_Darwin_6_2021"
+                input[2] = "GTR+G4"
+                input[3] = 0
+                input[4] = 12345
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.tree.size() == 1 : "the tree should still be built when more cpus are requested than cores exist"
+            assert process.stdout.join("\\n").contains("cpus requested but only")
+        }
+    }
+
 }

@@ -6,7 +6,8 @@ process PhyloTree {
     // bootstrap support (--bootstrap, default 1000; 0 disables it). Branch lengths are substitutions per site and
     // the tree is rooted on the outgroup root strain (--phyloOutgroup). Internal nodes are then named NODE_0000001...
     // in preorder so that TreeTime, TreeCluster and the figure refer to the same nodes; support values are kept in
-    // node_support.tsv. A fixed --seed and thread count make the run reproducible.
+    // node_support.tsv. A fixed --seed and thread count make the run reproducible;
+    // the thread count is capped at the cores available, with a warning when that lowers it.
     label 'big_mem'
     errorStrategy 'ignore'
     // Cache on file content: PhyloPreflight reruns when --aa-positions changes, but its reference outputs do not
@@ -30,7 +31,14 @@ process PhyloTree {
     script:
     def bootstrap_opt = bootstrap.toString().toInteger() > 0 ? "-B ${bootstrap}" : ""
     """
-    iqtree2 -s "${alignment}" -m "${model}" ${bootstrap_opt} -seed ${seed} -T ${task.cpus} \\
+    # IQ-TREE aborts when -T exceeds the machine's cores, so cap it; a different thread count can change the tree slightly
+    threads=${task.cpus}
+    cores=\$(nproc)
+    if [ "\$threads" -gt "\$cores" ]; then
+        echo "PhyloTree: WARNING ${task.cpus} cpus requested but only \$cores cores available; IQ-TREE runs with \$cores threads."
+        threads=\$cores
+    fi
+    iqtree2 -s "${alignment}" -m "${model}" ${bootstrap_opt} -seed ${seed} -T \$threads \\
         -o "${outgroup_tip}" --prefix phylo -quiet
     # Surface IQ-TREE warnings (e.g. identical sequences) that would otherwise stay in phylo.log
     grep -E "^WARNING" phylo.log | sed "s/^/PhyloTree: IQ-TREE /" || true
