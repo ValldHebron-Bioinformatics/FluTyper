@@ -125,4 +125,5 @@ jobs:
         run: nf-test test tests/modules/phylogeny/*.nf.test --verbose
 
       - name: Run Phylogenetics Pipeline Tests
-        run: nf-test test tests/phylogeny.nf.test --verbose
+        # ci profile: the default 12 big_mem cpus exceed the runner's cores and IQ-TREE aborts on that
+        run: nf-test test tests/phylogeny.nf.test --profile ci --verbose
