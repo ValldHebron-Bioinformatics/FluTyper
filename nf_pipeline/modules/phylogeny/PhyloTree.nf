@@ -12,7 +12,6 @@ process PhyloTree {
     errorStrategy 'ignore'
     // Cache on file content: PhyloPreflight reruns when --aa-positions changes, but its reference outputs do not
     cache 'deep'
-    debug true
 
     input:
     // tree_id e.g. "H3N2" (whole genome) or "H3N2_HA" (segment tree): globally unique, used for filenames downstream.
@@ -31,25 +30,28 @@ process PhyloTree {
     tuple val(tree_id), path("${tree_folder}/phylo_tree.nwk"),   emit: tree
     tuple val(tree_id), path("${tree_folder}/node_support.tsv"), emit: support
     tuple val(tree_id), path("${tree_folder}/phylo.iqtree"),     emit: report
-    tuple val(tree_id), path("${tree_folder}/phylo.log"),        emit: log
+    tuple val(tree_id), path("${tree_folder}/phylo.log"),        emit: log       // IQ-TREE's own log (internal; not the published phylo.log)
+    tuple val(tree_id), path("iqtree.log"),                      emit: step_log  // this step's messages, collected into the tree's phylo.log
     // Everything PhyloPostTree needs, in the exact shape it takes: no join required to call it
     tuple val(tree_id), val(tree_folder), path("${tree_folder}/phylo_tree.nwk"), path("${tree_folder}/node_support.tsv"), path(alignment), path(segments_tsv), emit: for_post_tree
 
     script:
     def bootstrap_opt = bootstrap.toString().toInteger() > 0 ? "-B ${bootstrap}" : ""
     """
+    # Step messages go to iqtree.log (part of the tree's phylo.log), not the terminal
+    : > iqtree.log
     mkdir -p "${tree_folder}"
     # IQ-TREE aborts when -T exceeds the machine's cores, so cap it; a different thread count can change the tree slightly
     threads=${task.cpus}
     cores=\$(nproc)
     if [ "\$threads" -gt "\$cores" ]; then
-        echo "PhyloTree: WARNING ${task.cpus} cpus requested but only \$cores cores available; IQ-TREE runs with \$cores threads."
+        echo "PhyloTree: WARNING ${task.cpus} cpus requested but only \$cores cores available; IQ-TREE runs with \$cores threads." >> iqtree.log
         threads=\$cores
     fi
     iqtree2 -s "${alignment}" -m "${model}" ${bootstrap_opt} -seed ${seed} -T \$threads \\
         -o "${outgroup_tip}" --prefix "${tree_folder}/phylo" -quiet
     # Surface IQ-TREE warnings (e.g. identical sequences) that would otherwise stay in phylo.log
-    grep -E "^WARNING" "${tree_folder}/phylo.log" | sed "s/^/PhyloTree: IQ-TREE /" || true
+    grep -E "^WARNING" "${tree_folder}/phylo.log" | sed "s/^/PhyloTree: IQ-TREE /" >> iqtree.log || true
 
     python3 - <<'PYEOF'
 from Bio import Phylo

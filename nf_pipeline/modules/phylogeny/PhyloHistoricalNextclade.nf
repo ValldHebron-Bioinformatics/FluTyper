@@ -7,7 +7,6 @@ process PhyloHistoricalNextclade {
     // segment against the current subtype's dataset instead of leaving it with subclade NA (mirrors the Nextclade
     // call of GenotypingNextclade, minus genin2, which PHYLOGENETICS does not need).
     errorStrategy 'ignore'
-    debug true
 
     input:
     tuple val(sample_id), path(ha_fasta), path(dataset_dir)

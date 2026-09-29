@@ -31,18 +31,30 @@ nextflow_pipeline {
             assert workflow.success
 
             def outputDir = path("$baseDir/tests/results/phylo_test_1")
-            def manifestFile = outputDir.resolve("phylogeny/H3N2/whole_genome/run_manifest.json")
-            assert manifestFile.exists() : "run_manifest.json was not published under phylogeny/H3N2/whole_genome/"
+            def manifestFile = PhyloTestHelpers.workFile(workflow.stdout, "whole_genome", "run_manifest.json")
+            assert !outputDir.resolve("phylogeny/H3N2/whole_genome/run_manifest.json").exists() : "run_manifest.json must stay in work/, not be published"
 
-            def manifest = new JsonSlurper().parse(manifestFile.toFile())
+            def manifest = new JsonSlurper().parse(manifestFile)
             assert manifest.qc.candidates == 6 : "expected 6 QC candidates, got ${manifest.qc.candidates}"
             assert manifest.qc.passed == 3 : "expected 3 passed, got ${manifest.qc.passed}"
 
             def skippedPanels = manifest.panels.skipped.collect { it.panel }
             assert skippedPanels.contains("source") : "source panel should be skipped (humanmetadata.csv has no ORIGINATING_LAB column): ${manifest.panels}"
 
-            def htmlReport = outputDir.resolve("phylogeny/H3N2/whole_genome/PhylogeneticTreeReport_H3N2.html")
-            assert htmlReport.exists() : "PhylogeneticTreeReport_H3N2.html was not published under phylogeny/H3N2/whole_genome/"
+            def phyloLog = PhyloTestHelpers.checkTreeFolder(outputDir.resolve("phylogeny/H3N2/whole_genome"), "H3N2")
+            // phylo.log: preflight note, the coverage QC summary (samples in / dropped) and the step messages, in order
+            assert phyloLog.contains("PhyloPreflight: all phylogenetics tools found.")
+            assert phyloLog.contains("PhyloCoverageQC: 3 of 6 candidate samples enter this tree; 3 dropped.") : phyloLog
+            assert phyloLog.contains("PhyloAlignment: whole-genome alignment of")
+            assert phyloLog.contains("PhyloPostTree: ")
+            assert phyloLog.contains("PhyloReport: INFO panel 'source' omitted")
+            assert phyloLog.indexOf("## Preflight") < phyloLog.indexOf("## Coverage QC") && phyloLog.indexOf("## Coverage QC") < phyloLog.indexOf("## Alignment") &&
+                   phyloLog.indexOf("## Alignment") < phyloLog.indexOf("## IQ-TREE") && phyloLog.indexOf("## IQ-TREE") < phyloLog.indexOf("## Report")
+            // no other phylogenetics file is published, neither per tree nor for the subtype
+            assert outputDir.resolve("phylogeny/H3N2").toFile().list().toList() == ["whole_genome"] : outputDir.resolve("phylogeny/H3N2").toFile().list().toList()
+
+            PhyloTestHelpers.checkQuietTerminal(workflow.stdout)
+            assert PhyloTestHelpers.countLines(workflow.stdout, "PHYLOGENETICS(H3N2): whole-genome tree built (3 samples) -> phylogeny/H3N2/") == 1
 
             def dashboard = outputDir.resolve("index.html")
             assert dashboard.exists() : "index.html was not published"
@@ -77,13 +89,12 @@ nextflow_pipeline {
             assert workflow.success
 
             def outputDir = path("$baseDir/tests/results/phylo_test_2")
-            def manifestFile = outputDir.resolve("phylogeny/H3N2/whole_genome/run_manifest.json")
-            def manifest = new JsonSlurper().parse(manifestFile.toFile())
+            def manifestFile = PhyloTestHelpers.workFile(workflow.stdout, "whole_genome", "run_manifest.json")
+            def manifest = new JsonSlurper().parse(manifestFile)
             def renderedPanels = manifest.panels.rendered
             assert renderedPanels.contains("source") : "source panel should be rendered with --labMap: ${manifest.panels}"
 
-            def annotationsFile = outputDir.resolve("phylogeny/H3N2/whole_genome/annotations.tsv")
-            assert annotationsFile.exists()
+            def annotationsFile = PhyloTestHelpers.workFile(workflow.stdout, "whole_genome", "annotations.tsv")
             def lines = annotationsFile.text.readLines()
             def header = lines[0].split("\t", -1)
             def byId = lines.drop(1).collectEntries { line -> def f = line.split("\t", -1); [(f[0]): f] }
@@ -109,8 +120,7 @@ nextflow_pipeline {
             assert byId["01818936"][ageIdx] == "65+" && byId["01818936"][sexIdx] == "M"
             assert byId["198353883"][ageIdx] == "65+" && byId["198353883"][sexIdx] == "M"
 
-            def htmlReport = outputDir.resolve("phylogeny/H3N2/whole_genome/PhylogeneticTreeReport_H3N2.html")
-            assert htmlReport.exists() : "PhylogeneticTreeReport_H3N2.html was not published under phylogeny/H3N2/whole_genome/"
+            PhyloTestHelpers.checkTreeFolder(outputDir.resolve("phylogeny/H3N2/whole_genome"), "H3N2")
 
             def dashboard = outputDir.resolve("index.html")
             assert dashboard.exists()
@@ -205,14 +215,19 @@ nextflow_pipeline {
             // HA and PA are both expected to have >= 3 samples passing their own coverage QC (same fixture as
             // phylo_test_1/2): with --phyloSegmentTrees "all" (the default), every segment with enough samples
             // should build its own tree, not just HA.
-            def haManifest = outputDir.resolve("phylogeny/H3N2/HA/run_manifest.json")
-            assert haManifest.exists() : "HA segment tree run_manifest.json was not published under phylogeny/H3N2/HA/"
-            def haReport = outputDir.resolve("phylogeny/H3N2/HA/PhylogeneticTreeReport_H3N2_HA.html")
-            assert haReport.exists() : "PhylogeneticTreeReport_H3N2_HA.html was not published under phylogeny/H3N2/HA/"
-            def paManifest = outputDir.resolve("phylogeny/H3N2/PA/run_manifest.json")
-            assert paManifest.exists() : "PA segment tree run_manifest.json was not published under phylogeny/H3N2/PA/"
-            def paReport = outputDir.resolve("phylogeny/H3N2/PA/PhylogeneticTreeReport_H3N2_PA.html")
-            assert paReport.exists() : "PhylogeneticTreeReport_H3N2_PA.html was not published under phylogeny/H3N2/PA/"
+            def haLog = PhyloTestHelpers.checkTreeFolder(outputDir.resolve("phylogeny/H3N2/HA"), "H3N2_HA")
+            def paLog = PhyloTestHelpers.checkTreeFolder(outputDir.resolve("phylogeny/H3N2/PA"), "H3N2_PA")
+            assert haLog.contains("PhyloSegmentAlignment: HA alignment of") && haLog.contains("PhyloCoverageQC:") : haLog
+            // PA: the configured outgroup A/Darwin/6/2021 has no PA segment; both the preflight note and the
+            // outgroup fallback of this tree end up in its own phylo.log (and not in the HA one)
+            assert paLog.contains("PhyloPreflight: A/Darwin/6/2021 has no PA segment in the protocol references") : paLog
+            assert paLog.contains("rooting the PA tree on A/Massachusetts/18/2022 instead") : paLog
+            assert !haLog.contains("has no PA segment") : "PA-only preflight notes must not appear in the HA tree's phylo.log"
+            // the shared subtype-level files are not published, only the tree folders
+            assert outputDir.resolve("phylogeny/H3N2").toFile().list().toList().every { it in ["PB2", "PB1", "PA", "HA", "NP", "NA", "MP", "NS"] }
+            PhyloTestHelpers.checkQuietTerminal(workflow.stdout)
+            // exactly one summary line for the subtype, listing every built segment tree
+            assert workflow.stdout.count { it.startsWith("PHYLOGENETICS(H3N2): ") && it.contains("segment trees built (") && it.contains("HA ") && it.contains("PA ") } == 1
 
             def dashboard = outputDir.resolve("index.html")
             assert dashboard.exists()
@@ -260,9 +275,14 @@ nextflow_pipeline {
             // gate_test.fasta: HA has 3 samples (builds), MP has 1 (<3, skipped), NS has 0 (skipped)
             assert workflow.stdout.join("\n").contains("segment tree MP skipped: only 1 sample(s) passed coverage QC for MP")
             assert workflow.stdout.join("\n").contains("segment tree NS skipped: 0 samples passed coverage QC for NS")
+            // each warning appears once on the terminal (println only, no extra log.warn copy) ...
+            assert PhyloTestHelpers.countLines(workflow.stdout, "segment tree MP skipped") == 1
+            assert PhyloTestHelpers.countLines(workflow.stdout, "segment tree NS skipped") == 1
+            // ... and the subtype summary names what was skipped
+            assert workflow.stdout.count { it.startsWith("PHYLOGENETICS(H3N2): 1 segment tree built (HA 3) -> phylogeny/H3N2/ (skipped: MP, NS)") } == 1
 
             def outputDir = path("$baseDir/tests/results/phylo_test_6")
-            assert outputDir.resolve("phylogeny/H3N2/HA/run_manifest.json").exists() : "HA (3 samples) should still build"
+            PhyloTestHelpers.checkTreeFolder(outputDir.resolve("phylogeny/H3N2/HA"), "H3N2_HA")
             assert !outputDir.resolve("phylogeny/H3N2/MP").exists() : "MP (1 sample) should be skipped"
             assert !outputDir.resolve("phylogeny/H3N2/NS").exists() : "NS (0 samples) should be skipped"
         }
@@ -294,11 +314,11 @@ nextflow_pipeline {
             assert workflow.stdout.join("\n").contains("PHYLOGENETICS(H1N1pdm09): no H1N1 samples were found, so no phylogeny is built.")
 
             def outputDir = path("$baseDir/tests/results/phylo_test_7")
-            assert outputDir.resolve("phylogeny/H3N2/HA/run_manifest.json").exists() : "the H3N2 HA tree should still be built"
-            // The subtype's top-level scaffolding (phylo_coverage_qc.tsv etc.) still publishes unconditionally, but
-            // with 0 candidates no tree subfolder should ever appear
-            assert !outputDir.resolve("phylogeny/H1N1pdm09/HA").exists() : "H1N1pdm09 has no candidates, so no HA tree is built"
-            assert !outputDir.resolve("phylogeny/H1N1pdm09/whole_genome").exists() : "H1N1pdm09 has no candidates, so no whole-genome tree is built"
+            PhyloTestHelpers.checkTreeFolder(outputDir.resolve("phylogeny/H3N2/HA"), "H3N2_HA")
+            // No shared subtype-level file is published any more, and with 0 candidates H1N1pdm09 publishes nothing
+            assert !outputDir.resolve("phylogeny/H1N1pdm09").exists() : "H1N1pdm09 has no candidates, so it publishes nothing"
+            assert PhyloTestHelpers.countLines(workflow.stdout, "no H1N1 samples were found") == 1 : "the 'no samples' warning must appear exactly once"
+            assert PhyloTestHelpers.countLines(workflow.stdout, "PHYLOGENETICS(H1N1pdm09): ") == 1 : "only the 'no samples' line is expected for H1N1pdm09"
 
             def dashboard = outputDir.resolve("index.html")
             assert dashboard.exists() : "index.html was not published"
@@ -335,18 +355,17 @@ nextflow_pipeline {
             def outputDir = path("$baseDir/tests/results/phylo_test_append")
 
             // The new run's own H3N2 tree still builds from gate_test.fasta's 3 samples
-            assert outputDir.resolve("phylogeny/H3N2/HA/run_manifest.json").exists() : "the H3N2 HA tree (from this run's own samples) should still be built"
+            PhyloTestHelpers.checkTreeFolder(outputDir.resolve("phylogeny/H3N2/HA"), "H3N2_HA")
 
             // Finding 1: GetDatasets must fetch the H1 Nextclade dataset from the merged (--append) inferred_subtypes.csv
             // even though the new run's own FASTA has no H1N1 samples at all - otherwise this tree silently vanishes.
-            def h1n1Manifest = outputDir.resolve("phylogeny/H1N1pdm09/HA/run_manifest.json")
-            assert h1n1Manifest.exists() : "the H1N1pdm09 HA tree (built entirely from --append history) was not published: GetDatasets likely did not fetch the H1 dataset for a subtype that only exists in --append history"
+            def h1n1Log = PhyloTestHelpers.checkTreeFolder(outputDir.resolve("phylogeny/H1N1pdm09/HA"), "H1N1pdm09_HA")
             def h1n1Report = outputDir.resolve("phylogeny/H1N1pdm09/HA/PhylogeneticTreeReport_H1N1pdm09_HA.html")
-            assert h1n1Report.exists()
+            assert h1n1Log.contains("PhyloCoverageQC: 4 of 4 candidate samples enter this tree") : h1n1Log
             assert h1n1Report.text.contains("<title>Phylogenetic Tree - H1N1pdm09 - HA segment phylogeny</title>")
 
             // The alignment/tree carries all 4 historical sample IDs plus the subtype's root strains
-            def alignmentText = outputDir.resolve("phylogeny/H1N1pdm09/HA/HA_alignment.fasta").text
+            def alignmentText = PhyloTestHelpers.workFile(workflow.stdout, "HA", "HA_alignment.fasta", "H1S001").text
             ["H1S001", "H1S002", "H1S003", "H1S004"].each { id ->
                 assert alignmentText.contains(id) : "historical sample ${id} is missing from the H1N1pdm09 HA alignment"
             }
@@ -357,7 +376,7 @@ nextflow_pipeline {
             // annotations.tsv: H1S001 has a persisted nextclade_results.csv in --append history (reuse path) and
             // must carry that CSV's own subclade (D.2); H1S002 has none (PhyloHistoricalNextclade rerun path,
             // finding 7) and must still get a real (non-NA) subclade rather than silently losing its output.
-            def annotations = outputDir.resolve("phylogeny/H1N1pdm09/HA/annotations.tsv").text
+            def annotations = PhyloTestHelpers.workFile(workflow.stdout, "HA", "annotations.tsv", "H1S001").text
             def rows = annotations.readLines().drop(1).collect { it.split('\t') }
             def h1s001 = rows.find { it[0] == "H1S001" }
             def h1s002 = rows.find { it[0] == "H1S002" }

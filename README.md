@@ -211,7 +211,7 @@ Open `RESULTS/index.html` and go to the **Phylogenetics** section of the sidebar
 - node labels with the ultrafast bootstrap support, shown only when ≥ `--min-support-label` (default `70`);
 - the heatmap: one solid column per annotation, every cell aligned with its tip; hover over a cell for the sample and its value;
 - season, age group and sex filters (from `--metadata`), which prune the tree to the matching samples while keeping the branch lengths of the full tree; reference strains are always shown;
-- a legend per panel, and the static version of the same figure in `phylo_tree.svg` / `phylo_tree.png` in the tree's output folder.
+- a legend per panel. (The static SVG/PNG version of the figure is still drawn by `PhyloReport`, but like the other intermediate files it stays in `work/` and is not published.)
 
 **Adding a new run to previous results.** With `--append <previous outDir>`, only the new FASTA is processed, but every tree is rebuilt from the previous samples plus the new ones (see [`--append` and phylogenetics](#append-and-phylogenetics)). Add `-resume` when rerunning from the same launch directory to reuse the steps whose inputs did not change (for example, changing only report options reruns just the reports).
 
@@ -233,7 +233,7 @@ nextflow run nf_pipeline/main.nf \
 
 `tests/data/humanmetadata_labs.csv` and `tests/data/lab_map_cat.tsv` are ready-made examples (dummy metadata whose originating labs come from `RESOURCES/coordenades_cat.tsv`, grouped into a hospital vs community split).
 
-**Steps.** The analysis is the `PHYLOGENETICS` subworkflow (`nf_pipeline/subworkflows/Phylogenetics.nf`), made of seven processes in `nf_pipeline/modules/phylogeny/`:
+**Steps.** The analysis is the `PHYLOGENETICS` subworkflow (`nf_pipeline/subworkflows/Phylogenetics.nf`), made of eight processes in `nf_pipeline/modules/phylogeny/` (plus the helper that renames reused historical Nextclade results in `--append` runs):
 
 | Process | Method |
 | --- | --- |
@@ -244,6 +244,7 @@ nextflow run nf_pipeline/main.nf \
 | `PhyloSubclades` | Nextclade `subclade` column (per-sample results; root strains run against the same dataset). |
 | `PhyloPostTree` | TreeTime parsimony ancestral states, translated through the codon map so internal nodes carry amino acid states; TreeCluster single linkage within each subclade, `--clusterThreshold 0.005` subs/site, tips outside a cluster stay `unclustered`; amino acid changes on the branch into each cluster. |
 | `PhyloReport` | `annotations.tsv`, the R/ggtree figure (SVG/PNG), the interactive `PhylogeneticTreeReport_<subtype>.html` and `run_manifest.json`. |
+| `PhyloLog` | Assembles each tree's `phylo.log` from the messages of the steps above and publishes the ML tree as `tree.nwk`. |
 
 Only `PhyloReport` depends on the figure options, so with `-resume` a change of `--aa-positions`, panels, lab map or figure size reruns the preflight check and the report but reuses the alignment, tree, ancestral states and clusters.
 
@@ -263,7 +264,7 @@ HA1,239,H3N2
 NA,247,
 ```
 
-A row's `subtype` (`H3N2` or `H1N1pdm09`) restricts it to that subtype's tree(s); a blank cell or a file with no `subtype` column applies the row to every requested subtype (`NA,247` above lands on both H3N2's and H1N1pdm09's NA tree). `--aa-positions-file` replaces `--aa-positions`/`--aa-positions-h1n1` (and the `aaPositions` default) only for the subtypes it actually has rows for: a subtype it never mentions keeps using its own `--aa-positions(-h1n1)` value, and FluTyper warns if those flags were also given explicitly. The file path and its resolved positions are recorded in `run_manifest.json`. A small example is at `tests/data/phylo/aa_positions_example.csv`.
+A row's `subtype` (`H3N2` or `H1N1pdm09`) restricts it to that subtype's tree(s); a blank cell or a file with no `subtype` column applies the row to every requested subtype (`NA,247` above lands on both H3N2's and H1N1pdm09's NA tree). `--aa-positions-file` replaces `--aa-positions`/`--aa-positions-h1n1` (and the `aaPositions` default) only for the subtypes it actually has rows for: a subtype it never mentions keeps using its own `--aa-positions(-h1n1)` value, and FluTyper warns if those flags were also given explicitly. The file path and its resolved positions are recorded in the tree's `run_manifest.json` (kept in `work/`, see **Outputs**). A small example is at `tests/data/phylo/aa_positions_example.csv`.
 
 **Bootstrap support labels.** Node labels on both the static figure and the interactive tree only show ultrafast bootstrap support ≥ `--minSupportLabel` (default `70`; `0` shows every value). `node_support.tsv` and the tree files always keep every value; only the drawn labels are filtered.
 
@@ -277,7 +278,7 @@ A row's `subtype` (`H3N2` or `H1N1pdm09`) restricts it to that subtype's tree(s)
 | `AGE GROUP`, `SEX` | No | **age group** / **sex** panels and filters of the interactive tree | Panels omitted, INFO line logged; filters disabled |
 | `LOCATION` | No | Not used by this module | — |
 
-The source and period panels are drawn only when their field exists and is non-missing for at least `--min-panel-coverage` (0.8) of the samples; otherwise the panel is left out, an INFO line gives the field and its coverage, the remaining panels close the gap, and the reason is recorded in `run_manifest.json`. The subclade panel is always drawn. A `YYYY-MM` date is placed in its month but has no week. Panels are declared in `RESOURCES/phylo_panels.tsv` (`panel`, `column`, `scale`, `required`), so adding a panel is a new row there.
+The source and period panels are drawn only when their field exists and is non-missing for at least `--min-panel-coverage` (0.8) of the samples; otherwise the panel is left out, an INFO line gives the field and its coverage, the remaining panels close the gap, and the reason is recorded in the tree's `phylo.log` (and `run_manifest.json` in `work/`). The subclade panel is always drawn. A `YYYY-MM` date is placed in its month but has no week. Panels are declared in `RESOURCES/phylo_panels.tsv` (`panel`, `column`, `scale`, `required`), so adding a panel is a new row there.
 
 **Parameters** (kebab-case also works, e.g. `--aa-positions` = `--aaPositions`):
 
@@ -308,7 +309,15 @@ The source and period panels are drawn only when their field exists and is non-m
 | `periodBin` | `month` | `month`, `week` or `none`. |
 | `width` / `height` / `dpi` | `12` / `10` / `300` | Figure size (inches) and PNG resolution. |
 
-**Outputs.** Each requested subtype publishes to its own `<outDir>/phylogeny/<subtype>/` folder (e.g. `phylogeny/H3N2/`, `phylogeny/H1N1pdm09/`). Inside it: subtype-level files shared by every tree of that subtype (`phylo_coverage_qc.tsv`, `gene_map.tsv`, `aa_positions.tsv`, `reference_segments.tsv`, `root_strains.tsv`, `phylo_tool_versions.json`, `subclades.tsv`), and one subfolder per tree actually built: `whole_genome/` (only with `--phyloWholeGenome`) and `<SEG>/` for each built segment tree (e.g. `HA/`, `NA/`). Each tree's own folder has: `<SEG>_alignment.fasta` / `whole_genome/phylo_alignment.fasta` and `..._segments.tsv` (segment trees also get `<SEG>_outgroup.txt` / `<SEG>_root_used.tsv`, recording an outgroup fallback if one was needed), `phylo.treefile` (IQ-TREE tree with support values) and `phylo_tree.nwk` / `node_support.tsv` (named internal nodes, every support value kept even though the figures only label those ≥ `--minSupportLabel`), `ancestral_nt.fasta`, `ancestral_aa/`, `aa_states.tsv`, `annotated_tree.nexus`, `clusters.tsv`, `cluster_mutations.tsv`, `annotations.tsv` (one row per tip: id, subclade, cluster, source group, period, season, age group, sex and the residue at each requested position on that tree's segment(s)), `phylo_tree.svg` / `phylo_tree.png`, `PhylogeneticTreeReport_<subtype>.html` (whole genome) or `PhylogeneticTreeReport_<subtype>_<SEG>.html` (segment tree) — every tree's report is also in `index.html`, switchable from the Subtype and Tree dropdowns — `panels_status.tsv` and `run_manifest.json` (tool versions, resolved parameters, input checksums, method choices, QC outcome, panels rendered and skipped with the reason). Output folders from runs made before this per-tree layout was added use the flat `phylogeny/` layout (single H3N2 whole-genome tree, `PhylogeneticTreeReport.html`) instead.
+**Outputs.** Each requested subtype publishes to its own `<outDir>/phylogeny/<subtype>/` folder (e.g. `phylogeny/H3N2/`, `phylogeny/H1N1pdm09/`), with one subfolder per tree actually built: `whole_genome/` (only with `--phyloWholeGenome`) and `<SEG>/` for each built segment tree (e.g. `HA/`, `NA/`). Each of these folders holds exactly three files:
+
+- `tree.nwk`: the rooted IQ-TREE maximum-likelihood tree, with the ultrafast bootstrap support as node labels and branch lengths in substitutions per site;
+- `phylo.log`: that tree's log, in order: the preflight notes that apply to it (for example `A/Darwin/6/2021 has no PA segment ...` and the outgroup fallback in the PA tree), a coverage QC summary (samples in, samples dropped and why), then the messages of each step (alignment, IQ-TREE warnings, clusters, panels rendered or skipped and why, invariant-position warnings). It is also written when a later step of that tree failed, and then shows where it stopped;
+- `PhylogeneticTreeReport_<subtype>.html` (whole genome) or `PhylogeneticTreeReport_<subtype>_<SEG>.html` (segment tree): the standalone interactive report. The same report is embedded in `index.html`, switchable from the Subtype and Tree dropdowns.
+
+Everything else the module computes (alignments, IQ-TREE report, `annotations.tsv`, ancestral states, `clusters.tsv`, `cluster_mutations.tsv`, the SVG/PNG figure, `panels_status.tsv`, `run_manifest.json` with tool versions, resolved parameters, input checksums and QC outcome, and the subtype-level `phylo_coverage_qc.tsv`, `gene_map.tsv`, `aa_positions.tsv`, `reference_segments.tsv`, `root_strains.tsv`, `phylo_tool_versions.json` and `subclades.tsv`) is still produced but only kept in the run's `work/` folder (find a task's folder with `nextflow log` or the `[xx/yyyyyy]` hash shown by the run); it is not published.
+
+**What the terminal shows.** The phylogenetics steps do not print their per-task messages (they go to each tree's `phylo.log`). The terminal only shows errors that stop the run, warnings you may need to act on (segment trees skipped for lack of samples, historical samples dropped in `--append` mode, a subtype with no samples, trees that failed or never produced a report, also listed in `pipeline_errors.log`) and one summary line per subtype when its trees are done, for example `PHYLOGENETICS(H3N2): 8 segment trees built (PB2 608, PB1 583, PA 567, HA 684, NP 690, NA 685, MP 687, NS 681 samples) -> phylogeny/H3N2/`, followed by `(skipped: ...)` when some segments were left out. Output folders from runs made with earlier versions may contain more files, or use the flat `phylogeny/` layout (single H3N2 whole-genome tree, `PhylogeneticTreeReport.html`).
 
 **Notes and differences from the paper.** The protocol references have no PA segment for A/Darwin/6/2021, so PA coordinates use A/Massachusetts/18/2022 and Darwin's PA is treated as missing data in the H3N2 tree; A/Wisconsin/67/2022 (H1N1pdm09) is complete, so no fallback is used for that subtype. IQ-TREE 2.3.6 is pinned (2.0 is no longer on bioconda). Alignments are not manually curated (the paper used AliView). Clades for non-HA segments are not assigned separately. The tools are pinned in `FluTyper_env.yaml`; with `conda`, create the environment from that file (it uses the `conda-forge` and `bioconda` channels only).
 

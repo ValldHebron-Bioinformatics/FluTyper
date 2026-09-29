@@ -56,7 +56,8 @@ nextflow_process {
             assert sampleLine == "01999999\tNA\tNA\tsample"
 
             // A zero-byte per-sample CSV has no Nextclade row: PhyloSubclades reports it and sets subclade/clade to NA
-            assert process.stdout.join("\\n").contains("no Nextclade row")
+            assert path(process.out.log.get(0)).text.contains("no Nextclade row")
+            assert !process.stdout.join("\\n").contains("PhyloSubclades:") : "PhyloSubclades no longer prints step messages to the terminal"
         }
     }
 

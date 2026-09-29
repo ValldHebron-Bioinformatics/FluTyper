@@ -116,8 +116,9 @@ nextflow_process {
             assert sourceRow.split("\t")[2] == "skipped" : "source panel should be skipped: ${sourceRow}"
             assert sourceRow.contains("ORIGINATING_LAB")
 
-            // The R script prints an INFO line for every omitted panel
-            assert process.stdout.join("\\n").contains("INFO panel 'source' omitted")
+            // The R script prints an INFO line for every omitted panel; it goes to the step log (phylo.log), not the terminal
+            assert path(process.out.step_log.get(0)[1]).text.contains("INFO panel 'source' omitted")
+            assert !process.stdout.join("\\n").contains("PhyloReport:") : "PhyloReport no longer prints step messages to the terminal"
         }
     }
 
@@ -383,7 +384,7 @@ nextflow_process {
 
             def sources = path(process.out.sources.get(0)[1]).text
             assert sources.contains("grouped with --labMap")
-            assert process.stdout.join("\\n").contains("--labMap matched")
+            assert path(process.out.step_log.get(0)[1]).text.contains("--labMap matched")
         }
     }
 

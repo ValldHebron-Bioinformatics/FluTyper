@@ -16,7 +16,6 @@ process PhyloPostTree {
     errorStrategy 'ignore'
     // Cache on file content: PhyloPreflight reruns when --aa-positions changes, but its reference outputs do not
     cache 'deep'
-    debug true
 
     input:
     // tree_id e.g. "H3N2" (whole genome) or "H3N2_HA" (segment tree): globally unique, used for filenames downstream.
@@ -43,14 +42,17 @@ process PhyloPostTree {
     // trees' PhyloReport calls silently never fired), so for_report gets its own, single-purpose copies instead.
     tuple val(tree_id), val(tree_folder), path("report_bundle/tree.nwk"), path("report_bundle/support.tsv"),
           path("report_bundle/clusters.tsv"), path("report_bundle/ancestral_aa"), path("report_bundle/segments.tsv"), emit: for_report
+    tuple val(tree_id), path("posttree.log"), emit: step_log   // this step's messages, collected into the tree's phylo.log
 
     script:
     """
+    # Step messages go to posttree.log (part of the tree's phylo.log), not the terminal
+    : > posttree.log
     mkdir -p "${tree_folder}"
     # ---- 1. Ancestral reconstruction ----
     treetime ancestral --aln "${alignment}" --tree "${tree}" --method-anc parsimony --outdir treetime_out > treetime.log 2>&1 \\
         || { cat treetime.log >&2; exit 1; }
-    grep -iE "warn" treetime.log | sed "s/^/PhyloPostTree: TreeTime /" || true
+    grep -iE "warn" treetime.log | sed "s/^/PhyloPostTree: TreeTime /" >> posttree.log || true
     cp treetime_out/ancestral_sequences.fasta "${tree_folder}/ancestral_nt.fasta"
     cp treetime_out/annotated_tree.nexus "${tree_folder}/annotated_tree.nexus"
 
@@ -202,7 +204,8 @@ with open(f"{TREE_FOLDER}/cluster_mutations.tsv", "w", newline="") as f:
     w.writerow(["cluster", "subclade", "mrca_node", "gene", "position", "parent_aa", "mrca_aa", "mutation",
                 "n_cluster_with", "n_cluster", "n_other_subclade_with", "n_other_subclade", "exclusive_in_subclade"])
     w.writerows(rows)
-print(f"PhyloPostTree: {len(clusters)} clusters; {sum(1 for v in cluster_of.values() if v == 'unclustered')} samples unclustered.")
+with open("posttree.log", "a") as log:
+    log.write(f"PhyloPostTree: {len(clusters)} clusters; {sum(1 for v in cluster_of.values() if v == 'unclustered')} samples unclustered.\\n")
 PYEOF
 
     # ---- 3. Bundle for PhyloReport (own copies, see the comment on for_report above) ----

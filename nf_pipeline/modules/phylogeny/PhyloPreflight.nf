@@ -13,7 +13,6 @@ process PhyloPreflight {
     //     against them, so amino acid numbering follows the protocol CDS (HA1 = mature HA1 numbering).
     //  5. Validates --aa-positions against that reference translation and fails fast when a position is out of range.
     errorStrategy 'terminate'
-    debug true
 
     input:
     val(expected_tools_b64)   // base64 JSON {tool: expected_version}, from params.phyloTools
@@ -34,6 +33,7 @@ process PhyloPreflight {
     path("root_strains.tsv"),         emit: root_table
     path("gene_map.tsv"),             emit: gene_map
     path("aa_positions.tsv"),         emit: positions
+    path("preflight.log"),            emit: log        // notes for the per-tree phylo.log, see say() below
 
     script:
     """
@@ -45,6 +45,14 @@ from Bio.Seq import Seq
 def fail(msg):
     sys.stderr.write(f"PhyloPreflight: {msg}\\n")
     sys.exit(1)
+
+# Notes are not printed to the terminal: they are collected in preflight.log for each tree's phylo.log. One line per
+# note, "<segments>\\t<message>": segments (comma-separated) restricts the note to the trees of those segments (the
+# whole-genome tree includes every segment); empty means it concerns every tree of the subtype.
+open("preflight.log", "w").close()
+def say(msg, segments=""):
+    with open("preflight.log", "a") as f:
+        f.write(f"{segments}\\t{msg}\\n")
 
 def write_tsv(path, header, rows):
     with open(path, "w", newline="") as f:
@@ -92,7 +100,7 @@ for tool, want in expected.items():
         missing.append(f"{kind} '{tool}' (expected version {want})")
         status = "missing"
     elif found != str(want):
-        print(f"PhyloPreflight: WARNING {kind} '{tool}' is version {found}, expected {want}. Results may differ from the pinned environment.")
+        say(f"WARNING {kind} '{tool}' is version {found}, expected {want}. Results may differ from the pinned environment.")
         status = "version_mismatch"
     else:
         status = "ok"
@@ -103,7 +111,7 @@ with open("phylo_tool_versions.json", "w") as f:
 if missing:
     fail("the phylogenetics module needs tools that are not installed:\\n  - " + "\\n  - ".join(missing)
          + "\\nInstall them with: conda env update -f FluTyper_env.yaml (or run without --phylogenetics).")
-print("PhyloPreflight: all phylogenetics tools found.")
+say("all phylogenetics tools found.")
 
 # ---- 2. Coordinate reference of each segment -----------------------------------------------------------------------
 subtype = "${subtype}"
@@ -129,7 +137,7 @@ def find_segment(strain, seg):
     prefix = f"{ref_subtype}_{seg}_{strain.replace(' ', '_')}"
     hits = [r for r in genomes if r.description == prefix or r.description.startswith(prefix + "_")]
     if len(hits) > 1:
-        print(f"PhyloPreflight: WARNING {len(hits)} records match {prefix}; using the first one.")
+        say(f"WARNING {len(hits)} records match {prefix}; using the first one.", seg)
     return str(hits[0].seq).upper().replace("U", "T") if hits else None
 
 coord = {}
@@ -142,7 +150,7 @@ for seg in segments:
     else:
         fail(f"segment {seg} is missing for both the reference {reference} and the fallback {fallback} in ${ref_genomes}.")
     if coord[seg][0] != reference:
-        print(f"PhyloPreflight: {reference} has no {seg} segment in the protocol references; {seg} coordinates use {coord[seg][0]}.")
+        say(f"{reference} has no {seg} segment in the protocol references; {seg} coordinates use {coord[seg][0]}.", seg)
 
 with open("reference_segments.fasta", "w") as out:
     for seg in segments:
@@ -165,7 +173,7 @@ with open("phylo_references.fasta", "w") as out:
         if not present:
             fail(f"root strain {strain} ({subtype}) is not in ${ref_genomes}.")
         if absent:
-            print(f"PhyloPreflight: root strain {strain} has no {','.join(absent)} segment(s); coded as missing data in the alignment.")
+            say(f"root strain {strain} has no {','.join(absent)} segment(s); coded as missing data in the alignment.", ",".join(absent))
         root_rows.append([strain, ref_id(strain), ",".join(present), ",".join(absent)])
 write_tsv("root_strains.tsv", ["strain", "tip_id", "segments_present", "segments_missing"], root_rows)
 
@@ -214,10 +222,10 @@ for seg in segments:
         if gene_rows and gene_rows[-1][-1] == "*":
             gene_rows.pop()
         if n_codons and matches / n_codons < 0.9:
-            print(f"PhyloPreflight: WARNING {gene} of {seg_strain} matches only {matches / n_codons:.1%} of the protocol CDS reference; check the reference sequences.")
+            say(f"WARNING {gene} of {seg_strain} matches only {matches / n_codons:.1%} of the protocol CDS reference; check the reference sequences.", seg)
         unmapped = sum(1 for r in gene_rows if r[-1] == "?")
         if unmapped:
-            print(f"PhyloPreflight: WARNING {unmapped} codons of {gene} could not be placed on {seg_strain} segment {seg}.")
+            say(f"WARNING {unmapped} codons of {gene} could not be placed on {seg_strain} segment {seg}.", seg)
         rows.extend(gene_rows)
         gene_len[gene] = len(gene_rows)
 

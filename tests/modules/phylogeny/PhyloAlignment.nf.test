@@ -26,6 +26,11 @@ nextflow_process {
         then {
             assert process.success
 
+            // Step messages go to alignment.log (part of the tree's phylo.log), not to the terminal
+            def stepLog = path(process.out.log.get(0)).text
+            assert stepLog.contains("PhyloAlignment: 3 of ") && stepLog.contains("whole-genome alignment of 8 sequences") : stepLog
+            assert !process.stdout.join("\\n").contains("PhyloAlignment:")
+
             def alignmentFile = path(process.out.alignment.get(0))
             def lines = alignmentFile.text.readLines()
             // 5 root strains + 3 samples = 8 tips, each with a header and one sequence line

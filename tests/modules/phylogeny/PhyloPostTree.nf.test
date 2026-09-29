@@ -27,6 +27,10 @@ nextflow_process {
         then {
             assert process.success
 
+            // Step messages go to posttree.log (part of the tree's phylo.log), not to the terminal
+            assert path(process.out.step_log.get(0)[1]).text.contains("PhyloPostTree: ") : "posttree.log should hold the cluster summary"
+            assert !process.stdout.join("\\n").contains("PhyloPostTree:")
+
             // ---- Ancestral reconstruction ----
             // ancestral_aa/HA1.fasta sequences are all 329 amino acids long
             def ha1Fasta = path("${process.out.proteins.get(0)[1]}/HA1.fasta").text

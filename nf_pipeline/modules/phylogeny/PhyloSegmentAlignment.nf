@@ -12,7 +12,6 @@ process PhyloSegmentAlignment {
     errorStrategy 'ignore'
     // Cache on file content: PhyloPreflight reruns when --aa-positions changes, but its reference outputs do not
     cache 'deep'
-    debug true
 
     input:
     tuple val(segment), path(sample_dirs, stageAs: "samples/*")  // segment folders of the samples that passed PhyloCoverageQC for this segment
@@ -27,12 +26,19 @@ process PhyloSegmentAlignment {
     tuple val(segment), path("${segment}/${segment}_segments.tsv"),    emit: segments
     tuple val(segment), path("${segment}/${segment}_outgroup.txt"),    emit: outgroup
     tuple val(segment), path("${segment}/${segment}_root_used.tsv"),   emit: root_used
+    tuple val(segment), path("alignment.log"),                         emit: log   // step messages, collected into the tree's phylo.log
 
     script:
     """
 #!/usr/bin/env python3
 import csv, io, os, re, subprocess, sys
 from Bio import SeqIO
+
+# Step messages go to alignment.log (part of the tree's phylo.log), not the terminal; errors stay on stderr
+LOG = open("alignment.log", "w")
+def say(msg):
+    LOG.write(f"PhyloSegmentAlignment: {msg}\\n")
+    LOG.flush()
 
 segment = "${segment}"
 threads = "${task.cpus}"
@@ -73,7 +79,7 @@ else:
     outgroup_strain_used = min(candidates, key=strain_year)
     outgroup_tip = ref_id(outgroup_strain_used)
     fallback_used = True
-    print(f"PhyloSegmentAlignment: {configured_outgroup_strain} has no {segment} segment; rooting the {segment} tree on {outgroup_strain_used} instead.")
+    say(f"{configured_outgroup_strain} has no {segment} segment; rooting the {segment} tree on {outgroup_strain_used} instead.")
 
 with open(f"{segment}/{segment}_outgroup.txt", "w") as f:
     f.write(outgroup_tip + "\\n")
@@ -115,7 +121,7 @@ with open(f"{segment}/{segment}_segments.tsv", "w", newline="") as f:
     w = csv.writer(f, delimiter="\\t", lineterminator="\\n")
     w.writerow(["segment", "reference_strain", "start", "end", "length", "insertion_columns_removed"])
     w.writerow([segment, coord_strain.get(segment, ""), 1, len(keep), len(keep), removed])
-print(f"PhyloSegmentAlignment: {segment} alignment of {len(tips)} sequences x {len(keep)} sites "
+say(f"{segment} alignment of {len(tips)} sequences x {len(keep)} sites "
       f"(outgroup {outgroup_tip}{' [fallback]' if fallback_used else ''}).")
     """
 }

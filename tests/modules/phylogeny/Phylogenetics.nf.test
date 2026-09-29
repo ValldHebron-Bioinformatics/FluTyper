@@ -79,20 +79,17 @@ nextflow_workflow {
             def outputFiles = workflow.out.outputs.collect { f -> path(f).getFileName().toString() }
 
             // 01817974 is missing PB2 entirely and fails coverage QC: it never reaches the alignment, but its
-            // failure is recorded in the merged coverage QC table (PQerrors.log/the errors channel is reserved
-            // for internal script failures such as a missing coordinate reference or a failed MAFFT run)
-            def qcTable = path(workflow.out.outputs.find { path(it).getFileName().toString() == "phylo_coverage_qc.tsv" })
-            def pb2Line = qcTable.text.readLines().find { it.startsWith("01817974\tPB2\t") }
-            assert pb2Line != null && pb2Line.contains("segment missing") : "expected 01817974's PB2 row to FAIL with 'segment missing': ${pb2Line}"
+            // failure is recorded in the tree's phylo.log coverage QC summary (PQerrors.log/the errors channel is
+            // reserved for internal script failures such as a missing coordinate reference or a failed MAFFT run)
             assert workflow.out.errors.size() == 0 : "no PQerrors.log is expected: 01817974's missing segment is a normal QC FAIL, not an internal script error"
-            [
-                "phylo_coverage_qc.tsv", "phylo_tool_versions.json", "gene_map.tsv", "aa_positions.tsv",
-                "reference_segments.tsv", "root_strains.tsv", "phylo_alignment.fasta", "phylo_segments.tsv",
-                "phylo_tree.nwk", "node_support.tsv", "subclades.tsv", "clusters.tsv", "annotations.tsv",
-                "phylo_tree.svg", "phylo_tree.png", "run_manifest.json", "PhylogeneticTreeReport_H3N2.html"
-            ].each { name ->
-                assert outputFiles.contains(name) : "expected ${name} among the PHYLOGENETICS outputs, got ${outputFiles}"
-            }
+
+            // Only the ML tree, the tree's log and the interactive HTML report are published; every other file stays in work/
+            assert outputFiles.sort() == ["PhylogeneticTreeReport_H3N2.html", "phylo.log", "tree.nwk"].sort() : "unexpected PHYLOGENETICS outputs: ${outputFiles}"
+            def phyloLog = path(workflow.out.outputs.find { path(it).getFileName().toString() == "phylo.log" }).text
+            assert phyloLog.contains("PhyloCoverageQC: 3 of 4 candidate samples enter this tree; 1 dropped.") : phyloLog
+            def pb2Line = phyloLog.readLines().find { it.contains("01817974") }
+            assert pb2Line != null && pb2Line.contains("PB2 segment missing") : "expected 01817974 to be dropped for 'PB2 segment missing': ${pb2Line}"
+            assert phyloLog.contains("PhyloAlignment: whole-genome alignment of")
 
             // The interactive HTML report is also emitted on its own channel (main.nf feeds it into MergeReports)
             assert workflow.out.report.size() == 1
@@ -100,14 +97,14 @@ nextflow_workflow {
             assert reportFile.toString().endsWith("PhylogeneticTreeReport_H3N2.html")
             assert reportFile.text.contains("<title>Phylogenetic Tree - H3N2 - whole-genome phylogeny</title>")
 
-            // Only the 3 fully-covered samples (01816372, 01818936, 198353883) make it into the alignment/tree
-            def alignmentFile = path(outputFiles.contains("phylo_alignment.fasta") ?
-                (workflow.out.outputs.find { path(it).getFileName().toString() == "phylo_alignment.fasta" }) : null)
-            def alignmentHeaders = alignmentFile.text.readLines().findAll { it.startsWith(">") }
-            assert alignmentHeaders.any { it == ">01816372" }
-            assert alignmentHeaders.any { it == ">01818936" }
-            assert alignmentHeaders.any { it == ">198353883" }
-            assert !alignmentHeaders.any { it == ">01817974" } : "01817974 should have failed coverage QC and be excluded from the alignment"
+            // Only the 3 fully-covered samples (01816372, 01818936, 198353883) make it into the tree
+            def treeText = path(workflow.out.outputs.find { path(it).getFileName().toString() == "tree.nwk" }).text
+            assert treeText.contains("01816372") && treeText.contains("01818936") && treeText.contains("198353883")
+            assert !treeText.contains("01817974") : "01817974 should have failed coverage QC and be excluded from the tree"
+
+            // One summary line for the subtype, and no step chatter on the terminal
+            assert workflow.stdout.count { it.startsWith("PHYLOGENETICS(H3N2): whole-genome tree built (3 samples) -> phylogeny/H3N2/") } == 1
+            assert !workflow.stdout.join("\n").contains("PhyloPreflight:")
         }
     }
 

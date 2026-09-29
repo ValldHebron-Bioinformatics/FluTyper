@@ -9,7 +9,6 @@ process PhyloSubclades {
     errorStrategy 'ignore'
     // Cache on file content: PhyloPreflight reruns when --aa-positions changes, but its reference outputs do not
     cache 'deep'
-    debug true
 
     input:
     path(nextclade_csvs, stageAs: "nextclade/*")  // nextclade_results_<sample>.csv files
@@ -18,9 +17,11 @@ process PhyloSubclades {
 
     output:
     path("subclades.tsv"), emit: subclades
+    path("subclades.log"), emit: log   // step messages, collected into every tree's phylo.log
 
     script:
     """
+    : > subclades.log
     python3 - <<'PYEOF'
 from Bio import SeqIO
 with open("root_ha.fasta", "w") as out:
@@ -33,7 +34,7 @@ PYEOF
     if [ -s root_ha.fasta ]; then
         nextclade run --input-dataset "${dataset}" --output-csv root_nextclade.csv root_ha.fasta > nextclade.log 2>&1 \\
             || { cat nextclade.log >&2; exit 1; }
-        grep -iE "warn" nextclade.log | sed "s/^/PhyloSubclades: Nextclade /" || true
+        grep -iE "warn" nextclade.log | sed "s/^/PhyloSubclades: Nextclade /" >> subclades.log || true
     fi
 
     python3 - <<'PYEOF'
@@ -63,7 +64,8 @@ for path in sorted(glob.glob("nextclade/nextclade_results_*.csv")):
         no_call.append(sample)
     rows.append([sample, clean(row.get("subclade")) if row else "NA", clean(row.get("clade")) if row else "NA", "sample"])
 if no_call:
-    print(f"PhyloSubclades: {len(no_call)} samples have no Nextclade row with a numeric qc.overallScore; subclade set to NA: {', '.join(no_call[:10])}")
+    with open("subclades.log", "a") as log:
+        log.write(f"PhyloSubclades: {len(no_call)} samples have no Nextclade row with a numeric qc.overallScore; subclade set to NA: {', '.join(no_call[:10])}\\n")
 
 if os.path.isfile("root_nextclade.csv"):
     with open("root_nextclade.csv", newline="") as f:

@@ -31,6 +31,13 @@ nextflow_process {
         then {
             assert process.success
 
+            // Notes go to preflight.log ("<segments>\t<message>", read by PhyloLog), not to the terminal
+            def notes = path(process.out.log.get(0)).text.readLines()
+            assert notes.contains("\tall phylogenetics tools found.")
+            assert notes.any { it.startsWith("PA\t") && it.contains("A/Darwin/6/2021 has no PA segment in the protocol references") } : notes
+            assert notes.any { it.startsWith("PA\t") && it.contains("root strain A/Darwin/6/2021 has no PA segment(s)") } : notes
+            assert !process.stdout.join("\\n").contains("PhyloPreflight:") : "PhyloPreflight no longer prints its notes to the terminal"
+
             // Tool versions: every tool matches the expected version
             def report = new JsonSlurper().parse(path(process.out.versions.get(0)).toFile())
             assert report.mafft.status == "ok"

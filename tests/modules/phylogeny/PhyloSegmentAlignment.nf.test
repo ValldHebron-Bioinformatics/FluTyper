@@ -29,6 +29,12 @@ nextflow_process {
         then {
             assert process.success
 
+            // The fallback note goes to the step log (part of the tree's phylo.log), not to the terminal
+            def stepLog = path(process.out.log.get(0)[1]).text
+            assert stepLog.contains("A/Darwin/6/2021 has no PA segment; rooting the PA tree on A/Massachusetts/18/2022 instead") : stepLog
+            assert stepLog.contains("PA alignment of") : stepLog
+            assert !process.stdout.join("\\n").contains("PhyloSegmentAlignment:") : "no step chatter on the terminal"
+
             def rootUsedLines = path(process.out.root_used.get(0)[1]).text.readLines()
             assert rootUsedLines[0] == "segment\tconfigured_outgroup\toutgroup_strain_used\toutgroup_tip\tfallback_used"
             def fields = rootUsedLines[1].split("\t", -1)

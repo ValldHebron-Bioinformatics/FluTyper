@@ -11,7 +11,6 @@ process PhyloAlignment {
     errorStrategy 'ignore'
     // Cache on file content: PhyloPreflight reruns when --aa-positions changes, but its reference outputs do not
     cache 'deep'
-    debug true
 
     input:
     path(sample_dirs, stageAs: "samples/*")  // segment folders of the samples that passed PhyloCoverageQC
@@ -24,12 +23,19 @@ process PhyloAlignment {
     output:
     path("whole_genome/phylo_alignment.fasta"), emit: alignment
     path("whole_genome/phylo_segments.tsv"),    emit: segments
+    path("alignment.log"),                      emit: log       // step messages, collected into the tree's phylo.log
 
     script:
     """
 #!/usr/bin/env python3
 import csv, io, os, subprocess, sys
 from Bio import SeqIO
+
+# Step messages go to alignment.log (part of the tree's phylo.log), not the terminal; errors stay on stderr
+LOG = open("alignment.log", "w")
+def say(msg):
+    LOG.write(f"PhyloAlignment: {msg}\\n")
+    LOG.flush()
 
 os.makedirs("whole_genome", exist_ok=True)
 order = [s.strip() for s in "${segment_order}".split(",") if s.strip()]
@@ -41,8 +47,8 @@ with open("${qc_table}") as f:
     for row in csv.DictReader(f, delimiter="\\t"):
         qc_samples.add(row["sample_id"])
 samples = sorted(os.listdir("samples")) if os.path.isdir("samples") else []
-print(f"PhyloAlignment: {len(samples)} of {len(qc_samples)} candidate samples passed coverage QC and enter the phylogeny "
-      f"({len(qc_samples) - len(samples)} dropped, reasons in phylo_coverage_qc.tsv).")
+say(f"{len(samples)} of {len(qc_samples)} candidate samples passed coverage QC and enter the phylogeny "
+      f"({len(qc_samples) - len(samples)} dropped, reasons in the coverage QC summary above).")
 if len(samples) < MIN_SAMPLES:
     sys.stderr.write(f"PhyloAlignment: only {len(samples)} samples passed coverage QC; at least {MIN_SAMPLES} are needed to build a tree.\\n")
     sys.exit(1)
@@ -98,6 +104,6 @@ with open("whole_genome/phylo_segments.tsv", "w", newline="") as f:
     w = csv.writer(f, delimiter="\\t", lineterminator="\\n")
     w.writerow(["segment", "reference_strain", "start", "end", "length", "insertion_columns_removed"])
     w.writerows(segment_rows)
-print(f"PhyloAlignment: whole-genome alignment of {len(tips)} sequences x {start - 1} sites.")
+say(f"whole-genome alignment of {len(tips)} sequences x {start - 1} sites.")
     """
 }

@@ -127,7 +127,9 @@ nextflow_process {
         then {
             assert process.success
             assert process.out.tree.size() == 1 : "the tree should still be built when more cpus are requested than cores exist"
-            assert process.stdout.join("\\n").contains("cpus requested but only")
+            // the warning goes to the step log that ends up in phylo.log, not to the terminal
+            assert path(process.out.step_log.get(0)[1]).text.contains("cpus requested but only")
+            assert !process.stdout.join("\\n").contains("PhyloTree:") : "PhyloTree no longer prints step messages to the terminal"
         }
     }
 

@@ -139,7 +139,6 @@ workflow {
                 .collectFile(name: 'inferred_subtypes_for_datasets.csv', keepHeader: true, sort: { f -> f.name })
         } else {
             def msg = "PHYLOGENETICS: --append directory '${params.append}' has no inferred_subtypes.csv; historical subtypes are not considered when fetching Nextclade datasets."
-            log.warn msg
             println "WARN: ${msg}"
         }
     }
@@ -321,7 +320,6 @@ workflow {
             def hist_samples_dir = file("${append_path}/samples")
             if (!hist_samples_dir.exists() || !hist_samples_dir.isDirectory()) {
                 def msg = "PHYLOGENETICS: --append directory '${append_path}' has no 'samples' folder; only this run's own samples are considered for the tree(s)."
-                log.warn msg
                 println "WARN: ${msg}"
             }
 
@@ -346,7 +344,6 @@ workflow {
                 .subscribe { ids ->
                     if (ids) {
                         def msg = "PHYLOGENETICS: ${ids.size()} historical sample folder(s) under '${append_path}/samples' have no segments/ subfolder and are skipped: ${ids.take(10).join(', ')}${ids.size() > 10 ? ', ...' : ''}."
-                        log.warn msg
                         println "WARN: ${msg}"
                     }
                 }

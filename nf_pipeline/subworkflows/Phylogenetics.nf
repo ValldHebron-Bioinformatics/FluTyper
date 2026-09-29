@@ -12,6 +12,7 @@ include { PhyloTree             } from '../modules/phylogeny/PhyloTree'
 include { PhyloSubclades        } from '../modules/phylogeny/PhyloSubclades'
 include { PhyloPostTree         } from '../modules/phylogeny/PhyloPostTree'
 include { PhyloReport           } from '../modules/phylogeny/PhyloReport'
+include { PhyloLog              } from '../modules/phylogeny/PhyloLog'
 
 workflow PHYLOGENETICS {
     take:
@@ -60,7 +61,6 @@ workflow PHYLOGENETICS {
     candidates.count().subscribe { n ->
         if (n == 0) {
             def msg = "PHYLOGENETICS(${subtype}): no ${subtype_tag} samples were found, so no phylogeny is built."
-            log.warn msg
             println "WARN: ${msg}"
         }
     }
@@ -84,7 +84,6 @@ workflow PHYLOGENETICS {
         .filter { missing -> missing }
         .subscribe { missing ->
             def msg = "PHYLOGENETICS(${subtype}): ${missing.size()} sample(s) typed as ${subtype_tag} have no sample folder (dropped from --append history, or missing segments/) and are excluded from every tree: ${missing.take(10).join(', ')}${missing.size() > 10 ? ', ...' : ''}."
-            log.warn msg
             println "WARN: ${msg}"
         }
 
@@ -106,6 +105,7 @@ workflow PHYLOGENETICS {
 
     // Whole-genome tree (optional, --phyloWholeGenome): reproduces Koumaty et al. 2026
     def whole_genome_trees_ch = channel.empty()
+    def whole_genome_log_ch = channel.empty()
     if (whole_genome) {
         passing = PhyloCoverageQC.out.results
             .filter { _sample_id, _sample_dir, qc_tsv ->
@@ -125,6 +125,7 @@ workflow PHYLOGENETICS {
         whole_genome_trees_ch = PhyloAlignment.out.alignment
             .combine(PhyloAlignment.out.segments)
             .map { alignment, segments_tsv -> tuple(subtype, "whole_genome", alignment, phyloRefId(outgroup), segments_tsv) }
+        whole_genome_log_ch = PhyloAlignment.out.log.map { f -> tuple(subtype, "whole_genome", f) }
     }
 
     // Segment trees (--phyloSegmentTrees): one per requested segment, gated on >= 3 samples passing that segment's
@@ -141,14 +142,14 @@ workflow PHYLOGENETICS {
             .map { dirs -> tuple(seg, dirs) }
     }
     def segment_passing_ch = segment_candidates_ch ? segment_candidates_ch.inject(channel.empty()) { acc, ch -> acc.mix(ch) } : channel.empty()
+    // (No skipped-segment warnings when there are no candidate samples at all: "no samples were found" says it.)
     segment_passing_ch
         .filter { _seg, dirs -> dirs.size() < 3 }
-        .subscribe { seg, dirs ->
+        .combine(candidates.count())
+        .filter { _seg, _dirs, n_candidates -> n_candidates > 0 }
+        .subscribe { seg, dirs, _n_candidates ->
             def reason = dirs.size() == 0 ? "0 samples passed coverage QC for ${seg}" : "only ${dirs.size()} sample(s) passed coverage QC for ${seg}"
-            // log.warn alone lands only in .nextflow.log (nf-test's workflow.stdout/stderr do not capture it), so
-            // also print it: this is exactly the kind of silently-dropped-tree visibility this warning exists for.
             def msg = "PHYLOGENETICS(${subtype}): segment tree ${seg} skipped: ${reason} (need at least 3)."
-            log.warn msg
             println "WARN: ${msg}"
         }
     def segment_gated_ch = segment_passing_ch.filter { _seg, dirs -> dirs.size() >= 3 }
@@ -170,8 +171,9 @@ workflow PHYLOGENETICS {
     // Every tree of this subtype, tagged (tree_id, tree_folder, alignment, outgroup_tip, segments_tsv):
     // tree_id is globally unique (used for filenames), tree_folder nests this tree's files under phylogeny/<subtype>/
     def all_trees_ch = whole_genome_trees_ch.mix(segment_trees_ch)
-    all_trees_ch.count().subscribe { n ->
-        if (n == 0) log.warn "PHYLOGENETICS(${subtype}): no tree was built (check --phyloWholeGenome/--phyloSegmentTrees and whether enough samples passed coverage QC)."
+    // (Not when there are no candidate samples at all: the "no samples were found" warning above already says so.)
+    all_trees_ch.count().combine(candidates.count()).subscribe { n_trees, n_candidates ->
+        if (n_trees == 0 && n_candidates > 0) println "WARN: PHYLOGENETICS(${subtype}): no tree was built (check --phyloWholeGenome/--phyloSegmentTrees and whether enough samples passed coverage QC)."
     }
 
     PhyloTree(
@@ -188,22 +190,30 @@ workflow PHYLOGENETICS {
     nextclade_join
         .filter { _sample_id, _is_candidate, csv -> csv == null }
         .subscribe { sample_id, _is_candidate, _csv ->
-            log.warn "PHYLOGENETICS(${subtype}): no Nextclade result for sample ${sample_id}; its subclade is NA and it is not clustered."
+            println "WARN: PHYLOGENETICS(${subtype}): no Nextclade result for sample ${sample_id}; its subclade is NA and it is not clustered."
         }
     nextclade_csvs = nextclade_join
         .filter { _sample_id, _is_candidate, csv -> csv != null }
         .map { _sample_id, _is_candidate, csv -> csv }
         .toSortedList { a, b -> a.name <=> b.name }
     def h_tag = subtype.find(/H\d+/)
+    // `dataset` must stay a value channel (toList/filter/map only): PhyloSubclades and everything fed by its outputs
+    // (PhyloPostTree, PhyloReport, PhyloLog) run once per tree, and a queue channel here would make them run once in
+    // total. Hence the missing-dataset warning is a separate subscribe, not part of this chain.
     dataset = datasets.flatten()
         .filter { dataset_dir -> dataset_dir.name == "nextclade_${h_tag}_dataset" }
         .toList()
-        .map { found ->
-            if (!found) log.warn "PHYLOGENETICS(${subtype}): no nextclade_${h_tag}_dataset was retrieved by GetDatasets, so subclades, clusters, annotations, the figure and the manifest are not produced."
-            found
-        }
         .filter { found -> found }
         .map { found -> found[0] }
+    // (Not when there are no candidate samples at all: "no samples were found" already says so.)
+    datasets.flatten()
+        .filter { dataset_dir -> dataset_dir.name == "nextclade_${h_tag}_dataset" }
+        .toList()
+        .map { found -> [found: found] }
+        .combine(candidates.count())
+        .subscribe { found_m, n_candidates ->
+            if (!found_m.found && n_candidates > 0) println "WARN: PHYLOGENETICS(${subtype}): no nextclade_${h_tag}_dataset was retrieved by GetDatasets, so subclades, clusters, annotations, the figure and the manifest are not produced."
+        }
     PhyloSubclades(nextclade_csvs, PhyloPreflight.out.references, dataset)
 
     // PhyloPostTree runs once per tree, fanned out over PhyloTree.out.for_post_tree: that emit already carries
@@ -303,8 +313,8 @@ workflow PHYLOGENETICS {
                             !tree_ok.contains(tree_id)      ? "PhyloTree (IQ-TREE)" :
                             !posttree_ok.contains(tree_id)  ? "PhyloPostTree (TreeTime/TreeCluster)" :
                                                                "PhyloReport (annotation/figure)"
-                def msg = "PHYLOGENETICS(${subtype}): tree '${tree_id}' was requested but never produced a report; ${stage} silently failed for it (errorStrategy 'ignore'). Check .nextflow.log for the failed task, or look for a missing phylogeny/${subtype}/<tree>/ folder."
-                log.warn msg
+                def msg = "PHYLOGENETICS(${subtype}): tree '${tree_id}' was requested but never produced a report; ${stage} silently failed for it (errorStrategy 'ignore'). Check phylogeny/${subtype}/<tree>/phylo.log (present when any step of that tree ran) and .nextflow.log for the failed task."
+                println "WARN: ${msg}"
                 msg
             }
             lines.join('\n')
@@ -312,41 +322,58 @@ workflow PHYLOGENETICS {
         .filter { text -> text }
         .collectFile(name: "phylo_tree_problems_${subtype}.log", newLine: true)
 
-    // Every per-tree emit is a (tree_id, file) tuple (one item per tree built); strip the tag for the flat
-    // 'outputs' channel published to <outDir>/phylogeny/<subtype>/. Subtype-level (shared) emits are plain files.
-    outputs = qc_table.mix(
-        PhyloPreflight.out.versions,
-        PhyloPreflight.out.gene_map,
-        PhyloPreflight.out.positions,
-        PhyloPreflight.out.coordinate_table,
-        PhyloPreflight.out.root_table,
-        all_trees_ch.map { _tree_id, _folder, alignment, _outgroup_tip, _seg -> alignment },
-        all_trees_ch.map { _tree_id, _folder, _al, _outgroup_tip, segments_tsv -> segments_tsv },
-        PhyloSegmentAlignment.out.outgroup.map { _seg, f -> f },
-        PhyloSegmentAlignment.out.root_used.map { _seg, f -> f },
-        PhyloTree.out.raw_tree.map { _tree_id, f -> f },
-        PhyloTree.out.tree.map { _tree_id, f -> f },
-        PhyloTree.out.support.map { _tree_id, f -> f },
-        PhyloTree.out.report.map { _tree_id, f -> f },
-        PhyloTree.out.log.map { _tree_id, f -> f },
-        PhyloSubclades.out.subclades,
-        PhyloPostTree.out.nucleotides.map { _tree_id, f -> f },
-        PhyloPostTree.out.annotated_tree.map { _tree_id, f -> f },
-        PhyloPostTree.out.proteins.map { _tree_id, f -> f },
-        PhyloPostTree.out.clusters.map { _tree_id, f -> f },
-        PhyloPostTree.out.mutations.map { _tree_id, f -> f },
-        PhyloReport.out.annotations.map { _tree_id, f -> f },
-        PhyloReport.out.sources.map { _tree_id, f -> f },
-        PhyloReport.out.aa_states.map { _tree_id, f -> f },
-        PhyloReport.out.svg.map { _tree_id, f -> f },
-        PhyloReport.out.png.map { _tree_id, f -> f },
-        PhyloReport.out.panels.map { _tree_id, f -> f },
-        PhyloReport.out.manifest.map { _tree_id, f -> f },
+    // Per-tree phylo.log + tree.nwk. Every phylogenetics step writes its messages to a small part file instead of
+    // the terminal; the parts of one tree (alignment, IQ-TREE log + treefile, TreeTime/clusters, report) are grouped
+    // by tree_id and assembled by PhyloLog together with the subtype-level preflight/QC/subclade notes. groupTuple
+    // never drops a tree: a group that is still incomplete when the steps are done (a later step failed) is flushed
+    // with the parts that exist, so its phylo.log shows where it stopped.
+    // tree_folder is recovered from tree_id ("H3N2" -> whole_genome, "H3N2_HA" -> HA) for the steps that only carry the id.
+    def log_parts_ch = whole_genome_log_ch
+        .mix(PhyloSegmentAlignment.out.log.map { seg, f -> tuple("${subtype}_${seg}".toString(), seg, f) })
+        .mix(PhyloTree.out.step_log.map { tree_id, f -> tuple(tree_id, tree_id == subtype ? "whole_genome" : tree_id.substring(subtype.length() + 1), f) })
+        .mix(PhyloTree.out.raw_tree.map { tree_id, f -> tuple(tree_id, tree_id == subtype ? "whole_genome" : tree_id.substring(subtype.length() + 1), f) })
+        .mix(PhyloPostTree.out.step_log.map { tree_id, f -> tuple(tree_id, tree_id == subtype ? "whole_genome" : tree_id.substring(subtype.length() + 1), f) })
+        .mix(PhyloReport.out.step_log.map { tree_id, f -> tuple(tree_id, tree_id == subtype ? "whole_genome" : tree_id.substring(subtype.length() + 1), f) })
+        .groupTuple(by: [0, 1], size: 5, remainder: true)
+    // qc_table.first(): collectFile emits one item on a queue channel, which would make PhyloLog run only once
+    PhyloLog(log_parts_ch, PhyloPreflight.out.log, PhyloSubclades.out.log, qc_table.first(), params.phyloSegmentOrder)
+
+    // One terminal line per subtype once all its trees are done. Built = has a report (like tree_problems above).
+    // Lists are wrapped in one-key Maps before combine(), see the note above tree_problems_ch.
+    def built_ch = PhyloLog.out.summary
+        .map { tree_id, tree_folder, n -> [id: tree_id, folder: tree_folder, n: n.toString().trim()] }
+        .toList()
+        .map { list -> [items: list] }
+    def skipped_ch = segment_passing_ch
+        .filter { _seg, dirs -> dirs.size() < 3 }
+        .map { seg, _dirs -> seg }
+        .toList()
+        .map { list -> [ids: list] }
+    built_ch.combine(report_ok_ids_ch).combine(skipped_ch)
+        .map { built_m, report_m, skipped_m ->
+            def order = params.phyloSegmentOrder.toString().split(',').collect { s -> s.trim() }
+            def built = built_m.items.findAll { it.id in report_m.ids }
+            def wg = built.find { it.folder == 'whole_genome' }
+            def segs = built.findAll { it.folder != 'whole_genome' }.sort { a, b -> order.indexOf(a.folder) <=> order.indexOf(b.folder) }
+            def parts = []
+            if (wg) parts << "whole-genome tree built (${wg.n} samples)"
+            if (segs) parts << "${segs.size()} segment tree${segs.size() == 1 ? '' : 's'} built (${segs.collect { "${it.folder} ${it.n}" }.join(', ')})"
+            def line = parts ? "PHYLOGENETICS(${subtype}): ${parts.join(' and ')} -> phylogeny/${subtype}/" : ''
+            if (line && skipped_m.ids) line += " (skipped: ${skipped_m.ids.sort { order.indexOf(it) }.join(', ')})"
+            line
+        }
+        .filter { line -> line }
+        .subscribe { line -> println line }
+
+    // Published to <outDir>/phylogeny/<subtype>/<tree_folder>/: only the tree, its log and the HTML report.
+    // Everything else stays in work/ and is still used internally exactly as before.
+    outputs = PhyloLog.out.tree.map { _tree_id, f -> f }.mix(
+        PhyloLog.out.log.map { _tree_id, f -> f },
         PhyloReport.out.html.map { _tree_id, f -> f }
     )
 
     emit:
-    outputs        = outputs                          // every file published to <outDir>/phylogeny/<subtype>
+    outputs        = outputs                          // tree.nwk, phylo.log and the HTML of every tree, published to <outDir>/phylogeny/<subtype>
     errors         = PhyloCoverageQC.out.errors        // per-sample QC errors, merged into pipeline_errors.log
     report         = PhyloReport.out.html.map { _tree_id, f -> f }  // interactive tree(s), added to the index.html dashboard
     tree_problems  = tree_problems_ch                  // 0 or 1 file: requested trees that a later 'ignore'd step silently dropped

@@ -21,7 +21,6 @@ process PhyloReport {
     //  4. run_manifest.json: tool versions, resolved parameters, input checksums, method choices, coverage QC,
     //     clusters, and the panels rendered or skipped with the reason.
     errorStrategy 'ignore'
-    debug true
 
     input:
     // subtype_label names and tags every tree of the module: "H3N2"/"H1N1pdm09" for the (optional) whole-genome
@@ -58,9 +57,12 @@ process PhyloReport {
     tuple val(subtype_label), path("${tree_folder}/panels_status.tsv"),      emit: panels
     tuple val(subtype_label), path("${tree_folder}/run_manifest.json"),      emit: manifest
     tuple val(subtype_label), path("${tree_folder}/PhylogeneticTreeReport_${subtype_label}.html"), emit: html
+    tuple val(subtype_label), path("report.log"), emit: step_log   // this step's messages, collected into the tree's phylo.log
 
     script:
     """
+    # Step messages (python print, R cat) go to report.log, part of the tree's phylo.log, not the terminal; errors stay on stderr
+    exec > report.log
     # ---- 1. Annotations ----
     python3 - <<'PYEOF'
 import csv, os, re, sys
