@@ -1,0 +1,35 @@
+{
+  "title": "FluTyper influenza phylogeny",
+  "maintainers": [
+    {"name": "FluTyper (Vall d'Hebron Bioinformatics)", "url": "https://github.com/ValldHebron-Bioinformatics/FluTyper"}
+  ],
+  "build_url": "https://github.com/ValldHebron-Bioinformatics/FluTyper",
+  "colorings": [
+    {"key": "subclade",  "title": "Subclade",      "type": "categorical"},
+    {"key": "cluster",   "title": "Cluster",       "type": "categorical"},
+    {"key": "region",    "title": "Region",        "type": "categorical"},
+    {"key": "country",   "title": "Country",       "type": "categorical"},
+    {"key": "division",  "title": "Division",      "type": "categorical"},
+    {"key": "location",  "title": "Location",      "type": "categorical"},
+    {"key": "age_group", "title": "Age group",     "type": "ordinal"},
+    {"key": "sex",       "title": "Sex",           "type": "categorical"},
+    {"key": "season",    "title": "Season",        "type": "ordinal"},
+    {"key": "num_date",  "title": "Sampling date", "type": "continuous"}
+  ],
+  "geo_resolutions": [
+    {"key": "country",  "title": "Country"},
+    {"key": "division", "title": "Division"},
+    {"key": "location", "title": "Location"}
+  ],
+  "display_defaults": {
+    "color_by": "subclade",
+    "distance_measure": "num_date",
+    "geo_resolution": "country",
+    "transmission_lines": true,
+    "map_triplicate": false,
+    "layout": "rect",
+    "branch_label": "aa"
+  },
+  "filters": ["subclade", "cluster", "region", "country", "division", "location", "age_group", "sex", "season"],
+  "panels": ["tree", "map", "entropy"]
+}
