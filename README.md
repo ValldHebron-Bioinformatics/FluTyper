@@ -181,9 +181,41 @@ nextflow run nf_pipeline/main.nf -c secrets.config --protocol AVIAN --inputFasta
 
 ### Phylogenetics Module (Optional)
 
-With `--phylogenetics`, FluTyper builds an annotated whole-genome maximum likelihood tree of the A(H3N2) samples of a HUMAN run, reproducing the analysis and Fig. 2 of Koumaty *et al.* (2026, see [Citation](#-citation)): a rectangular tree with aligned heatmap panels to the right, in the order `subclade | source | period | one column per requested amino acid position`.
+With `--phylogenetics`, FluTyper builds annotated maximum likelihood trees of a HUMAN run, following the method of Koumaty *et al.* (2026, see [Citation](#-citation)).
 
-**Worked example (the paper's figure, HA1 62, 145 and 239):**
+**What you get.** For each subtype present in the run (`--phyloSubtype`, default `H3N2,H1N1pdm09`), one **tree per segment** (PB2, PB1, PA, HA, NP, NA, MP, NS; `--phyloSegmentTrees`, default `all`). Each segment tree contains every sample of that subtype whose segment passes coverage QC, plus the subtype's WHO reference / vaccine strains as root tips, so a sample with a poor PB1 still appears in its HA or NA tree. Next to each tree, a heatmap shows one column per annotation: `subclade | source | period | season | age group | sex`, followed by one column per requested amino acid position on that segment (e.g. `HA1:62` on the HA tree, `NA:247` on the NA tree). The **whole-genome** tree of the paper (all 8 segments concatenated; a sample needs every segment to pass QC) is opt-in with `--phylo-whole-genome`.
+
+| Subtype | Coordinate reference | Root strains (tips) | Outgroup |
+| --- | --- | --- | --- |
+| H3N2 | A/Darwin/6/2021 (PA: A/Massachusetts/18/2022) | Darwin/6/2021, Massachusetts/18/2022, Croatia/10136RV/2023, Singapore/GP20238/2024, Sydney/1359/2024 | A/Darwin/6/2021 (PA tree: A/Massachusetts/18/2022) |
+| H1N1pdm09 | A/Wisconsin/67/2022 | Victoria/2570/2019, Sydney/5/2021, Wisconsin/67/2022 | A/Victoria/2570/2019 |
+
+**Quick start.** Segment trees for both subtypes, with the amino acid positions listed in a CSV (see [below](#aa-positions-csv)):
+
+```bash
+conda activate FluTyper
+nextflow run nf_pipeline/main.nf \
+  --protocol HUMAN \
+  --inputFasta sequences.fasta \
+  --metadata metadata.csv \
+  --outDir RESULTS \
+  --phylogenetics \
+  --aa-positions-file aa_positions.csv
+```
+
+Open `RESULTS/index.html` and go to the **Phylogenetics** section of the sidebar.
+
+**The interactive tree report.** In the dashboard, the **Subtype** dropdown (H3N2 / H1N1pdm09) and the **Tree** dropdown (the segments that were built, plus *Whole genome* when requested) choose the tree to display. Each report has:
+
+- the rooted tree, with tips coloured by subclade and branch lengths in substitutions per site (scale bar at the bottom);
+- node labels with the ultrafast bootstrap support, shown only when ≥ `--min-support-label` (default `70`);
+- the heatmap: one solid column per annotation, every cell aligned with its tip; hover over a cell for the sample and its value;
+- season, age group and sex filters (from `--metadata`), which prune the tree to the matching samples while keeping the branch lengths of the full tree; reference strains are always shown;
+- a legend per panel, and the static version of the same figure in `phylo_tree.svg` / `phylo_tree.png` in the tree's output folder.
+
+**Adding a new run to previous results.** With `--append <previous outDir>`, only the new FASTA is processed, but every tree is rebuilt from the previous samples plus the new ones (see [`--append` and phylogenetics](#append-and-phylogenetics)). Add `-resume` when rerunning from the same launch directory to reuse the steps whose inputs did not change (for example, changing only report options reruns just the reports).
+
+**Reproducing the paper's figure (H3N2 whole-genome tree, HA1 62, 145 and 239):**
 
 ```bash
 nextflow run nf_pipeline/main.nf \
@@ -192,6 +224,9 @@ nextflow run nf_pipeline/main.nf \
   --metadata metadata.csv \
   --outDir RESULTS \
   --phylogenetics \
+  --phylo-subtype H3N2 \
+  --phylo-whole-genome \
+  --phylo-segment-trees none \
   --aa-positions HA1:62,HA1:145,HA1:239 \
   --lab-map lab_map.tsv
 ```
@@ -203,16 +238,34 @@ nextflow run nf_pipeline/main.nf \
 | Process | Method |
 | --- | --- |
 | `PhyloPreflight` | Stops the run if a tool or R package is missing (names it and the expected version; a different version only warns), builds the codon map of every protein on the coordinate references and validates `--aa-positions` against it. Every other step waits for it. |
-| `PhyloCoverageQC` | Per sample, in parallel: the sample enters the tree only if **every** segment covers ≥ `--phyloMinCoverage` (0.95) of the reference with non-N bases. Missing segments and segments with several records fail the sample. |
-| `PhyloAlignment` | MAFFT `--auto` per segment against A/Darwin/6/2021, trimmed to reference columns (no manual curation), concatenated PB2, PB1, PA, HA, NP, NA, MP, NS. |
-| `PhyloTree` | IQ-TREE, `--model GTR+G4`, `--bootstrap 1000` ultrafast bootstraps, `--seed`, rooted on the `--phyloOutgroup` WHO reference / vaccine strain. |
+| `PhyloCoverageQC` | Per sample and segment, in parallel: a segment passes when it covers ≥ `--phyloMinCoverage` (0.95) of the reference with non-N bases; missing segments and segments with several records fail. A sample enters a segment tree when that segment passes, and the whole-genome tree only when **every** segment passes. |
+| `PhyloAlignment` | MAFFT `--auto` per segment against the subtype's coordinate reference, trimmed to reference columns (no manual curation), concatenated PB2, PB1, PA, HA, NP, NA, MP, NS. |
+| `PhyloTree` | IQ-TREE, `--model GTR+G4`, `--bootstrap 1000` ultrafast bootstraps, `--seed`, rooted on the subtype's outgroup root strain. |
 | `PhyloSubclades` | Nextclade `subclade` column (per-sample results; root strains run against the same dataset). |
 | `PhyloPostTree` | TreeTime parsimony ancestral states, translated through the codon map so internal nodes carry amino acid states; TreeCluster single linkage within each subclade, `--clusterThreshold 0.005` subs/site, tips outside a cluster stay `unclustered`; amino acid changes on the branch into each cluster. |
-| `PhyloReport` | `annotations.tsv`, the R/ggtree figure (SVG/PNG) and `run_manifest.json`. |
+| `PhyloReport` | `annotations.tsv`, the R/ggtree figure (SVG/PNG), the interactive `PhylogeneticTreeReport_<subtype>.html` and `run_manifest.json`. |
 
 Only `PhyloReport` depends on the figure options, so with `-resume` a change of `--aa-positions`, panels, lab map or figure size reruns the preflight check and the report but reuses the alignment, tree, ancestral states and clusters.
 
-**Amino acid positions.** `--aa-positions` takes a comma-separated list of `GENE:POS` (`HA1:62,HA1:145`) and/or bare integers, which use `--aa-gene` (default `HA1`). Columns follow the order given; omit it for no amino acid columns. Numbering follows FluTyper's protein references (HA1 = mature HA1 numbering). Positions are checked at startup: an out-of-range position stops the run naming the valid range, and a position with the same residue in every sample only warns. Nextflow keeps only the last value of a repeated flag, so give several positions as one comma-separated list (or as a YAML list in a `-params-file`). Residue colours are fixed per amino acid letter, so they are identical across positions and runs. Amino acid states come from the ancestral reconstruction for internal nodes; tips keep their observed sequence, and ambiguous or missing codons are shown as `NA`.
+**Several trees, one subtype.** `PhyloPreflight`, `PhyloCoverageQC` and `PhyloSubclades` run once per subtype (coverage QC checks every segment regardless of which trees are built; subclade assignment, from HA, does not depend on the tree). `PhyloAlignment` (whole genome, `--phyloWholeGenome`) and `PhyloSegmentAlignment` (one call per requested segment, `--phyloSegmentTrees`) then each build their own alignment from the samples with full coverage of *their* segment(s) — a segment's candidate pool is usually larger than the whole-genome one. `PhyloTree`, `PhyloPostTree` and `PhyloReport` run once per tree (whole genome plus every segment tree), fanned out over one Nextflow channel so trees build in parallel (serialised for the heavy alignment/tree steps by the `big_mem` label, `maxForks = 1`). A segment tree is skipped (with a warning) when fewer than 3 samples pass coverage QC for that segment. If the configured `--phyloOutgroup` lacks a segment (H3N2 PA: A/Darwin/6/2021 has none), that segment's tree is rooted on the oldest remaining root strain instead (by the year in its name), recorded in `<SEG>_root_used.tsv`.
+
+**Two independent subtypes.** `PHYLOGENETICS_H3N2` and `PHYLOGENETICS_H1N1PDM09` are separate invocations of the same `PHYLOGENETICS` subworkflow, gated by whether their subtype is in `--phyloSubtype`; each publishes to its own `phylogeny/<subtype>/` folder (see **Outputs** below) and its own reports.
+
+**Amino acid positions.** `--aa-positions` (H3N2, defaults to the paper's positions `HA1:62,HA1:145,HA1:239`) and `--aa-positions-h1n1` (H1N1pdm09, *no default*: the paper is H3N2-only) each take a comma-separated list of `GENE:POS` (`HA1:62,HA1:145`) and/or bare integers, which use `--aa-gene` (default `HA1`, shared by both subtypes). Columns follow the order given; omit a subtype's flag for no amino acid columns on its tree(s). Numbering follows FluTyper's protein references (HA1 = mature HA1 numbering). Positions are checked at startup by that subtype's own `PhyloPreflight`, against its own reference translation: an out-of-range position stops the run naming the valid range, and a position with the same residue in every sample only warns. On a segment tree, only the positions on genes of that segment are shown (e.g. the HA tree shows `HA1`/`HA2` columns, the NA tree shows `NA` columns; a segment tree with none simply has no aa columns). Nextflow keeps only the last value of a repeated flag, so give several positions as one comma-separated list (or as a YAML list in a `-params-file`). Residue colours are fixed per amino acid letter, so they are identical across positions and runs. Amino acid states come from the ancestral reconstruction for internal nodes; tips keep their observed sequence, and ambiguous or missing codons are shown as `NA`.
+
+<a id="aa-positions-csv"></a>**Amino acid positions from a CSV (`--aa-positions-file`).** Instead of `--aa-positions`/`--aa-positions-h1n1`, a CSV with (case-insensitive) `protein,position` columns and an optional `subtype` column can be given, e.g.:
+
+```
+protein,position,subtype
+HA1,62,H3N2
+HA1,145,H3N2
+HA1,239,H3N2
+NA,247,
+```
+
+A row's `subtype` (`H3N2` or `H1N1pdm09`) restricts it to that subtype's tree(s); a blank cell or a file with no `subtype` column applies the row to every requested subtype (`NA,247` above lands on both H3N2's and H1N1pdm09's NA tree). `--aa-positions-file` replaces `--aa-positions`/`--aa-positions-h1n1` (and the `aaPositions` default) only for the subtypes it actually has rows for: a subtype it never mentions keeps using its own `--aa-positions(-h1n1)` value, and FluTyper warns if those flags were also given explicitly. The file path and its resolved positions are recorded in `run_manifest.json`. A small example is at `tests/data/phylo/aa_positions_example.csv`.
+
+**Bootstrap support labels.** Node labels on both the static figure and the interactive tree only show ultrafast bootstrap support ≥ `--minSupportLabel` (default `70`; `0` shows every value). `node_support.tsv` and the tree files always keep every value; only the drawn labels are filtered.
 
 **Metadata.** The module reads the `--metadata` CSV used by the rest of the pipeline. Nothing is imputed: missing or unparseable values stay `NA` (grey), and reference strains never receive metadata.
 
@@ -231,27 +284,37 @@ The source and period panels are drawn only when their field exists and is non-m
 | Parameter | Default | Description |
 | --- | --- | --- |
 | `phylogenetics` | `false` | Enable the module (HUMAN protocol only). |
-| `phyloSubtype` | `H3N2` | Subtype of the samples placed in the tree (only H3N2 is supported). |
-| `phyloReference` | `A/Darwin/6/2021` | Alignment coordinate reference. |
-| `phyloReferenceFallback` | `A/Massachusetts/18/2022` | Coordinate reference for segments missing from `phyloReference` (PA). |
-| `phyloRootStrains` | Darwin/6/2021, Massachusetts/18/2022, Croatia/10136RV/2023, Singapore/GP20238/2024, Sydney/1359/2024 | WHO reference / vaccine strains added as tips. |
-| `phyloOutgroup` | `A/Darwin/6/2021` | Root strain used to root the tree. |
-| `phyloSegmentOrder` | `PB2,PB1,PA,HA,NP,NA,MP,NS` | Concatenation order. |
+| `phyloSubtype` | `H3N2,H1N1pdm09` | Comma-separated subtypes that each get their own tree. |
+| `phyloSubtypeConfig` | see `nextflow.config` | Map of `reference` / `referenceFallback` / `rootStrains` / `outgroup` per subtype. |
+| `phyloReference` | `A/Darwin/6/2021` | **H3N2 override** of `phyloSubtypeConfig.H3N2.reference`: a value here always wins for H3N2. |
+| `phyloReferenceFallback` | `A/Massachusetts/18/2022` | **H3N2 override**: coordinate reference for segments missing from `phyloReference` (PA). |
+| `phyloRootStrains` | Darwin/6/2021, Massachusetts/18/2022, Croatia/10136RV/2023, Singapore/GP20238/2024, Sydney/1359/2024 | **H3N2 override**: WHO reference / vaccine strains added as tips. |
+| `phyloOutgroup` | `A/Darwin/6/2021` | **H3N2 override**: root strain used to root the H3N2 tree. |
+| `phyloSegmentOrder` | `PB2,PB1,PA,HA,NP,NA,MP,NS` | Concatenation order (shared by every subtype). |
+| `phyloWholeGenome` | `false` | Also build the whole-genome tree (reproduces Koumaty et al. 2026); off by default. |
+| `phyloSegmentTrees` | `all` | Segment trees to build: `all`, `none`, or a comma-separated subset of `phyloSegmentOrder`'s segments. |
 | `phyloMinCoverage` | `0.95` | Minimum coverage in every segment. |
 | `model` | `GTR+G4` | IQ-TREE substitution model. |
 | `bootstrap` | `1000` | Ultrafast bootstrap replicates (`0` = none, otherwise ≥ 1000). |
 | `seed` | `12345` | Random seed. |
 | `clusterThreshold` | `0.005` | Single-linkage cluster threshold (substitutions/site). |
-| `aaPositions` | *None* | Amino acid heatmap columns. |
-| `aaGene` | `HA1` | Gene for bare positions. |
+| `minSupportLabel` | `70` | Minimum ultrafast bootstrap support (%) drawn as a node label (`0` shows every value). |
+| `aaPositions` | `HA1:62,HA1:145,HA1:239` | H3N2 amino acid heatmap columns (the paper's positions). |
+| `aaPositionsH1n1` | *None* | H1N1pdm09 amino acid heatmap columns; no default (the paper is H3N2-only). |
+| `aaPositionsFile` | *None* | CSV (`protein,position[,subtype]`) of positions; replaces `aaPositions`/`aaPositionsH1n1` for the subtypes it covers. |
+| `aaGene` | `HA1` | Gene for bare positions in `aaPositions` / `aaPositionsH1n1`. |
 | `minPanelCoverage` | `0.8` | Minimum sample coverage for the source and period panels. |
 | `labMap` | *None* | TSV `ORIGINATING_LAB<TAB>display_group` (optional header, case-insensitive match); unmapped labs become `Other`, without a map raw lab names are shown. |
 | `periodBin` | `month` | `month`, `week` or `none`. |
 | `width` / `height` / `dpi` | `12` / `10` / `300` | Figure size (inches) and PNG resolution. |
 
-**Outputs** (`<outDir>/phylogeny/`): `phylo_coverage_qc.tsv`, `phylo_alignment.fasta` (trimmed concatenated alignment) and `phylo_segments.tsv`, `phylo.treefile` (IQ-TREE tree with support values) and `phylo_tree.nwk` / `node_support.tsv` (named internal nodes), `ancestral_nt.fasta`, `ancestral_aa/`, `aa_states.tsv`, `annotated_tree.nexus`, `subclades.tsv`, `clusters.tsv`, `cluster_mutations.tsv`, `annotations.tsv` (one row per tip: id, subclade, cluster, source group, period, season, age group, sex and the residue at each requested position), `phylo_tree.svg` / `phylo_tree.png`, `PhylogeneticTreeReport.html` (interactive tree with season / age group / sex filters, also in `index.html`), `panels_status.tsv` and `run_manifest.json` (tool versions, resolved parameters, input checksums, method choices, QC outcome, panels rendered and skipped with the reason).
+**Outputs.** Each requested subtype publishes to its own `<outDir>/phylogeny/<subtype>/` folder (e.g. `phylogeny/H3N2/`, `phylogeny/H1N1pdm09/`). Inside it: subtype-level files shared by every tree of that subtype (`phylo_coverage_qc.tsv`, `gene_map.tsv`, `aa_positions.tsv`, `reference_segments.tsv`, `root_strains.tsv`, `phylo_tool_versions.json`, `subclades.tsv`), and one subfolder per tree actually built: `whole_genome/` (only with `--phyloWholeGenome`) and `<SEG>/` for each built segment tree (e.g. `HA/`, `NA/`). Each tree's own folder has: `<SEG>_alignment.fasta` / `whole_genome/phylo_alignment.fasta` and `..._segments.tsv` (segment trees also get `<SEG>_outgroup.txt` / `<SEG>_root_used.tsv`, recording an outgroup fallback if one was needed), `phylo.treefile` (IQ-TREE tree with support values) and `phylo_tree.nwk` / `node_support.tsv` (named internal nodes, every support value kept even though the figures only label those ≥ `--minSupportLabel`), `ancestral_nt.fasta`, `ancestral_aa/`, `aa_states.tsv`, `annotated_tree.nexus`, `clusters.tsv`, `cluster_mutations.tsv`, `annotations.tsv` (one row per tip: id, subclade, cluster, source group, period, season, age group, sex and the residue at each requested position on that tree's segment(s)), `phylo_tree.svg` / `phylo_tree.png`, `PhylogeneticTreeReport_<subtype>.html` (whole genome) or `PhylogeneticTreeReport_<subtype>_<SEG>.html` (segment tree) — every tree's report is also in `index.html`, switchable from the Subtype and Tree dropdowns — `panels_status.tsv` and `run_manifest.json` (tool versions, resolved parameters, input checksums, method choices, QC outcome, panels rendered and skipped with the reason). Output folders from runs made before this per-tree layout was added use the flat `phylogeny/` layout (single H3N2 whole-genome tree, `PhylogeneticTreeReport.html`) instead.
 
-**Notes and differences from the paper.** The protocol references have no PA segment for A/Darwin/6/2021, so PA coordinates use A/Massachusetts/18/2022 and Darwin's PA is treated as missing data in the tree. IQ-TREE 2.3.6 is pinned (2.0 is no longer on bioconda). Alignments are not manually curated (the paper used AliView). Clades for non-HA segments are not assigned separately. The tools are pinned in `FluTyper_env.yaml`; with `conda`, create the environment from that file (it uses the `conda-forge` and `bioconda` channels only).
+**Notes and differences from the paper.** The protocol references have no PA segment for A/Darwin/6/2021, so PA coordinates use A/Massachusetts/18/2022 and Darwin's PA is treated as missing data in the H3N2 tree; A/Wisconsin/67/2022 (H1N1pdm09) is complete, so no fallback is used for that subtype. IQ-TREE 2.3.6 is pinned (2.0 is no longer on bioconda). Alignments are not manually curated (the paper used AliView). Clades for non-HA segments are not assigned separately. The tools are pinned in `FluTyper_env.yaml`; with `conda`, create the environment from that file (it uses the `conda-forge` and `bioconda` channels only).
+
+<a id="append-and-phylogenetics"></a>**`--append` and phylogenetics.** `MergeHistoricalData` only merges the summary tables, so with both `--append` and `--phylogenetics` the module also pulls in samples from the append directory: their sample folders (`<appendDir>/samples/<sample_id>/`, matched by having a `segments/` folder; the current run's own samples win on a duplicate ID) and their subclade. Since sample folders only started keeping a per-sample `nextclade_results.csv` recently, a historical sample without one has Nextclade rerun on its HA segment against the current subtype's dataset instead of being left with subclade `NA`. Nextclade datasets are fetched for every subtype of the merged (previous + new) table, so a subtype that only has previous samples still gets its trees. FluTyper warns when `<appendDir>/samples` is missing or empty, and lists previous samples dropped for lacking a `segments/` folder.
+
+Note that the new `--outDir` only receives the sample folders of the new run: the previous sample folders stay in the append directory. To append again later, point `--append` at the directory that holds the previous sample folders (or use the same folder for `--append` and `--outDir`).
 
 ## 🔄 Pipeline Architecture
 
@@ -315,7 +378,7 @@ Within the dashboard, there is deep cross-report linkage of the markers. Clickin
 | **Markers Table** | Interactive table detailing marker effects, subtypes, and references. |
 | **Frequency Evolution** | Time-series plots showing marker frequency over time (requires metadata). |
 | **Geographic Report** | Interactive maps based on the configured geographical levels. |
-| **Phylogenetic Tree** | Interactive whole-genome tree of the optional [phylogenetics module](#phylogenetics-module-optional); filters prune the tree to the selected samples. |
+| **Phylogenetic Tree** | Interactive trees of the optional [phylogenetics module](#phylogenetics-module-optional), one per segment and subtype (plus the whole-genome tree when requested), chosen with the Subtype and Tree dropdowns; filters prune the tree to the selected samples. |
 | **Sample Barcodes** | Per-sample mutation barcode plots for rapid visual inspection. These do not appear in the `index.html` dashboard, but are generated as separate HTML files inside each individual sample's directory. |
 
 ### Excel Data Schema (`final_mutations_report.xlsx`)
