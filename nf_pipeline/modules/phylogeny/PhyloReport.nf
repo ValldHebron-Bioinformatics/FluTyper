@@ -14,21 +14,25 @@ process PhyloReport {
     //     from the declarative spec (RESOURCES/phylo_panels.tsv) filtered by availability: a non-required panel whose
     //     metadata field is absent, or non-missing for fewer than --minPanelCoverage of the samples, is omitted with an
     //     INFO line and the next panels move left. Residue colours are fixed per amino acid letter.
-    //  3. PhylogeneticTreeReport.html: interactive version of the tree for the index.html dashboard, with dropdowns for
-    //     season (All Time, or from one season to another), age group and sex. A selection prunes the tree to the
-    //     matching samples (reference strains always stay), keeping the branch lengths of the full ML tree.
+    //  3. PhylogeneticTreeReport_<subtype_label>.html: interactive version of the tree for the index.html dashboard,
+    //     with dropdowns for season (All Time, or from one season to another), age group and sex. A selection prunes
+    //     the tree to the matching samples (reference strains always stay), keeping the branch lengths of the full
+    //     ML tree.
     //  4. run_manifest.json: tool versions, resolved parameters, input checksums, method choices, coverage QC,
     //     clusters, and the panels rendered or skipped with the reason.
     errorStrategy 'ignore'
     debug true
 
     input:
-    path(tree)                                  // phylo_tree.nwk
-    path(support)                               // node_support.tsv
-    path(subclades)                             // subclades.tsv
-    path(clusters)                              // clusters.tsv
-    path(proteins)                              // ancestral_aa folder (tips and internal nodes)
-    path(positions)                             // aa_positions.tsv
+    // subtype_label names and tags every tree of the module: "H3N2"/"H1N1pdm09" for the (optional) whole-genome
+    // tree, "H3N2_HA" etc. for a segment tree; used for the report filename/title. tree_folder is where this
+    // tree's files live under the subtype's own output folder: "whole_genome" or the bare segment name e.g. "HA".
+    // tree/support/clusters/proteins/segments are joined by subtype_label before this call, since they come from
+    // separate per-tree PhyloTree/PhyloPostTree/PhyloAlignment(-Segment) invocations fanned out over one channel
+    // (see PHYLOGENETICS in subworkflows/Phylogenetics.nf).
+    tuple val(subtype_label), val(tree_folder), path(tree), path(support), path(clusters), path(proteins), path(segments)
+    path(subclades)                             // subclades.tsv (shared: subclade assignment does not depend on the tree)
+    path(positions)                             // aa_positions.tsv (shared; positions whose gene has no ancestral_aa/<gene>.fasta in `proteins` are dropped, so a segment tree only shows its own genes)
     path(metadata)                              // metadata CSV, or empty when --metadata is not given
     path(lab_map)                               // --labMap TSV, or empty
     path(panel_spec)                            // phylo_panels.tsv
@@ -36,30 +40,30 @@ process PhyloReport {
     path(qc_table)                              // phylo_coverage_qc.tsv
     path(coordinate_table)                      // reference_segments.tsv
     path(root_table)                            // root_strains.tsv
-    path(segments)                              // phylo_segments.tsv
     path(checksum_inputs, stageAs: "inputs/*")  // input files to checksum
     val(period_bin)                             // month, week or none
     val(min_panel_coverage)
     val(width)
     val(height)
     val(dpi)
+    val(min_support_label)                      // minimum ultrafast bootstrap support (%) drawn as a node label; 0 shows all
     val(run_info_b64)                           // base64 JSON: resolved parameters and run information
 
     output:
-    path("annotations.tsv"),        emit: annotations
-    path("annotation_sources.tsv"), emit: sources
-    path("aa_states.tsv"),          emit: aa_states
-    path("phylo_tree.svg"),         emit: svg
-    path("phylo_tree.png"),         emit: png
-    path("panels_status.tsv"),      emit: panels
-    path("run_manifest.json"),      emit: manifest
-    path("PhylogeneticTreeReport.html"), emit: html
+    tuple val(subtype_label), path("${tree_folder}/annotations.tsv"),        emit: annotations
+    tuple val(subtype_label), path("${tree_folder}/annotation_sources.tsv"), emit: sources
+    tuple val(subtype_label), path("${tree_folder}/aa_states.tsv"),          emit: aa_states
+    tuple val(subtype_label), path("${tree_folder}/phylo_tree.svg"),         emit: svg
+    tuple val(subtype_label), path("${tree_folder}/phylo_tree.png"),         emit: png
+    tuple val(subtype_label), path("${tree_folder}/panels_status.tsv"),      emit: panels
+    tuple val(subtype_label), path("${tree_folder}/run_manifest.json"),      emit: manifest
+    tuple val(subtype_label), path("${tree_folder}/PhylogeneticTreeReport_${subtype_label}.html"), emit: html
 
     script:
     """
     # ---- 1. Annotations ----
     python3 - <<'PYEOF'
-import csv, re, sys
+import csv, os, re, sys
 import pandas as pd
 from Bio import Phylo, SeqIO
 
@@ -75,7 +79,10 @@ def read_tsv(path):
 tips = sorted(t.name for t in Phylo.read("${tree}", "newick").get_terminals())
 sub = {r["tip"]: r for r in read_tsv("${subclades}")}
 clu = {r["tip"]: r["cluster"] for r in read_tsv("${clusters}")}
-positions = read_tsv("${positions}")
+# aa_positions.tsv is resolved once per subtype and shared by every tree (whole genome + every segment tree); a
+# segment tree's ancestral_aa/ only has the genes of its own segment(s) (PhyloPostTree), so positions on any other
+# gene are silently dropped here -- a segment tree ends up with only the aa columns that belong to it.
+positions = [p for p in read_tsv("${positions}") if os.path.isfile(f"${proteins}/{p['gene']}.fasta")]
 proteins = {}
 for gene in sorted({p["gene"] for p in positions}):
     proteins[gene] = {r.id: str(r.seq) for r in SeqIO.parse(f"${proteins}/{gene}.fasta", "fasta")}
@@ -286,6 +293,7 @@ min_cov <- as.numeric("${min_panel_coverage}")
 fig_width <- as.numeric("${width}")
 fig_height <- as.numeric("${height}")
 fig_dpi <- as.numeric("${dpi}")
+min_support_label <- as.numeric("${min_support_label}")
 
 NA_COLOUR <- "#D9D9D9"
 BASE_COLS <- c("id", "tip_type", "subclade", "cluster", "source_group", "period", "season", "age_group", "sex")
@@ -381,11 +389,13 @@ sup <- setNames(support[["support"]], support[["node"]])
 int <- d[!d[["isTip"]], c("x", "y", "label")]
 int[["support"]] <- unname(sup[int[["label"]]])
 int <- int[!is.na(int[["support"]]) & nzchar(int[["support"]]), , drop = FALSE]
+# node_support.tsv (emitted above) keeps every value; only the drawn labels are filtered by --minSupportLabel
+int <- int[as.numeric(int[["support"]]) >= min_support_label, , drop = FALSE]
 if (nrow(int)) {
     p <- p + geom_text(data = int, aes(x = x, y = y, label = support), size = 1.8, hjust = 1.15, vjust = -0.35, colour = "grey30")
 }
 p <- p + geom_treescale(fontsize = 2.5, linesize = 0.4) +
-    labs(caption = "Branch lengths: substitutions per site; node labels: ultrafast bootstrap support")
+    labs(caption = sprintf("Branch lengths: substitutions per site; node labels: ultrafast bootstrap support ≥ %g", min_support_label))
 
 # Cluster labels alongside the tree
 label_space <- if (show_tips) 0.3 * tree_w else 0.02 * tree_w
@@ -440,6 +450,13 @@ REOF
 import csv, html, json
 from Bio import Phylo
 from plotly.offline import get_plotlyjs_version
+
+SUBTYPE_LABEL = "${subtype_label}"  # tree_id, e.g. "H3N2" (whole genome) or "H3N2_HA" (segment tree): names the file
+TREE_FOLDER_LABEL = "${tree_folder}"
+# "whole_genome" -> "whole-genome phylogeny"; any segment folder (e.g. "HA") -> "HA segment phylogeny"
+TREE_KIND_LABEL = "whole-genome phylogeny" if TREE_FOLDER_LABEL == "whole_genome" else f"{TREE_FOLDER_LABEL} segment phylogeny"
+# Bare subtype for display (e.g. "H3N2_HA" -> "H3N2"), so the title/heading don't repeat the segment twice
+BARE_SUBTYPE_LABEL = SUBTYPE_LABEL if TREE_FOLDER_LABEL == "whole_genome" else SUBTYPE_LABEL[: -(len(TREE_FOLDER_LABEL) + 1)]
 
 def read_tsv(path):
     with open(path) as f:
@@ -509,6 +526,9 @@ data = {
     "subcladeColours": colour_of.get("subclade", {}),
     "subclade": {tip: r["subclade"] for tip, r in ann.items()},
     "naColour": NA_COLOUR,
+    "subtypeLabel": BARE_SUBTYPE_LABEL,
+    "treeKindLabel": TREE_KIND_LABEL,
+    "minSupportLabel": float("${min_support_label}"),
 }
 
 def note(column, field):
@@ -539,7 +559,7 @@ legend = "".join(
 payload = json.dumps(data).replace("<", "\\\\u003c")
 
 page = r'''<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Phylogenetic Tree</title>
+<html><head><meta charset="utf-8"><title>Phylogenetic Tree - SUBTYPELABEL - TREEKINDLABEL</title>
 <script src="https://cdn.plot.ly/plotly-PLOTLYVERSION.min.js"></script>
 <style>
 body { font-family: Arial, Helvetica, sans-serif; margin: 16px; color: #222; }
@@ -551,13 +571,13 @@ body { font-family: Arial, Helvetica, sans-serif; margin: 16px; color: #222; }
 .chip { display: inline-block; margin: 2px 8px 2px 0; }
 .chip i { display: inline-block; width: 11px; height: 11px; margin-right: 4px; vertical-align: middle; border: 1px solid #999; }
 </style></head><body>
-<h2 id="title">Whole-genome phylogeny</h2>
+<h2 id="title">SUBTYPELABEL TREEKINDLABEL</h2>
 <div class="bar">CONTROLS</div>
 <div id="info"></div>
 <div id="tree"></div>
 <div class="legends">LEGENDS</div>
 <p style="font-size:11px;color:#777">Maximum likelihood tree inferred once from all samples that passed coverage QC; filters prune it to the
-selected samples, keeping the branch lengths of the full tree. Node labels: ultrafast bootstrap support. Reference strains are always shown.</p>
+selected samples, keeping the branch lengths of the full tree. Node labels: ultrafast bootstrap support &ge; MINSUPPORTLABEL. Reference strains are always shown.</p>
 <script>
 const D = PAYLOAD;
 const n = D.parent.length;
@@ -622,7 +642,7 @@ function draw() {
   const from = byId("selFrom") ? byId("selFrom").value : "ALL";
   const to = byId("selTo") ? byId("selTo").value : "";
   const label = from === "ALL" ? "All Time" : (from === to ? "Season " + from : "Seasons " + from + " to " + to);
-  byId("title").textContent = "Whole-genome phylogeny - " + label;
+  byId("title").textContent = D.subtypeLabel + " " + D.treeKindLabel + " - " + label;
   byId("info").textContent = "Showing " + nSamples + " of " + totalSamples + " samples, plus " + (nTips - nSamples) + " reference strains.";
 
   const bx = [], by = [];
@@ -636,7 +656,8 @@ function draw() {
   traces.push({x: tips.map(d => d.x), y: tips.map(d => d.y), mode: "markers", xaxis: "x", yaxis: "y",
     marker: {size: 6, color: tips.map(d => D.subcladeColours[D.subclade[D.name[d.j]]] || D.naColour), line: {color: "#333", width: 0.5}},
     text: tips.map(d => D.hover[D.name[d.j]]), hovertemplate: "%{text}<extra></extra>"});
-  const sup = drawn.filter(d => !D.tip[d.j] && D.support[d.j] !== "" && d.parent >= 0);
+  // D.support keeps every node's raw value; only the drawn labels are filtered by --minSupportLabel
+  const sup = drawn.filter(d => !D.tip[d.j] && D.support[d.j] !== "" && d.parent >= 0 && Number(D.support[d.j]) >= D.minSupportLabel);
   traces.push({x: sup.map(d => d.x), y: sup.map(d => d.y), mode: "text", text: sup.map(d => D.support[d.j]),
     textposition: "top left", textfont: {size: 9, color: "#666"}, hoverinfo: "skip", xaxis: "x", yaxis: "y"});
   if (showLabels) traces.push({x: tips.map(() => maxX * 1.02), y: tips.map(d => d.y), mode: "text", text: tips.map(d => D.name[d.j]),
@@ -644,20 +665,24 @@ function draw() {
 
   const K = D.panels.length;
   const height = Math.max(450, nTips * 16 + 200);
-  const cell = Math.max(3, Math.min(18, (height - 200) / Math.max(1, nTips) * 0.95));
+  // Heatmap cells are bars, one row tall (base y-0.5, height 1), so a column is a solid band whatever the number of
+  // tips; colWidth (x2 units, column pitch = 1) leaves only a thin gap between neighbouring columns
+  const colWidth = 0.9;
   D.panels.forEach((p, k) => {
-    traces.push({x: tips.map(() => k), y: tips.map(d => d.y), mode: "markers", xaxis: "x2", yaxis: "y",
-      marker: {symbol: "square", size: cell, color: tips.map(d => p.colours[D.name[d.j]] || D.naColour)},
-      text: tips.map(d => "<b>" + D.name[d.j] + "</b><br>" + p.name + ": " + (p.values[D.name[d.j]] || "NA")),
-      hovertemplate: "%{text}<extra></extra>"});
+    traces.push({type: "bar", x: tips.map(() => k), y: tips.map(() => 1), base: tips.map(d => d.y - 0.5),
+      width: colWidth, xaxis: "x2", yaxis: "y",
+      marker: {color: tips.map(d => p.colours[D.name[d.j]] || D.naColour), line: {width: 0}},
+      hovertext: tips.map(d => "<b>" + D.name[d.j] + "</b><br>" + p.name + ": " + (p.values[D.name[d.j]] || "NA")),
+      hovertemplate: "%{hovertext}<extra></extra>"});
   });
-  const heatFrac = Math.min(0.5, 0.045 * K + 0.03);
+  // Width of the heatmap area: each column gets a fixed share of the plot, capped so wide panel sets still leave room
+  const heatFrac = Math.min(0.5, 0.05 * K + 0.02);
   const scale = niceScale(maxX);
   Plotly.react("tree", traces, {
-    height: height, showlegend: false, hovermode: "closest", margin: {t: 110, l: 20, r: 20, b: 60},
+    height: height, showlegend: false, hovermode: "closest", barmode: "overlay", margin: {t: 110, l: 20, r: 20, b: 60},
     xaxis: {domain: [0, 1 - heatFrac - 0.02], range: [-maxX * 0.02, maxX * (showLabels ? 1.45 : 1.05)],
             showgrid: false, zeroline: false, showticklabels: false},
-    xaxis2: {domain: [1 - heatFrac, 1], range: [-0.6, Math.max(K, 1) - 0.4], side: "top", tickangle: -90,
+    xaxis2: {domain: [1 - heatFrac, 1], range: [-0.5, Math.max(K, 1) - 0.5], side: "top", tickangle: -90,
              tickvals: D.panels.map((p, k) => k), ticktext: D.panels.map(p => p.name), showgrid: false, zeroline: false},
     yaxis: {autorange: "reversed", showgrid: false, zeroline: false, showticklabels: false, range: [nTips + 1, -1]},
     shapes: [{type: "line", xref: "x", yref: "y", x0: 0, x1: scale, y0: nTips + 0.5, y1: nTips + 0.5, line: {width: 2}}],
@@ -681,8 +706,9 @@ draw();
 </script></body></html>
 '''
 page = (page.replace("PLOTLYVERSION", get_plotlyjs_version()).replace("CONTROLS", controls)
-            .replace("LEGENDS", legend).replace("PAYLOAD", payload))
-with open("PhylogeneticTreeReport.html", "w", encoding="utf-8") as f:
+            .replace("LEGENDS", legend).replace("PAYLOAD", payload).replace("SUBTYPELABEL", BARE_SUBTYPE_LABEL)
+            .replace("TREEKINDLABEL", TREE_KIND_LABEL).replace("MINSUPPORTLABEL", "${min_support_label}"))
+with open(f"PhylogeneticTreeReport_{SUBTYPE_LABEL}.html", "w", encoding="utf-8") as f:
     f.write(page)
 print(f"PhyloReport: interactive tree written with {len(panels)} panels and filters: "
       + ", ".join(k for k, v in (("season", season_opts), ("age group", data["ages"]), ("sex", data["sexes"])) if v) + ".")
@@ -761,5 +787,10 @@ manifest = {
 with open("run_manifest.json", "w") as f:
     json.dump(manifest, f, indent=2)
 PYEOF
+
+    # ---- Move this tree's files into its own folder, so publishing several trees of the same subtype never collides ----
+    mkdir -p "${tree_folder}"
+    mv annotations.tsv annotation_sources.tsv aa_states.tsv phylo_tree.svg phylo_tree.png panels_status.tsv \\
+       run_manifest.json "PhylogeneticTreeReport_${subtype_label}.html" "${tree_folder}/"
     """
 }

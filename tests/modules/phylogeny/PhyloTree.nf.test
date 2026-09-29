@@ -12,11 +12,10 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true)
-                input[1] = "REF_A_Darwin_6_2021"
-                input[2] = "GTR+G4"
-                input[3] = 1000
-                input[4] = 12345
+                input[0] = tuple("H3N2", "whole_genome", file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true), "REF_A_Darwin_6_2021", file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true))
+                input[1] = "GTR+G4"
+                input[2] = 1000
+                input[3] = 12345
                 """
             }
         }
@@ -24,7 +23,7 @@ nextflow_process {
         then {
             assert process.success
 
-            def treeText = path(process.out.tree.get(0)).text
+            def treeText = path(process.out.tree.get(0)[1]).text
             [
                 "REF_A_Darwin_6_2021", "REF_A_Massachusetts_18_2022", "REF_A_Croatia_10136RV_2023",
                 "REF_A_Singapore_GP20238_2024", "REF_A_Sydney_1359_2024",
@@ -33,7 +32,7 @@ nextflow_process {
                 assert treeText.contains(tip) : "tip ${tip} missing from phylo_tree.nwk"
             }
 
-            def supportLines = path(process.out.support.get(0)).text.readLines()
+            def supportLines = path(process.out.support.get(0)[1]).text.readLines()
             assert supportLines[0] == "node\tsupport"
             def supportValues = supportLines.drop(1).collect { it.split("\t", -1)[1] }
             // The root's support is always empty; every other internal node must carry a numeric value
@@ -52,18 +51,17 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true)
-                input[1] = "REF_A_Darwin_6_2021"
-                input[2] = "GTR+G4"
-                input[3] = 0
-                input[4] = 12345
+                input[0] = tuple("H3N2", "whole_genome", file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true), "REF_A_Darwin_6_2021", file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true))
+                input[1] = "GTR+G4"
+                input[2] = 0
+                input[3] = 12345
                 """
             }
         }
 
         then {
             assert process.success
-            def supportLines = path(process.out.support.get(0)).text.readLines()
+            def supportLines = path(process.out.support.get(0)[1]).text.readLines()
             assert supportLines[0] == "node\tsupport"
             def supportValues = supportLines.drop(1).collect { it.split("\t", -1)[1] }
             assert supportValues.every { it == "" } : "every support value should be empty when bootstrap is 0: ${supportValues}"
@@ -75,18 +73,17 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true)
-                input[1] = "REF_A_Darwin_6_2021"
-                input[2] = "GTR+G4"
-                input[3] = 0
-                input[4] = 12345
+                input[0] = tuple("H3N2", "whole_genome", file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true), "REF_A_Darwin_6_2021", file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true))
+                input[1] = "GTR+G4"
+                input[2] = 0
+                input[3] = 12345
                 """
             }
         }
 
         then {
             assert process.success
-            firstRunTree = path(process.out.raw_tree.get(0)).text
+            firstRunTree = path(process.out.raw_tree.get(0)[1]).text
             assert firstRunTree != null && firstRunTree.length() > 0
         }
     }
@@ -96,18 +93,17 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true)
-                input[1] = "REF_A_Darwin_6_2021"
-                input[2] = "GTR+G4"
-                input[3] = 0
-                input[4] = 12345
+                input[0] = tuple("H3N2", "whole_genome", file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true), "REF_A_Darwin_6_2021", file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true))
+                input[1] = "GTR+G4"
+                input[2] = 0
+                input[3] = 12345
                 """
             }
         }
 
         then {
             assert process.success
-            def secondRunTree = path(process.out.raw_tree.get(0)).text
+            def secondRunTree = path(process.out.raw_tree.get(0)[1]).text
             assert firstRunTree != null : "the first determinism test must run before this one"
             assert secondRunTree == firstRunTree : "IQ-TREE with a fixed seed should produce an identical treefile across independent runs"
         }
@@ -120,11 +116,10 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true)
-                input[1] = "REF_A_Darwin_6_2021"
-                input[2] = "GTR+G4"
-                input[3] = 0
-                input[4] = 12345
+                input[0] = tuple("H3N2", "whole_genome", file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true), "REF_A_Darwin_6_2021", file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true))
+                input[1] = "GTR+G4"
+                input[2] = 0
+                input[3] = 12345
                 """
             }
         }
@@ -133,6 +128,30 @@ nextflow_process {
             assert process.success
             assert process.out.tree.size() == 1 : "the tree should still be built when more cpus are requested than cores exist"
             assert process.stdout.join("\\n").contains("cpus requested but only")
+        }
+    }
+
+    test("Should nest a segment tree's files under its own tree_folder (e.g. 'HA'), not 'whole_genome'") {
+
+        when {
+            process {
+                """
+                input[0] = tuple("H3N2_HA", "HA", file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true), "REF_A_Darwin_6_2021", file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true))
+                input[1] = "GTR+G4"
+                input[2] = 0
+                input[3] = 12345
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def treePath = path(process.out.tree.get(0)[1])
+            assert treePath.toString().contains("/HA/") : "expected the tree nested under an 'HA' folder, got ${treePath}"
+            assert treePath.getFileName().toString() == "phylo_tree.nwk"
+            def forPostTree = process.out.for_post_tree.get(0)
+            assert forPostTree[0] == "H3N2_HA"
+            assert forPostTree[1] == "HA"
         }
     }
 

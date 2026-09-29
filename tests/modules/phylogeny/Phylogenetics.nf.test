@@ -19,6 +19,8 @@ nextflow_workflow {
                 labMap = null
                 phyloPanels = "${projectDir}/RESOURCES/phylo_panels.tsv"
                 phyloSubtype = "H3N2"
+                phyloWholeGenome = true
+                phyloSegmentTrees = "none"
                 phyloReference = "A/Darwin/6/2021"
                 phyloReferenceFallback = "A/Massachusetts/18/2022"
                 phyloRootStrains = "A/Darwin/6/2021,A/Massachusetts/18/2022,A/Croatia/10136RV/2023,A/Singapore/GP20238/2024,A/Sydney/1359/2024"
@@ -29,6 +31,7 @@ nextflow_workflow {
                 bootstrap = 0
                 seed = 12345
                 clusterThreshold = 0.005
+                minSupportLabel = 70
                 periodBin = "month"
                 minPanelCoverage = 0.8
                 width = 6
@@ -58,8 +61,14 @@ nextflow_workflow {
                     tuple("01816372", file("${projectDir}/tests/data/phylo/nextclade/nextclade_results_01816372.csv", checkIfExists: true))
                 )
                 input[3] = Channel.of(file("${projectDir}/protocols/HUMAN/v1/resources/H3/nextclade_H3_dataset", checkIfExists: true))
-                input[4] = file("${projectDir}/tests/data/phylo/metadata_lab.csv", checkIfExists: true)
+                input[4] = Channel.of(file("${projectDir}/tests/data/phylo/metadata_lab.csv", checkIfExists: true))
                 input[5] = ["HA1:62", "HA1:145", "HA1:239"]
+                input[6] = "H3N2"
+                input[7] = "H3N2"
+                input[8] = "A/Darwin/6/2021"
+                input[9] = "A/Massachusetts/18/2022"
+                input[10] = "A/Darwin/6/2021,A/Massachusetts/18/2022,A/Croatia/10136RV/2023,A/Singapore/GP20238/2024,A/Sydney/1359/2024"
+                input[11] = "A/Darwin/6/2021"
                 """
             }
         }
@@ -80,7 +89,7 @@ nextflow_workflow {
                 "phylo_coverage_qc.tsv", "phylo_tool_versions.json", "gene_map.tsv", "aa_positions.tsv",
                 "reference_segments.tsv", "root_strains.tsv", "phylo_alignment.fasta", "phylo_segments.tsv",
                 "phylo_tree.nwk", "node_support.tsv", "subclades.tsv", "clusters.tsv", "annotations.tsv",
-                "phylo_tree.svg", "phylo_tree.png", "run_manifest.json", "PhylogeneticTreeReport.html"
+                "phylo_tree.svg", "phylo_tree.png", "run_manifest.json", "PhylogeneticTreeReport_H3N2.html"
             ].each { name ->
                 assert outputFiles.contains(name) : "expected ${name} among the PHYLOGENETICS outputs, got ${outputFiles}"
             }
@@ -88,8 +97,8 @@ nextflow_workflow {
             // The interactive HTML report is also emitted on its own channel (main.nf feeds it into MergeReports)
             assert workflow.out.report.size() == 1
             def reportFile = path(workflow.out.report.get(0))
-            assert reportFile.toString().endsWith("PhylogeneticTreeReport.html")
-            assert reportFile.text.contains("<title>Phylogenetic Tree</title>")
+            assert reportFile.toString().endsWith("PhylogeneticTreeReport_H3N2.html")
+            assert reportFile.text.contains("<title>Phylogenetic Tree - H3N2 - whole-genome phylogeny</title>")
 
             // Only the 3 fully-covered samples (01816372, 01818936, 198353883) make it into the alignment/tree
             def alignmentFile = path(outputFiles.contains("phylo_alignment.fasta") ?
@@ -101,5 +110,6 @@ nextflow_workflow {
             assert !alignmentHeaders.any { it == ">01817974" } : "01817974 should have failed coverage QC and be excluded from the alignment"
         }
     }
+
 
 }

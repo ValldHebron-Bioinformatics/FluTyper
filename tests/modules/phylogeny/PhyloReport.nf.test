@@ -11,27 +11,32 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true)
-                input[1] = file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true)
-                input[2] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
-                input[3] = file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true)
-                input[4] = file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true)
-                input[5] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
-                input[6] = file("${projectDir}/tests/data/phylo/metadata_lab.csv", checkIfExists: true)
-                input[7] = []
-                input[8] = file("${projectDir}/RESOURCES/phylo_panels.tsv", checkIfExists: true)
-                input[9] = file("${projectDir}/tests/data/phylo/phylo_tool_versions.json", checkIfExists: true)
-                input[10] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
-                input[11] = file("${projectDir}/tests/data/phylo/reference_segments.tsv", checkIfExists: true)
-                input[12] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
-                input[13] = file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
-                input[14] = [file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true)]
-                input[15] = "month"
-                input[16] = 0.8
-                input[17] = 6
-                input[18] = 5
-                input[19] = 72
-                input[20] = groovy.json.JsonOutput.toJson([
+                                input[0] = tuple(
+                    "H3N2",
+                    "whole_genome",
+                    file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/metadata_lab.csv", checkIfExists: true)
+                input[4] = []
+                input[5] = file("${projectDir}/RESOURCES/phylo_panels.tsv", checkIfExists: true)
+                input[6] = file("${projectDir}/tests/data/phylo/phylo_tool_versions.json", checkIfExists: true)
+                input[7] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
+                input[8] = file("${projectDir}/tests/data/phylo/reference_segments.tsv", checkIfExists: true)
+                input[9] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
+                input[10] = [file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true)]
+                input[11] = "month"
+                input[12] = 0.8
+                input[13] = 6
+                input[14] = 5
+                input[15] = 72
+                input[16] = 70
+                input[17] = groovy.json.JsonOutput.toJson([
                     pipeline_version: "1.1.0", started: "2024-01-01T00:00:00Z",
                     parameters: [phyloMinCoverage: "0.95", model: "GTR+G4", bootstrap: "1000", seed: "12345",
                                  phyloOutgroup: "A/Darwin/6/2021", clusterThreshold: "0.005"]
@@ -42,20 +47,20 @@ nextflow_process {
 
         then {
             assert process.success
-            def sources = path(process.out.sources.get(0)).text
+            def sources = path(process.out.sources.get(0)[1]).text
             assert sources.contains("source_group\tORIGINATING_LAB\tyes\traw values")
 
-            def panels = path(process.out.panels.get(0)).text.readLines()
+            def panels = path(process.out.panels.get(0)[1]).text.readLines()
             def sourceRow = panels.find { it.startsWith("source\t") }
             assert sourceRow != null
             assert sourceRow.split("\t")[2] == "rendered" : "source panel should be rendered: ${sourceRow}"
 
-            assert path(process.out.svg.get(0)).exists()
-            assert path(process.out.png.get(0)).exists()
+            assert path(process.out.svg.get(0)[1]).exists()
+            assert path(process.out.png.get(0)[1]).exists()
 
-            def htmlFile = path(process.out.html.get(0))
+            def htmlFile = path(process.out.html.get(0)[1])
             assert htmlFile.exists() && htmlFile.size() > 0
-            assert htmlFile.toString().endsWith("PhylogeneticTreeReport.html")
+            assert htmlFile.toString().endsWith("PhylogeneticTreeReport_H3N2.html")
         }
     }
 
@@ -64,27 +69,32 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true)
-                input[1] = file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true)
-                input[2] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
-                input[3] = file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true)
-                input[4] = file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true)
-                input[5] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
-                input[6] = file("${projectDir}/tests/data/phylo/metadata_nolab.csv", checkIfExists: true)
-                input[7] = []
-                input[8] = file("${projectDir}/RESOURCES/phylo_panels.tsv", checkIfExists: true)
-                input[9] = file("${projectDir}/tests/data/phylo/phylo_tool_versions.json", checkIfExists: true)
-                input[10] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
-                input[11] = file("${projectDir}/tests/data/phylo/reference_segments.tsv", checkIfExists: true)
-                input[12] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
-                input[13] = file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
-                input[14] = [file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true)]
-                input[15] = "month"
-                input[16] = 0.8
-                input[17] = 6
-                input[18] = 5
-                input[19] = 72
-                input[20] = groovy.json.JsonOutput.toJson([
+                                input[0] = tuple(
+                    "H3N2",
+                    "whole_genome",
+                    file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/metadata_nolab.csv", checkIfExists: true)
+                input[4] = []
+                input[5] = file("${projectDir}/RESOURCES/phylo_panels.tsv", checkIfExists: true)
+                input[6] = file("${projectDir}/tests/data/phylo/phylo_tool_versions.json", checkIfExists: true)
+                input[7] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
+                input[8] = file("${projectDir}/tests/data/phylo/reference_segments.tsv", checkIfExists: true)
+                input[9] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
+                input[10] = [file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true)]
+                input[11] = "month"
+                input[12] = 0.8
+                input[13] = 6
+                input[14] = 5
+                input[15] = 72
+                input[16] = 70
+                input[17] = groovy.json.JsonOutput.toJson([
                     pipeline_version: "1.1.0", started: "2024-01-01T00:00:00Z",
                     parameters: [phyloMinCoverage: "0.95", model: "GTR+G4", bootstrap: "1000", seed: "12345",
                                  phyloOutgroup: "A/Darwin/6/2021", clusterThreshold: "0.005"]
@@ -95,13 +105,13 @@ nextflow_process {
 
         then {
             assert process.success
-            def sourcesLines = path(process.out.sources.get(0)).text.readLines()
+            def sourcesLines = path(process.out.sources.get(0)[1]).text.readLines()
             def sourceLine = sourcesLines.find { it.startsWith("source_group\t") }
             assert sourceLine != null
             assert sourceLine.split("\t")[2] == "no"
             assert sourceLine.contains("ORIGINATING_LAB")
 
-            def panelsLines = path(process.out.panels.get(0)).text.readLines()
+            def panelsLines = path(process.out.panels.get(0)[1]).text.readLines()
             def sourceRow = panelsLines.find { it.startsWith("source\t") }
             assert sourceRow.split("\t")[2] == "skipped" : "source panel should be skipped: ${sourceRow}"
             assert sourceRow.contains("ORIGINATING_LAB")
@@ -116,27 +126,32 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true)
-                input[1] = file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true)
-                input[2] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
-                input[3] = file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true)
-                input[4] = file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true)
-                input[5] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
-                input[6] = file("${projectDir}/tests/data/phylo/metadata_lab_partial.csv", checkIfExists: true)
-                input[7] = []
-                input[8] = file("${projectDir}/RESOURCES/phylo_panels.tsv", checkIfExists: true)
-                input[9] = file("${projectDir}/tests/data/phylo/phylo_tool_versions.json", checkIfExists: true)
-                input[10] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
-                input[11] = file("${projectDir}/tests/data/phylo/reference_segments.tsv", checkIfExists: true)
-                input[12] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
-                input[13] = file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
-                input[14] = [file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true)]
-                input[15] = "month"
-                input[16] = 0.7
-                input[17] = 6
-                input[18] = 5
-                input[19] = 72
-                input[20] = groovy.json.JsonOutput.toJson([
+                                input[0] = tuple(
+                    "H3N2",
+                    "whole_genome",
+                    file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/metadata_lab_partial.csv", checkIfExists: true)
+                input[4] = []
+                input[5] = file("${projectDir}/RESOURCES/phylo_panels.tsv", checkIfExists: true)
+                input[6] = file("${projectDir}/tests/data/phylo/phylo_tool_versions.json", checkIfExists: true)
+                input[7] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
+                input[8] = file("${projectDir}/tests/data/phylo/reference_segments.tsv", checkIfExists: true)
+                input[9] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
+                input[10] = [file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true)]
+                input[11] = "month"
+                input[12] = 0.7
+                input[13] = 6
+                input[14] = 5
+                input[15] = 72
+                input[16] = 70
+                input[17] = groovy.json.JsonOutput.toJson([
                     pipeline_version: "1.1.0", started: "2024-01-01T00:00:00Z",
                     parameters: [phyloMinCoverage: "0.95", model: "GTR+G4", bootstrap: "1000", seed: "12345",
                                  phyloOutgroup: "A/Darwin/6/2021", clusterThreshold: "0.005"]
@@ -147,7 +162,7 @@ nextflow_process {
 
         then {
             assert process.success
-            def panelsLines = path(process.out.panels.get(0)).text.readLines()
+            def panelsLines = path(process.out.panels.get(0)[1]).text.readLines()
             def sourceRow = panelsLines.find { it.startsWith("source\t") }
             assert sourceRow.split("\t")[2] == "skipped" : "source panel should be skipped at min_panel_coverage 0.7: ${sourceRow}"
             assert sourceRow.split("\t")[3] == "0.6667" : "expected coverage 0.6667, got ${sourceRow}"
@@ -160,27 +175,32 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true)
-                input[1] = file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true)
-                input[2] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
-                input[3] = file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true)
-                input[4] = file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true)
-                input[5] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
-                input[6] = file("${projectDir}/tests/data/phylo/metadata_lab_partial.csv", checkIfExists: true)
-                input[7] = []
-                input[8] = file("${projectDir}/RESOURCES/phylo_panels.tsv", checkIfExists: true)
-                input[9] = file("${projectDir}/tests/data/phylo/phylo_tool_versions.json", checkIfExists: true)
-                input[10] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
-                input[11] = file("${projectDir}/tests/data/phylo/reference_segments.tsv", checkIfExists: true)
-                input[12] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
-                input[13] = file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
-                input[14] = [file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true)]
-                input[15] = "month"
-                input[16] = 0.6
-                input[17] = 6
-                input[18] = 5
-                input[19] = 72
-                input[20] = groovy.json.JsonOutput.toJson([
+                                input[0] = tuple(
+                    "H3N2",
+                    "whole_genome",
+                    file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/metadata_lab_partial.csv", checkIfExists: true)
+                input[4] = []
+                input[5] = file("${projectDir}/RESOURCES/phylo_panels.tsv", checkIfExists: true)
+                input[6] = file("${projectDir}/tests/data/phylo/phylo_tool_versions.json", checkIfExists: true)
+                input[7] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
+                input[8] = file("${projectDir}/tests/data/phylo/reference_segments.tsv", checkIfExists: true)
+                input[9] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
+                input[10] = [file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true)]
+                input[11] = "month"
+                input[12] = 0.6
+                input[13] = 6
+                input[14] = 5
+                input[15] = 72
+                input[16] = 70
+                input[17] = groovy.json.JsonOutput.toJson([
                     pipeline_version: "1.1.0", started: "2024-01-01T00:00:00Z",
                     parameters: [phyloMinCoverage: "0.95", model: "GTR+G4", bootstrap: "1000", seed: "12345",
                                  phyloOutgroup: "A/Darwin/6/2021", clusterThreshold: "0.005"]
@@ -191,7 +211,7 @@ nextflow_process {
 
         then {
             assert process.success
-            def panelsLines = path(process.out.panels.get(0)).text.readLines()
+            def panelsLines = path(process.out.panels.get(0)[1]).text.readLines()
             def sourceRow = panelsLines.find { it.startsWith("source\t") }
             assert sourceRow.split("\t")[2] == "rendered" : "source panel should be rendered at min_panel_coverage 0.6: ${sourceRow}"
         }
@@ -202,27 +222,32 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true)
-                input[1] = file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true)
-                input[2] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
-                input[3] = file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true)
-                input[4] = file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true)
-                input[5] = file("${projectDir}/tests/data/phylo/aa_positions_empty.tsv", checkIfExists: true)
-                input[6] = file("${projectDir}/tests/data/phylo/metadata_lab.csv", checkIfExists: true)
-                input[7] = []
-                input[8] = file("${projectDir}/RESOURCES/phylo_panels.tsv", checkIfExists: true)
-                input[9] = file("${projectDir}/tests/data/phylo/phylo_tool_versions.json", checkIfExists: true)
-                input[10] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
-                input[11] = file("${projectDir}/tests/data/phylo/reference_segments.tsv", checkIfExists: true)
-                input[12] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
-                input[13] = file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
-                input[14] = [file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true)]
-                input[15] = "month"
-                input[16] = 0.8
-                input[17] = 6
-                input[18] = 5
-                input[19] = 72
-                input[20] = groovy.json.JsonOutput.toJson([
+                                input[0] = tuple(
+                    "H3N2",
+                    "whole_genome",
+                    file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/aa_positions_empty.tsv", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/metadata_lab.csv", checkIfExists: true)
+                input[4] = []
+                input[5] = file("${projectDir}/RESOURCES/phylo_panels.tsv", checkIfExists: true)
+                input[6] = file("${projectDir}/tests/data/phylo/phylo_tool_versions.json", checkIfExists: true)
+                input[7] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
+                input[8] = file("${projectDir}/tests/data/phylo/reference_segments.tsv", checkIfExists: true)
+                input[9] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
+                input[10] = [file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true)]
+                input[11] = "month"
+                input[12] = 0.8
+                input[13] = 6
+                input[14] = 5
+                input[15] = 72
+                input[16] = 70
+                input[17] = groovy.json.JsonOutput.toJson([
                     pipeline_version: "1.1.0", started: "2024-01-01T00:00:00Z",
                     parameters: [phyloMinCoverage: "0.95", model: "GTR+G4", bootstrap: "1000", seed: "12345",
                                  phyloOutgroup: "A/Darwin/6/2021", clusterThreshold: "0.005"]
@@ -233,18 +258,18 @@ nextflow_process {
 
         then {
             assert process.success
-            def aaStatesLines = path(process.out.aa_states.get(0)).text.readLines()
+            def aaStatesLines = path(process.out.aa_states.get(0)[1]).text.readLines()
             assert aaStatesLines.size() == 1 : "aa_states.tsv should only contain the header when no positions are requested"
 
-            def annotationsHeader = path(process.out.annotations.get(0)).text.readLines()[0]
+            def annotationsHeader = path(process.out.annotations.get(0)[1]).text.readLines()[0]
             assert annotationsHeader == "id\ttip_type\tsubclade\tcluster\tsource_group\tperiod\tseason\tage_group\tsex"
 
-            def svgFile = path(process.out.svg.get(0))
-            def pngFile = path(process.out.png.get(0))
+            def svgFile = path(process.out.svg.get(0)[1])
+            def pngFile = path(process.out.png.get(0)[1])
             assert svgFile.exists() && svgFile.size() > 0
             assert pngFile.exists() && pngFile.size() > 0
 
-            def htmlFile = path(process.out.html.get(0))
+            def htmlFile = path(process.out.html.get(0)[1])
             assert htmlFile.exists() && htmlFile.size() > 0
         }
     }
@@ -254,27 +279,32 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true)
-                input[1] = file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true)
-                input[2] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
-                input[3] = file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true)
-                input[4] = file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true)
-                input[5] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
-                input[6] = []
-                input[7] = []
-                input[8] = file("${projectDir}/RESOURCES/phylo_panels.tsv", checkIfExists: true)
-                input[9] = file("${projectDir}/tests/data/phylo/phylo_tool_versions.json", checkIfExists: true)
-                input[10] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
-                input[11] = file("${projectDir}/tests/data/phylo/reference_segments.tsv", checkIfExists: true)
-                input[12] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
-                input[13] = file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
-                input[14] = [file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true)]
-                input[15] = "month"
-                input[16] = 0.8
-                input[17] = 6
-                input[18] = 5
-                input[19] = 72
-                input[20] = groovy.json.JsonOutput.toJson([
+                                input[0] = tuple(
+                    "H3N2",
+                    "whole_genome",
+                    file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
+                input[3] = []
+                input[4] = []
+                input[5] = file("${projectDir}/RESOURCES/phylo_panels.tsv", checkIfExists: true)
+                input[6] = file("${projectDir}/tests/data/phylo/phylo_tool_versions.json", checkIfExists: true)
+                input[7] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
+                input[8] = file("${projectDir}/tests/data/phylo/reference_segments.tsv", checkIfExists: true)
+                input[9] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
+                input[10] = [file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true)]
+                input[11] = "month"
+                input[12] = 0.8
+                input[13] = 6
+                input[14] = 5
+                input[15] = 72
+                input[16] = 70
+                input[17] = groovy.json.JsonOutput.toJson([
                     pipeline_version: "1.1.0", started: "2024-01-01T00:00:00Z",
                     parameters: [phyloMinCoverage: "0.95", model: "GTR+G4", bootstrap: "1000", seed: "12345",
                                  phyloOutgroup: "A/Darwin/6/2021", clusterThreshold: "0.005"]
@@ -285,7 +315,7 @@ nextflow_process {
 
         then {
             assert process.success
-            def sourcesLines = path(process.out.sources.get(0)).text.readLines()
+            def sourcesLines = path(process.out.sources.get(0)[1]).text.readLines()
             def sourceLine = sourcesLines.find { it.startsWith("source_group\t") }
             def periodLine = sourcesLines.find { it.startsWith("period\t") }
             def seasonLine = sourcesLines.find { it.startsWith("season\t") }
@@ -308,27 +338,32 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true)
-                input[1] = file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true)
-                input[2] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
-                input[3] = file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true)
-                input[4] = file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true)
-                input[5] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
-                input[6] = file("${projectDir}/tests/data/phylo/metadata_lab.csv", checkIfExists: true)
-                input[7] = file("${projectDir}/tests/data/phylo/lab_map.tsv", checkIfExists: true)
-                input[8] = file("${projectDir}/RESOURCES/phylo_panels.tsv", checkIfExists: true)
-                input[9] = file("${projectDir}/tests/data/phylo/phylo_tool_versions.json", checkIfExists: true)
-                input[10] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
-                input[11] = file("${projectDir}/tests/data/phylo/reference_segments.tsv", checkIfExists: true)
-                input[12] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
-                input[13] = file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
-                input[14] = [file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true)]
-                input[15] = "month"
-                input[16] = 0.8
-                input[17] = 6
-                input[18] = 5
-                input[19] = 72
-                input[20] = groovy.json.JsonOutput.toJson([
+                                input[0] = tuple(
+                    "H3N2",
+                    "whole_genome",
+                    file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/metadata_lab.csv", checkIfExists: true)
+                input[4] = file("${projectDir}/tests/data/phylo/lab_map.tsv", checkIfExists: true)
+                input[5] = file("${projectDir}/RESOURCES/phylo_panels.tsv", checkIfExists: true)
+                input[6] = file("${projectDir}/tests/data/phylo/phylo_tool_versions.json", checkIfExists: true)
+                input[7] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
+                input[8] = file("${projectDir}/tests/data/phylo/reference_segments.tsv", checkIfExists: true)
+                input[9] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
+                input[10] = [file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true)]
+                input[11] = "month"
+                input[12] = 0.8
+                input[13] = 6
+                input[14] = 5
+                input[15] = 72
+                input[16] = 70
+                input[17] = groovy.json.JsonOutput.toJson([
                     pipeline_version: "1.1.0", started: "2024-01-01T00:00:00Z",
                     parameters: [phyloMinCoverage: "0.95", model: "GTR+G4", bootstrap: "1000", seed: "12345",
                                  phyloOutgroup: "A/Darwin/6/2021", clusterThreshold: "0.005"]
@@ -339,14 +374,14 @@ nextflow_process {
 
         then {
             assert process.success
-            def annotations = path(process.out.annotations.get(0)).text.readLines()
+            def annotations = path(process.out.annotations.get(0)[1]).text.readLines()
             def byId = annotations.drop(1).collectEntries { line -> def f = line.split("\t", -1); [(f[0]): f] }
             // lab_map.tsv: LabA -> Hospital (exact match); labb -> Community (case-insensitive match of LabB); LabC is unmapped -> Other
             assert byId["01816372"][4] == "Hospital" : "01816372 (LabA) should be grouped as Hospital: ${byId['01816372']}"
             assert byId["01818936"][4] == "Community" : "01818936 (LabB) should be grouped as Community via the case-insensitive 'labb' entry: ${byId['01818936']}"
             assert byId["198353883"][4] == "Other" : "198353883 (LabC, unmapped) should be grouped as Other: ${byId['198353883']}"
 
-            def sources = path(process.out.sources.get(0)).text
+            def sources = path(process.out.sources.get(0)[1]).text
             assert sources.contains("grouped with --labMap")
             assert process.stdout.join("\\n").contains("--labMap matched")
         }
@@ -357,27 +392,32 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true)
-                input[1] = file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true)
-                input[2] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
-                input[3] = file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true)
-                input[4] = file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true)
-                input[5] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
-                input[6] = file("${projectDir}/tests/data/phylo/metadata_lab.csv", checkIfExists: true)
-                input[7] = []
-                input[8] = file("${projectDir}/RESOURCES/phylo_panels.tsv", checkIfExists: true)
-                input[9] = file("${projectDir}/tests/data/phylo/phylo_tool_versions.json", checkIfExists: true)
-                input[10] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
-                input[11] = file("${projectDir}/tests/data/phylo/reference_segments.tsv", checkIfExists: true)
-                input[12] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
-                input[13] = file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
-                input[14] = [file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true)]
-                input[15] = "week"
-                input[16] = 0.8
-                input[17] = 6
-                input[18] = 5
-                input[19] = 72
-                input[20] = groovy.json.JsonOutput.toJson([
+                                input[0] = tuple(
+                    "H3N2",
+                    "whole_genome",
+                    file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/metadata_lab.csv", checkIfExists: true)
+                input[4] = []
+                input[5] = file("${projectDir}/RESOURCES/phylo_panels.tsv", checkIfExists: true)
+                input[6] = file("${projectDir}/tests/data/phylo/phylo_tool_versions.json", checkIfExists: true)
+                input[7] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
+                input[8] = file("${projectDir}/tests/data/phylo/reference_segments.tsv", checkIfExists: true)
+                input[9] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
+                input[10] = [file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true)]
+                input[11] = "week"
+                input[12] = 0.8
+                input[13] = 6
+                input[14] = 5
+                input[15] = 72
+                input[16] = 70
+                input[17] = groovy.json.JsonOutput.toJson([
                     pipeline_version: "1.1.0", started: "2024-01-01T00:00:00Z",
                     parameters: [phyloMinCoverage: "0.95", model: "GTR+G4", bootstrap: "1000", seed: "12345",
                                  phyloOutgroup: "A/Darwin/6/2021", clusterThreshold: "0.005"]
@@ -388,7 +428,7 @@ nextflow_process {
 
         then {
             assert process.success
-            def annotations = path(process.out.annotations.get(0)).text.readLines()
+            def annotations = path(process.out.annotations.get(0)[1]).text.readLines()
             def byId = annotations.drop(1).collectEntries { line -> def f = line.split("\t", -1); [(f[0]): f] }
             // 2024-11-05 (01816372's DATE in metadata_lab.csv) falls in ISO week 45 of 2024
             assert byId["01816372"][5] == "2024-W45" : "expected 2024-W45, got ${byId['01816372'][5]}"
@@ -400,27 +440,32 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true)
-                input[1] = file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true)
-                input[2] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
-                input[3] = file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true)
-                input[4] = file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true)
-                input[5] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
-                input[6] = file("${projectDir}/tests/data/phylo/metadata_lab_partial.csv", checkIfExists: true)
-                input[7] = []
-                input[8] = file("${projectDir}/RESOURCES/phylo_panels.tsv", checkIfExists: true)
-                input[9] = file("${projectDir}/tests/data/phylo/phylo_tool_versions.json", checkIfExists: true)
-                input[10] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
-                input[11] = file("${projectDir}/tests/data/phylo/reference_segments.tsv", checkIfExists: true)
-                input[12] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
-                input[13] = file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
-                input[14] = [file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true)]
-                input[15] = "week"
-                input[16] = 0.8
-                input[17] = 6
-                input[18] = 5
-                input[19] = 72
-                input[20] = groovy.json.JsonOutput.toJson([
+                                input[0] = tuple(
+                    "H3N2",
+                    "whole_genome",
+                    file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/metadata_lab_partial.csv", checkIfExists: true)
+                input[4] = []
+                input[5] = file("${projectDir}/RESOURCES/phylo_panels.tsv", checkIfExists: true)
+                input[6] = file("${projectDir}/tests/data/phylo/phylo_tool_versions.json", checkIfExists: true)
+                input[7] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
+                input[8] = file("${projectDir}/tests/data/phylo/reference_segments.tsv", checkIfExists: true)
+                input[9] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
+                input[10] = [file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true)]
+                input[11] = "week"
+                input[12] = 0.8
+                input[13] = 6
+                input[14] = 5
+                input[15] = 72
+                input[16] = 70
+                input[17] = groovy.json.JsonOutput.toJson([
                     pipeline_version: "1.1.0", started: "2024-01-01T00:00:00Z",
                     parameters: [phyloMinCoverage: "0.95", model: "GTR+G4", bootstrap: "1000", seed: "12345",
                                  phyloOutgroup: "A/Darwin/6/2021", clusterThreshold: "0.005"]
@@ -431,7 +476,7 @@ nextflow_process {
 
         then {
             assert process.success
-            def annotations = path(process.out.annotations.get(0)).text.readLines()
+            def annotations = path(process.out.annotations.get(0)[1]).text.readLines()
             def byId = annotations.drop(1).collectEntries { line -> def f = line.split("\t", -1); [(f[0]): f] }
             // 01818936's DATE in metadata_lab_partial.csv is '2024-08' (year-month only): no day to place it in a week
             assert byId["01818936"][5] == "NA" : "expected NA, got ${byId['01818936'][5]}"
@@ -443,30 +488,35 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true)
-                input[1] = file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true)
-                input[2] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
-                input[3] = file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true)
-                input[4] = file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true)
-                input[5] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
-                input[6] = file("${projectDir}/tests/data/phylo/metadata_lab.csv", checkIfExists: true)
-                input[7] = []
-                input[8] = file("${projectDir}/RESOURCES/phylo_panels.tsv", checkIfExists: true)
-                input[9] = file("${projectDir}/tests/data/phylo/phylo_tool_versions.json", checkIfExists: true)
-                input[10] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
-                input[11] = file("${projectDir}/tests/data/phylo/reference_segments.tsv", checkIfExists: true)
-                input[12] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
-                input[13] = file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
-                input[14] = [
+                                input[0] = tuple(
+                    "H3N2",
+                    "whole_genome",
+                    file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/metadata_lab.csv", checkIfExists: true)
+                input[4] = []
+                input[5] = file("${projectDir}/RESOURCES/phylo_panels.tsv", checkIfExists: true)
+                input[6] = file("${projectDir}/tests/data/phylo/phylo_tool_versions.json", checkIfExists: true)
+                input[7] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
+                input[8] = file("${projectDir}/tests/data/phylo/reference_segments.tsv", checkIfExists: true)
+                input[9] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
+                input[10] = [
                     file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/metadata_lab.csv", checkIfExists: true)
                 ]
-                input[15] = "month"
-                input[16] = 0.8
-                input[17] = 6
-                input[18] = 5
-                input[19] = 72
-                input[20] = groovy.json.JsonOutput.toJson([
+                input[11] = "month"
+                input[12] = 0.8
+                input[13] = 6
+                input[14] = 5
+                input[15] = 72
+                input[16] = 70
+                input[17] = groovy.json.JsonOutput.toJson([
                     pipeline_version: "1.1.0", started: "2024-01-01T00:00:00Z",
                     parameters: [phyloMinCoverage: "0.95", model: "GTR+G4", bootstrap: "1000", seed: "12345",
                                  phyloOutgroup: "A/Darwin/6/2021", clusterThreshold: "0.005"]
@@ -478,7 +528,7 @@ nextflow_process {
         then {
             assert process.success
 
-            def manifest = new JsonSlurper().parse(path(process.out.manifest.get(0)).toFile())
+            def manifest = new JsonSlurper().parse(path(process.out.manifest.get(0)[1]).toFile())
             assert manifest.pipeline_version == "1.1.0"
             assert manifest.tools.mafft.status == "ok"
             assert manifest.parameters.model == "GTR+G4"
@@ -497,13 +547,13 @@ nextflow_process {
             assert manifest.panels.skipped.size() >= 0
             assert (manifest.panels.rendered + manifest.panels.skipped.collect { it.panel }).contains("source")
 
-            def aaStatesLines = path(process.out.aa_states.get(0)).text.readLines()
+            def aaStatesLines = path(process.out.aa_states.get(0)[1]).text.readLines()
             assert aaStatesLines[0] == "node\tnode_type\tlabel\tgene\tposition\taa"
             def rows = aaStatesLines.drop(1)
             assert rows.any { it.startsWith("01816372\ttip\t") } : "aa_states.tsv should list a tip row for 01816372"
             assert rows.any { it =~ /^NODE_\d+\tinternal\t/ } : "aa_states.tsv should list internal node rows"
 
-            def htmlFile = path(process.out.html.get(0))
+            def htmlFile = path(process.out.html.get(0)[1])
             assert htmlFile.exists() && htmlFile.size() > 0
         }
     }
@@ -513,27 +563,32 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true)
-                input[1] = file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true)
-                input[2] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
-                input[3] = file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true)
-                input[4] = file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true)
-                input[5] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
-                input[6] = file("${projectDir}/tests/data/phylo/metadata_lab.csv", checkIfExists: true)
-                input[7] = []
-                input[8] = file("${projectDir}/RESOURCES/phylo_panels.tsv", checkIfExists: true)
-                input[9] = file("${projectDir}/tests/data/phylo/phylo_tool_versions.json", checkIfExists: true)
-                input[10] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
-                input[11] = file("${projectDir}/tests/data/phylo/reference_segments.tsv", checkIfExists: true)
-                input[12] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
-                input[13] = file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
-                input[14] = [file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true)]
-                input[15] = "month"
-                input[16] = 0.8
-                input[17] = 6
-                input[18] = 5
-                input[19] = 72
-                input[20] = groovy.json.JsonOutput.toJson([
+                                input[0] = tuple(
+                    "H3N2",
+                    "whole_genome",
+                    file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/metadata_lab.csv", checkIfExists: true)
+                input[4] = []
+                input[5] = file("${projectDir}/RESOURCES/phylo_panels.tsv", checkIfExists: true)
+                input[6] = file("${projectDir}/tests/data/phylo/phylo_tool_versions.json", checkIfExists: true)
+                input[7] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
+                input[8] = file("${projectDir}/tests/data/phylo/reference_segments.tsv", checkIfExists: true)
+                input[9] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
+                input[10] = [file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true)]
+                input[11] = "month"
+                input[12] = 0.8
+                input[13] = 6
+                input[14] = 5
+                input[15] = 72
+                input[16] = 70
+                input[17] = groovy.json.JsonOutput.toJson([
                     pipeline_version: "1.1.0", started: "2024-01-01T00:00:00Z",
                     parameters: [phyloMinCoverage: "0.95", model: "GTR+G4", bootstrap: "1000", seed: "12345",
                                  phyloOutgroup: "A/Darwin/6/2021", clusterThreshold: "0.005"]
@@ -544,8 +599,8 @@ nextflow_process {
 
         then {
             assert process.success
-            def htmlText = path(process.out.html.get(0)).text
-            assert htmlText.contains("<title>Phylogenetic Tree</title>")
+            def htmlText = path(process.out.html.get(0)[1]).text
+            assert htmlText.contains("<title>Phylogenetic Tree - H3N2 - whole-genome phylogeny</title>")
             assert htmlText.contains("const D = {")
 
             def m = htmlText =~ /const D = (\{.+?\});\n/
@@ -568,8 +623,183 @@ nextflow_process {
             assert payload.hover["01816372"].contains("01816372")
             assert payload.panels.any { it.name == "subclade" }
 
+            // --minSupportLabel 70 (input[16]): node_support.tsv keeps every value unfiltered in the payload (only
+            // the drawn labels are filtered, client-side); NODE_0000007 (62) is below the threshold, NODE_0000003
+            // (100) is at/above it, and the threshold itself is embedded so the browser can filter consistently
+            assert payload.minSupportLabel == 70
+            def nodeIdx = { String name -> payload.name.findIndexOf { it == name } }
+            assert payload.support[nodeIdx("NODE_0000007")] == "62"
+            assert payload.support[nodeIdx("NODE_0000003")] == "100"
+            def htmlSource = path(process.out.html.get(0)[1]).text
+            assert htmlSource.contains("Number(D.support[d.j]) >= D.minSupportLabel") :
+                "the interactive tree's drawn-label filter must compare against D.minSupportLabel"
+
             assert payload.name.size() == payload.parent.size()
             assert payload.tip.size() == payload.parent.size()
+        }
+    }
+
+    test("Should embed --minSupportLabel 0 so every node's support label is shown") {
+
+        when {
+            process {
+                """
+                input[0] = tuple(
+                    "H3N2",
+                    "whole_genome",
+                    file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/metadata_lab.csv", checkIfExists: true)
+                input[4] = []
+                input[5] = file("${projectDir}/RESOURCES/phylo_panels.tsv", checkIfExists: true)
+                input[6] = file("${projectDir}/tests/data/phylo/phylo_tool_versions.json", checkIfExists: true)
+                input[7] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
+                input[8] = file("${projectDir}/tests/data/phylo/reference_segments.tsv", checkIfExists: true)
+                input[9] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
+                input[10] = [file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true)]
+                input[11] = "month"
+                input[12] = 0.8
+                input[13] = 6
+                input[14] = 5
+                input[15] = 72
+                input[16] = 0
+                input[17] = groovy.json.JsonOutput.toJson([
+                    pipeline_version: "1.1.0", started: "2024-01-01T00:00:00Z",
+                    parameters: [phyloMinCoverage: "0.95", model: "GTR+G4", bootstrap: "1000", seed: "12345",
+                                 phyloOutgroup: "A/Darwin/6/2021", clusterThreshold: "0.005"]
+                ]).bytes.encodeBase64().toString()
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def htmlText = path(process.out.html.get(0)[1]).text
+            def m = htmlText =~ /const D = (\{.+?\});\n/
+            assert m.find() : "could not find the embedded 'const D = {...};' JSON payload"
+            def payload = new JsonSlurper().parseText(m.group(1))
+            assert payload.minSupportLabel == 0
+            // Every non-empty support value (47, 62, 100...) is now >= the threshold, so every one would be drawn
+            assert payload.support.findAll { it != "" }.every { it.toInteger() >= 0 }
+        }
+    }
+
+    test("Should drop aa-position columns whose gene has no ancestral_aa file for this tree (segment-tree filtering)") {
+
+        when {
+            process {
+                """
+                input[0] = tuple(
+                    "H3N2_NA",
+                    "NA",
+                    file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/ancestral_aa_na_only", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/aa_positions_ha_na.tsv", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/metadata_lab.csv", checkIfExists: true)
+                input[4] = []
+                input[5] = file("${projectDir}/RESOURCES/phylo_panels.tsv", checkIfExists: true)
+                input[6] = file("${projectDir}/tests/data/phylo/phylo_tool_versions.json", checkIfExists: true)
+                input[7] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
+                input[8] = file("${projectDir}/tests/data/phylo/reference_segments.tsv", checkIfExists: true)
+                input[9] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
+                input[10] = [file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true)]
+                input[11] = "month"
+                input[12] = 0.8
+                input[13] = 6
+                input[14] = 5
+                input[15] = 72
+                input[16] = 70
+                input[17] = groovy.json.JsonOutput.toJson([
+                    pipeline_version: "1.1.0", started: "2024-01-01T00:00:00Z",
+                    parameters: [phyloMinCoverage: "0.95", model: "GTR+G4", bootstrap: "1000", seed: "12345",
+                                 phyloOutgroup: "A/Darwin/6/2021", clusterThreshold: "0.005"]
+                ]).bytes.encodeBase64().toString()
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            // aa_positions_ha_na.tsv requests HA1:62 and NA:10, but this NA tree's ancestral_aa/ only has NA.fasta:
+            // HA1:62 has no gene file for this tree and must be dropped; NA:10 must stay
+            def header = path(process.out.annotations.get(0)[1]).text.readLines()[0].split("\t", -1)
+            assert !header.contains("HA1:62") : "HA1:62 should be dropped: ${header}"
+            assert header.contains("NA:10") : "NA:10 should be kept: ${header}"
+
+            def sourcesText = path(process.out.sources.get(0)[1]).text
+            assert !sourcesText.contains("HA1:62\t")
+            assert sourcesText.contains("NA:10\t")
+        }
+    }
+
+    test("Should label a node with support exactly at --minSupportLabel (70) but not one at 69.9, in both the SVG and the interactive payload") {
+
+        when {
+            process {
+                """
+                input[0] = tuple(
+                    "H3N2",
+                    "whole_genome",
+                    file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/node_support_boundary.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/metadata_lab.csv", checkIfExists: true)
+                input[4] = []
+                input[5] = file("${projectDir}/RESOURCES/phylo_panels.tsv", checkIfExists: true)
+                input[6] = file("${projectDir}/tests/data/phylo/phylo_tool_versions.json", checkIfExists: true)
+                input[7] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
+                input[8] = file("${projectDir}/tests/data/phylo/reference_segments.tsv", checkIfExists: true)
+                input[9] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
+                input[10] = [file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true)]
+                input[11] = "month"
+                input[12] = 0.8
+                input[13] = 6
+                input[14] = 5
+                input[15] = 72
+                input[16] = 70
+                input[17] = groovy.json.JsonOutput.toJson([
+                    pipeline_version: "1.1.0", started: "2024-01-01T00:00:00Z",
+                    parameters: [phyloMinCoverage: "0.95", model: "GTR+G4", bootstrap: "1000", seed: "12345",
+                                 phyloOutgroup: "A/Darwin/6/2021", clusterThreshold: "0.005"]
+                ]).bytes.encodeBase64().toString()
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            // Interactive payload: minSupportLabel is embedded and every raw support value is kept unfiltered,
+            // so a client can compute "Number(support) >= minSupportLabel" itself (70 >= 70 true, 69.9 >= 70 false)
+            def htmlText = path(process.out.html.get(0)[1]).text
+            def m = htmlText =~ /const D = (\{.+?\});\n/
+            assert m.find()
+            def payload = new JsonSlurper().parseText(m.group(1))
+            assert payload.minSupportLabel == 70
+            def nodeIdx = { String name -> payload.name.findIndexOf { it == name } }
+            assert payload.support[nodeIdx("NODE_0000003")] == "70"
+            assert payload.support[nodeIdx("NODE_0000005")] == "69.9"
+
+            // Static SVG: ggtree/ggplot2 render each drawn label as its own <text ...>VALUE</text> element
+            def svgText = path(process.out.svg.get(0)[1]).text
+            assert svgText.contains(">70<") : "the node at exactly the threshold (70) should be labelled in the SVG"
+            assert !svgText.contains(">69.9<") : "the node below the threshold (69.9) should not be labelled in the SVG"
         }
     }
 

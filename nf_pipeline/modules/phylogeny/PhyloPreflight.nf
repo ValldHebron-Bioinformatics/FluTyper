@@ -112,6 +112,7 @@ fallback = "${reference_fallback}"
 root_strains = [s.strip() for s in "${root_strains}".split(",") if s.strip()]
 segments = [s.strip() for s in "${segments}".split(",") if s.strip()]
 requested = [p.strip() for p in "${aa_positions}".split(",") if p.strip()]
+ref_subtype = "H1N1" if subtype == "H1N1pdm09" else subtype
 
 PROT_BY_SEGMENT = {
     "HA": ["HA1", "HA2"], "NA": ["NA"], "PB2": ["PB2"], "PB1": ["PB1", "PB1-F2"],
@@ -125,7 +126,7 @@ def ref_id(strain):
 genomes = list(SeqIO.parse("${ref_genomes}", "fasta"))
 
 def find_segment(strain, seg):
-    prefix = f"{subtype}_{seg}_{strain.replace(' ', '_')}"
+    prefix = f"{ref_subtype}_{seg}_{strain.replace(' ', '_')}"
     hits = [r for r in genomes if r.description == prefix or r.description.startswith(prefix + "_")]
     if len(hits) > 1:
         print(f"PhyloPreflight: WARNING {len(hits)} records match {prefix}; using the first one.")
@@ -172,7 +173,7 @@ write_tsv("root_strains.tsv", ["strain", "tip_id", "segments_present", "segments
 cds = {}
 for r in SeqIO.parse("${cds_refs}", "fasta"):
     parts = r.id.split("_")
-    if len(parts) > 2 and parts[0] == subtype:
+    if len(parts) > 2 and parts[0] in {subtype, ref_subtype}:
         cds.setdefault(parts[1], str(r.seq).upper().replace("U", "T"))
 
 def align_pair(seg_seq, cds_seq):

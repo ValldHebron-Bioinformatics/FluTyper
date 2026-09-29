@@ -10,29 +10,53 @@ process MergeReports {
     #!/usr/bin/env python3
     import base64
     import json
+    import re
     from pathlib import Path
 
     # Recursively find all HTML files staged by Nextflow
     html_files = [f for f in Path('.').rglob('*.html') if f.name != 'index.html']
 
+    # PhylogeneticTreeReport_<subtype>[_<SEGMENT>].html: one whole-genome tree (--phylo-whole-genome) and/or one
+    # segment tree per built segment (--phylo-segment-trees), for each --phyloSubtype (e.g. H3N2, H1N1pdm09). The
+    # legacy, pre-subtype name PhylogeneticTreeReport.html (older runs' output folders) still matches, with an
+    # empty subtype/tree (shown as a single "Phylogenetic Tree" entry, same as before this module built several).
+    PHYLO_REPORT_RE = re.compile(r'^phylogenetictreereport(?:_(?P<tag>.+))?\$', re.IGNORECASE)
+    # Keep in sync with subworkflows/Phylogenetics.nf's phyloKnownSubtypes() (Groovy/Python, so not shareable
+    # directly): both lists gate which subtypes the pipeline and this dashboard recognise.
+    PHYLO_KNOWN_SUBTYPES = ["H1N1pdm09", "H3N2"]  # neither is a prefix of the other's "_SEGMENT" suffix
+
+    def split_subtype_tree(tag):
+        # "H3N2" (whole genome) -> ("H3N2", "Whole genome"); "H3N2_HA" (segment tree) -> ("H3N2", "HA")
+        for s in PHYLO_KNOWN_SUBTYPES:
+            if tag == s:
+                return s, "Whole genome"
+            if tag.startswith(s + "_"):
+                return s, tag[len(s) + 1:]
+        return tag, ""
+
     report_catalog = []
     for file_path in html_files:
         clean_name = file_path.stem.replace('_', ' ')
-        
+
         category = "General Analysis"
         subcategory = ""
         evo_key = ""
-        
-        # Interactive tree of the optional phylogenetics module gets its own section
-        if file_path.stem.lower().startswith('phylogenetic'):
+        subtype = ""
+        tree = ""
+
+        # Interactive tree(s) of the optional phylogenetics module get their own section, one per subtype x tree
+        phylo_match = PHYLO_REPORT_RE.match(file_path.stem)
+        if phylo_match:
             category = "Phylogenetics"
-            clean_name = "Phylogenetic Tree"
+            tag = phylo_match.group("tag") or ""
+            subtype, tree = split_subtype_tree(tag) if tag else ("", "")
+            clean_name = f"Phylogenetic Tree {subtype} {tree}".strip()
 
         # Strictly ensure the filename starts with 'evolution' to exclude clade reports
         if clean_name.lower().startswith('evolution'):
             category = "Frequency Evolution"
             parts = clean_name.split(' ')
-            
+
             # Extract the protein segment (e.g., HA1, PB1) to create the nested folder
             if len(parts) >= 2:
                 subcategory = parts[1].upper()
@@ -42,15 +66,17 @@ process MergeReports {
             # computed in MutationsGraphicReport.nf / InteractiveMutationsTable.nf verbatim.
             if file_path.stem.lower().startswith('evolution_'):
                 evo_key = file_path.stem[len('evolution_'):]
-            
+
         content = file_path.read_bytes()
         b64_content = base64.b64encode(content).decode('utf-8')
-        
+
         report_catalog.append({
             "title": clean_name,
             "category": category,
             "subcategory": subcategory,
             "evo_key": evo_key,
+            "subtype": subtype,
+            "tree": tree,
             "b64": b64_content
         })
 
@@ -214,14 +240,76 @@ process MergeReports {
                         header.querySelector('.folder-icon').textContent = isHidden ? '▼' : '▶';
                     }};
 
-                    // Append standalone items directly under the main category
-                    data.items.forEach(item => {{
-                        const link = document.createElement('a');
-                        link.className = 'report-link';
-                        link.textContent = item.title;
-                        link.onclick = () => openReport(item, link);
-                        catContent.appendChild(link);
-                    }});
+                    // Phylogenetics: one report per --phyloSubtype x tree (whole genome and/or one per built
+                    // segment). Two dropdowns switch between them instead of listing them as separate links.
+                    if (category === 'Phylogenetics' && data.items.length) {{
+                        const segTreeOrder = {{ 'PB2': 1, 'PB1': 2, 'PA': 3, 'HA': 4, 'NP': 5, 'NA': 6, 'MP': 7, 'NS': 8 }};
+                        const treeRank = t => t === 'Whole genome' ? 0 : (segTreeOrder[t] !== undefined ? segTreeOrder[t] : 999);
+
+                        const selWrapper = document.createElement('div');
+                        selWrapper.className = 'report-link';
+                        selWrapper.style.cursor = 'default';
+
+                        const subtypeLabel = document.createElement('div');
+                        subtypeLabel.textContent = 'Subtype';
+                        subtypeLabel.style.cssText = 'font-size:10px;font-weight:bold;color:#666;margin-bottom:4px;';
+                        const subtypeSelect = document.createElement('select');
+                        subtypeSelect.style.cssText = 'width:100%;padding:6px;border-radius:4px;border:1px solid #ccc;margin-bottom:8px;';
+
+                        const treeLabel = document.createElement('div');
+                        treeLabel.textContent = 'Tree';
+                        treeLabel.style.cssText = 'font-size:10px;font-weight:bold;color:#666;margin-bottom:4px;';
+                        const treeSelect = document.createElement('select');
+                        treeSelect.style.cssText = 'width:100%;padding:6px;border-radius:4px;border:1px solid #ccc;';
+
+                        const bySubtype = {{}};
+                        data.items.forEach(item => {{
+                            const key = item.subtype || item.title;
+                            (bySubtype[key] = bySubtype[key] || []).push(item);
+                        }});
+                        const subtypeOrder = Object.keys(bySubtype).sort();
+
+                        function populateTreeSelect(subtype) {{
+                            treeSelect.innerHTML = '';
+                            const items = bySubtype[subtype].slice().sort((a, b) => treeRank(a.tree) - treeRank(b.tree));
+                            items.forEach((item, idx) => {{
+                                const option = document.createElement('option');
+                                option.value = String(idx);
+                                option.textContent = item.tree || item.title;
+                                treeSelect.appendChild(option);
+                            }});
+                            treeSelect._items = items;
+                        }}
+
+                        subtypeOrder.forEach(subtype => {{
+                            const option = document.createElement('option');
+                            option.value = subtype;
+                            option.textContent = subtype;
+                            subtypeSelect.appendChild(option);
+                        }});
+                        populateTreeSelect(subtypeOrder[0]);
+
+                        subtypeSelect.onchange = () => {{
+                            populateTreeSelect(subtypeSelect.value);
+                            openReport(treeSelect._items[0]);
+                        }};
+                        treeSelect.onchange = () => openReport(treeSelect._items[parseInt(treeSelect.value, 10)]);
+
+                        selWrapper.appendChild(subtypeLabel);
+                        selWrapper.appendChild(subtypeSelect);
+                        selWrapper.appendChild(treeLabel);
+                        selWrapper.appendChild(treeSelect);
+                        catContent.appendChild(selWrapper);
+                    }} else {{
+                        // Append standalone items directly under the main category
+                        data.items.forEach(item => {{
+                            const link = document.createElement('a');
+                            link.className = 'report-link';
+                            link.textContent = item.title;
+                            link.onclick = () => openReport(item, link);
+                            catContent.appendChild(link);
+                        }});
+                    }}
 
                     // Sort subcategories by segment order (genome position); unmapped segments fall to the end, alphabetically among themselves
                     const sortedSubcategories = Object.keys(data.subcategories).sort((a, b) => {{

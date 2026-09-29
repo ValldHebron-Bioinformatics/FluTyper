@@ -22,8 +22,8 @@ process PhyloAlignment {
     val(segment_order)                       // comma-separated segment names
 
     output:
-    path("phylo_alignment.fasta"), emit: alignment
-    path("phylo_segments.tsv"),    emit: segments
+    path("whole_genome/phylo_alignment.fasta"), emit: alignment
+    path("whole_genome/phylo_segments.tsv"),    emit: segments
 
     script:
     """
@@ -31,6 +31,7 @@ process PhyloAlignment {
 import csv, io, os, subprocess, sys
 from Bio import SeqIO
 
+os.makedirs("whole_genome", exist_ok=True)
 order = [s.strip() for s in "${segment_order}".split(",") if s.strip()]
 threads = "${task.cpus}"
 MIN_SAMPLES = 3
@@ -90,10 +91,10 @@ for seg in order:
     segment_rows.append([seg, coord_strain.get(seg, ""), start, start + len(keep) - 1, len(keep), removed])
     start += len(keep)
 
-with open("phylo_alignment.fasta", "w") as out:
+with open("whole_genome/phylo_alignment.fasta", "w") as out:
     for t in tips:
         out.write(f">{t}\\n{''.join(concat[t])}\\n")
-with open("phylo_segments.tsv", "w", newline="") as f:
+with open("whole_genome/phylo_segments.tsv", "w", newline="") as f:
     w = csv.writer(f, delimiter="\\t", lineterminator="\\n")
     w.writerow(["segment", "reference_strain", "start", "end", "length", "insertion_columns_removed"])
     w.writerows(segment_rows)

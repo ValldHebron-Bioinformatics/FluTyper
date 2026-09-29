@@ -1,0 +1,95 @@
+nextflow_process {
+
+    name "Test Process PhyloSegmentAlignment"
+    script "nf_pipeline/modules/phylogeny/PhyloSegmentAlignment.nf"
+    process "PhyloSegmentAlignment"
+
+    test("Should fall back to A/Massachusetts/18/2022 for PA, since A/Darwin/6/2021 (the configured outgroup) has no PA segment, and drop Darwin as a tip") {
+
+        when {
+            process {
+                """
+                input[0] = tuple(
+                    "PA",
+                    [
+                        file("${projectDir}/tests/data/phylo/samples/01816372", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/samples/01818936", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/samples/198353883", checkIfExists: true)
+                    ]
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/phylo_references.fasta", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/reference_segments.fasta", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/reference_segments.tsv", checkIfExists: true)
+                input[4] = "A/Darwin/6/2021"
+                input[5] = "A/Darwin/6/2021,A/Massachusetts/18/2022,A/Croatia/10136RV/2023,A/Singapore/GP20238/2024,A/Sydney/1359/2024"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def rootUsedLines = path(process.out.root_used.get(0)[1]).text.readLines()
+            assert rootUsedLines[0] == "segment\tconfigured_outgroup\toutgroup_strain_used\toutgroup_tip\tfallback_used"
+            def fields = rootUsedLines[1].split("\t", -1)
+            assert fields[1] == "A/Darwin/6/2021" : "configured_outgroup should stay A/Darwin/6/2021: ${rootUsedLines[1]}"
+            assert fields[2] == "A/Massachusetts/18/2022" : "PA's fallback should be the oldest root strain that has it: ${rootUsedLines[1]}"
+            assert fields[3] == "REF_A_Massachusetts_18_2022"
+            assert fields[4] == "yes" : "fallback_used should be yes: ${rootUsedLines[1]}"
+
+            def outgroupText = path(process.out.outgroup.get(0)[1]).text.trim()
+            assert outgroupText == "REF_A_Massachusetts_18_2022"
+
+            def alignmentHeaders = path(process.out.alignment.get(0)[1]).text.readLines().findAll { it.startsWith(">") }
+            assert !alignmentHeaders.any { it == ">REF_A_Darwin_6_2021" } :
+                "Darwin has no PA segment and should be dropped as a tip, not gapped: ${alignmentHeaders}"
+            assert alignmentHeaders.any { it == ">REF_A_Massachusetts_18_2022" }
+            assert alignmentHeaders.any { it == ">01816372" }
+            assert alignmentHeaders.any { it == ">01818936" }
+            assert alignmentHeaders.any { it == ">198353883" }
+
+            def segmentsLines = path(process.out.segments.get(0)[1]).text.readLines()
+            assert segmentsLines[1].startsWith("PA\tA/Massachusetts/18/2022\t")
+        }
+    }
+
+    test("Should use the configured outgroup directly for HA (A/Darwin/6/2021 has an HA segment): no fallback") {
+
+        when {
+            process {
+                """
+                input[0] = tuple(
+                    "HA",
+                    [
+                        file("${projectDir}/tests/data/phylo/samples/01816372", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/samples/01818936", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/samples/198353883", checkIfExists: true)
+                    ]
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/phylo_references.fasta", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/reference_segments.fasta", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/reference_segments.tsv", checkIfExists: true)
+                input[4] = "A/Darwin/6/2021"
+                input[5] = "A/Darwin/6/2021,A/Massachusetts/18/2022,A/Croatia/10136RV/2023,A/Singapore/GP20238/2024,A/Sydney/1359/2024"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def rootUsedLines = path(process.out.root_used.get(0)[1]).text.readLines()
+            def fields = rootUsedLines[1].split("\t", -1)
+            assert fields[2] == "A/Darwin/6/2021" : "HA should use the configured outgroup directly: ${rootUsedLines[1]}"
+            assert fields[3] == "REF_A_Darwin_6_2021"
+            assert fields[4] == "no" : "fallback_used should be no for HA: ${rootUsedLines[1]}"
+
+            def outgroupText = path(process.out.outgroup.get(0)[1]).text.trim()
+            assert outgroupText == "REF_A_Darwin_6_2021"
+
+            def alignmentHeaders = path(process.out.alignment.get(0)[1]).text.readLines().findAll { it.startsWith(">") }
+            assert alignmentHeaders.any { it == ">REF_A_Darwin_6_2021" } : "Darwin has an HA segment and should stay a tip"
+        }
+    }
+
+}
