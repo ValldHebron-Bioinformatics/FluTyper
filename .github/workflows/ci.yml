@@ -120,6 +120,26 @@ jobs:
         with:
           environment-file: FluTyper_env.yaml
           cache-environment: true
+          # explicit (= the action's default) so the PATH step below does not depend on that default
+          micromamba-binary-path: ~/micromamba-bin/micromamba
+
+      # Nextstrain/augur env (envs/nextstrain.yaml) for the Auspice export processes: Nextflow builds it on first use
+      # (conda directive) into conda.cacheDir = ~/.flutyper/conda (nf_pipeline/conf/conda.config). Cache that folder,
+      # keyed on the env file, so it is solved and downloaded once, not on every run.
+      - name: Cache Nextstrain conda environment
+        uses: actions/cache@v5.0.5
+        with:
+          path: ~/.flutyper/conda
+          key: ${{ runner.os }}-nextstrain-env-${{ hashFiles('envs/nextstrain.yaml') }}
+
+      # conf/conda.config picks micromamba when it is an executable on PATH (there is no mamba/conda on PATH here);
+      # the login shell only defines a `micromamba` shell function, so expose the binary's folder to later steps.
+      - name: Put micromamba on PATH for Nextflow
+        run: |
+          for mm in "${MAMBA_EXE:-}" "$HOME/micromamba-bin/micromamba"; do
+            if [ -n "$mm" ] && [ -x "$mm" ]; then dirname "$mm" >> "$GITHUB_PATH"; echo "micromamba: $mm"; exit 0; fi
+          done
+          echo "::error::micromamba binary not found: Nextflow cannot build envs/nextstrain.yaml"; exit 1
 
       - name: Run Phylogenetics Module Tests
         run: nf-test test tests/modules/phylogeny/*.nf.test --verbose

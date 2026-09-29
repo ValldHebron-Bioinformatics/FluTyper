@@ -1,0 +1,26 @@
+# Nextstrain tools for the Auspice export (--auspice, PhyloAuspice / PhyloGeography processes only).
+# Why a separate env: augur cannot be solved against FluTyper_env.yaml's pinned python=3.9.15 (augur 34 needs a
+# newer Python), so the processes that call augur get this env through a per-process `conda` directive while every
+# other process keeps running in the already-activated FluTyper env. Nextflow builds it once into conda.cacheDir
+# (see nf_pipeline/nextflow.config), keyed on this file's content: any edit here triggers a rebuild.
+# Pins verified in Phase 0 (2026-09-29, .claude/context/phase0-prototypes/nextstrain.yaml): solves on linux-64 in ~12 s.
+# treetime here is 0.12.1 (augur 34.1.4's requirement), NOT the 0.11.4 of the main env: record both in run_manifest.
+# geonamescache is not on conda-forge/bioconda at this version, hence pip. No nodejs/auspice: the user views the
+# JSONs with `npx auspice@3.0.0 view` or auspice.us (conda's auspice package is stale at 2.29).
+# If mamba reports "augur 34.1.4 is not installable ... python-calamine / xopen does not exist", its sharded-repodata
+# cache is stale: `mamba clean --index-cache` (or create once with `--repodata-ttl 0`) and rerun.
+name: flutyper-nextstrain
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - python=3.13.15
+  - augur=34.1.4
+  - treetime=0.12.1
+  - biopython=1.88
+  - pandas=2.3.3
+  - numpy=2.5.3
+  - pip
+  - pip:
+      - geonamescache==3.0.2
