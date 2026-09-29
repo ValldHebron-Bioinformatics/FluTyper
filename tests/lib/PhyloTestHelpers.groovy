@@ -2,14 +2,15 @@
 class PhyloTestHelpers {
 
     // Only tree.nwk, phylo.log and the HTML report are published per tree; every other phylogenetics file (manifest,
-    // annotations, alignment, ...) stays in the task work dir. The pipeline prints "[WORKDIR] <dir>" first, so these
-    // files are read from there: the task output that sits in a folder named after the tree (e.g. HA/run_manifest.json).
+    // annotations, alignment, ...) stays in the task work dir, so these files are read from the test's work dir
+    // ("${launchDir}/work"; don't parse it from stdout, whose format differs between machines): the task output that
+    // sits in a folder named after the tree (e.g. HA/run_manifest.json).
     // `marker` tells apart same-named files of two subtypes (e.g. H3N2 and H1N1pdm09 both have an HA tree).
-    static File workFile(List stdout, String treeFolder, String name, String marker = null) {
-        def line = stdout.find { it.startsWith("[WORKDIR]") }
-        assert line : "no [WORKDIR] line in the pipeline stdout"
+    static File workFile(def workDir, String treeFolder, String name, String marker = null) {
+        def root = new File(workDir.toString())
+        assert root.isDirectory() : "work dir ${root} does not exist"
         def hits = []
-        new File(line.substring("[WORKDIR]".length()).trim()).eachFileRecurse { f ->
+        root.eachFileRecurse { f ->
             if (f.isFile() && f.name == name && f.parentFile.name == treeFolder && (marker == null || f.text.contains(marker))) hits << f
         }
         assert hits : "no ${treeFolder}/${name} in the work dir"

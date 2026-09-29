@@ -31,7 +31,7 @@ nextflow_pipeline {
             assert workflow.success
 
             def outputDir = path("$baseDir/tests/results/phylo_test_1")
-            def manifestFile = PhyloTestHelpers.workFile(workflow.stdout, "whole_genome", "run_manifest.json")
+            def manifestFile = PhyloTestHelpers.workFile("${launchDir}/work", "whole_genome", "run_manifest.json")
             assert !outputDir.resolve("phylogeny/H3N2/whole_genome/run_manifest.json").exists() : "run_manifest.json must stay in work/, not be published"
 
             def manifest = new JsonSlurper().parse(manifestFile)
@@ -89,12 +89,12 @@ nextflow_pipeline {
             assert workflow.success
 
             def outputDir = path("$baseDir/tests/results/phylo_test_2")
-            def manifestFile = PhyloTestHelpers.workFile(workflow.stdout, "whole_genome", "run_manifest.json")
+            def manifestFile = PhyloTestHelpers.workFile("${launchDir}/work", "whole_genome", "run_manifest.json")
             def manifest = new JsonSlurper().parse(manifestFile)
             def renderedPanels = manifest.panels.rendered
             assert renderedPanels.contains("source") : "source panel should be rendered with --labMap: ${manifest.panels}"
 
-            def annotationsFile = PhyloTestHelpers.workFile(workflow.stdout, "whole_genome", "annotations.tsv")
+            def annotationsFile = PhyloTestHelpers.workFile("${launchDir}/work", "whole_genome", "annotations.tsv")
             def lines = annotationsFile.text.readLines()
             def header = lines[0].split("\t", -1)
             def byId = lines.drop(1).collectEntries { line -> def f = line.split("\t", -1); [(f[0]): f] }
@@ -365,7 +365,7 @@ nextflow_pipeline {
             assert h1n1Report.text.contains("<title>Phylogenetic Tree - H1N1pdm09 - HA segment phylogeny</title>")
 
             // The alignment/tree carries all 4 historical sample IDs plus the subtype's root strains
-            def alignmentText = PhyloTestHelpers.workFile(workflow.stdout, "HA", "HA_alignment.fasta", "H1S001").text
+            def alignmentText = PhyloTestHelpers.workFile("${launchDir}/work", "HA", "HA_alignment.fasta", "H1S001").text
             ["H1S001", "H1S002", "H1S003", "H1S004"].each { id ->
                 assert alignmentText.contains(id) : "historical sample ${id} is missing from the H1N1pdm09 HA alignment"
             }
@@ -376,7 +376,7 @@ nextflow_pipeline {
             // annotations.tsv: H1S001 has a persisted nextclade_results.csv in --append history (reuse path) and
             // must carry that CSV's own subclade (D.2); H1S002 has none (PhyloHistoricalNextclade rerun path,
             // finding 7) and must still get a real (non-NA) subclade rather than silently losing its output.
-            def annotations = PhyloTestHelpers.workFile(workflow.stdout, "HA", "annotations.tsv", "H1S001").text
+            def annotations = PhyloTestHelpers.workFile("${launchDir}/work", "HA", "annotations.tsv", "H1S001").text
             def rows = annotations.readLines().drop(1).collect { it.split('\t') }
             def h1s001 = rows.find { it[0] == "H1S001" }
             def h1s002 = rows.find { it[0] == "H1S002" }
