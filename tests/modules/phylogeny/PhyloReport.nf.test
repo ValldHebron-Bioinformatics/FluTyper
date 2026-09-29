@@ -18,7 +18,10 @@ nextflow_process {
                     file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true),
-                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
+                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/ancestral_nt.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/gene_map.tsv", checkIfExists: true)
                 )
                 input[1] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
                 input[2] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
@@ -76,7 +79,10 @@ nextflow_process {
                     file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true),
-                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
+                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/ancestral_nt.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/gene_map.tsv", checkIfExists: true)
                 )
                 input[1] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
                 input[2] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
@@ -134,7 +140,10 @@ nextflow_process {
                     file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true),
-                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
+                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/ancestral_nt.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/gene_map.tsv", checkIfExists: true)
                 )
                 input[1] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
                 input[2] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
@@ -183,7 +192,10 @@ nextflow_process {
                     file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true),
-                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
+                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/ancestral_nt.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/gene_map.tsv", checkIfExists: true)
                 )
                 input[1] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
                 input[2] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
@@ -230,7 +242,10 @@ nextflow_process {
                     file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true),
-                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
+                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/ancestral_nt.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/gene_map.tsv", checkIfExists: true)
                 )
                 input[1] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
                 input[2] = file("${projectDir}/tests/data/phylo/aa_positions_empty.tsv", checkIfExists: true)
@@ -287,7 +302,10 @@ nextflow_process {
                     file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true),
-                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
+                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/ancestral_nt.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/gene_map.tsv", checkIfExists: true)
                 )
                 input[1] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
                 input[2] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
@@ -346,7 +364,10 @@ nextflow_process {
                     file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true),
-                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
+                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/ancestral_nt.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/gene_map.tsv", checkIfExists: true)
                 )
                 input[1] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
                 input[2] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
@@ -400,7 +421,10 @@ nextflow_process {
                     file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true),
-                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
+                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/ancestral_nt.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/gene_map.tsv", checkIfExists: true)
                 )
                 input[1] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
                 input[2] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
@@ -448,7 +472,10 @@ nextflow_process {
                     file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true),
-                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
+                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/ancestral_nt.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/gene_map.tsv", checkIfExists: true)
                 )
                 input[1] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
                 input[2] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
@@ -496,7 +523,10 @@ nextflow_process {
                     file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true),
-                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
+                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/ancestral_nt.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/gene_map.tsv", checkIfExists: true)
                 )
                 input[1] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
                 input[2] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
@@ -571,7 +601,10 @@ nextflow_process {
                     file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true),
-                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
+                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/ancestral_nt.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/gene_map.tsv", checkIfExists: true)
                 )
                 input[1] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
                 input[2] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
@@ -652,7 +685,10 @@ nextflow_process {
                     file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true),
-                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
+                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/ancestral_nt.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/gene_map.tsv", checkIfExists: true)
                 )
                 input[1] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
                 input[2] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
@@ -703,7 +739,10 @@ nextflow_process {
                     file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/ancestral_aa_na_only", checkIfExists: true),
-                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
+                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/ancestral_nt.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/gene_map.tsv", checkIfExists: true)
                 )
                 input[1] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
                 input[2] = file("${projectDir}/tests/data/phylo/aa_positions_ha_na.tsv", checkIfExists: true)
@@ -756,7 +795,10 @@ nextflow_process {
                     file("${projectDir}/tests/data/phylo/node_support_boundary.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true),
-                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
+                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/ancestral_nt.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/gene_map.tsv", checkIfExists: true)
                 )
                 input[1] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
                 input[2] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
@@ -801,6 +843,117 @@ nextflow_process {
             def svgText = path(process.out.svg.get(0)[1]).text
             assert svgText.contains(">70<") : "the node at exactly the threshold (70) should be labelled in the SVG"
             assert !svgText.contains(">69.9<") : "the node below the threshold (69.9) should not be labelled in the SVG"
+        }
+    }
+
+    test("Should emit exactly one for_auspice bundle per tree (tree, alignment, ancestral_nt, ancestral_aa, segments, gene_map, annotations), every element present and non-empty") {
+
+        when {
+            process {
+                """
+                // Two trees through one PhyloReport: a whole-genome tree and an HA segment tree (HA-only segments.tsv,
+                // so the two bundles can be told apart). PhyloReport only passes these files through for PhyloAuspice.
+                input[0] = Channel.of(
+                    tuple(
+                        "H3N2",
+                        "whole_genome",
+                        file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/ancestral_nt.fasta", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/gene_map.tsv", checkIfExists: true)
+                    ),
+                    tuple(
+                        "H3N2_HA",
+                        "HA",
+                        file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/clusters.tsv", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/ancestral_aa", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/phylo_segments_ha.tsv", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/ancestral_nt.fasta", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/gene_map.tsv", checkIfExists: true)
+                    )
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/aa_positions.tsv", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/metadata_lab.csv", checkIfExists: true)
+                input[4] = []
+                input[5] = file("${projectDir}/RESOURCES/phylo_panels.tsv", checkIfExists: true)
+                input[6] = file("${projectDir}/tests/data/phylo/phylo_tool_versions.json", checkIfExists: true)
+                input[7] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
+                input[8] = file("${projectDir}/tests/data/phylo/reference_segments.tsv", checkIfExists: true)
+                input[9] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
+                input[10] = [file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true)]
+                input[11] = "month"
+                input[12] = 0.8
+                input[13] = 6
+                input[14] = 5
+                input[15] = 72
+                input[16] = 70
+                input[17] = groovy.json.JsonOutput.toJson([
+                    pipeline_version: "1.1.0", started: "2024-01-01T00:00:00Z",
+                    parameters: [phyloMinCoverage: "0.95", model: "GTR+G4", bootstrap: "1000", seed: "12345",
+                                 phyloOutgroup: "A/Darwin/6/2021", clusterThreshold: "0.005"]
+                ]).bytes.encodeBase64().toString()
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def fixtures = "${projectDir}/tests/data/phylo"
+
+            // Exactly one bundle per tree, no duplicates, none missing
+            def bundles = process.out.for_auspice
+            assert bundles.size() == 2 : "expected one for_auspice bundle per tree (2), got ${bundles.size()}"
+            assert bundles.collect { it[0] }.sort() == ["H3N2", "H3N2_HA"]
+
+            def expectedFolder = ["H3N2": "whole_genome", "H3N2_HA": "HA"]
+            def expectedSegments = ["H3N2": "phylo_segments.tsv", "H3N2_HA": "phylo_segments_ha.tsv"]
+            def names = [2: "tree.nwk", 3: "alignment.fasta", 4: "ancestral_nt.fasta", 5: "ancestral_aa",
+                         6: "segments.tsv", 7: "gene_map.tsv", 8: "annotations.tsv"]
+            bundles.each { b ->
+                def id = b[0]
+                assert b.size() == 9 : "${id}: for_auspice should have 9 elements, got ${b.size()}: ${b}"
+                assert b[1] == expectedFolder[id]
+                names.each { i, name ->
+                    def f = new File(b[i].toString())
+                    // Own copies in auspice_bundle/, never the published ${tree_folder}/ files
+                    assert b[i].toString().endsWith("/auspice_bundle/${name}") : "${id}: for_auspice[${i}] should be auspice_bundle/${name}, got ${b[i]}"
+                    assert f.exists() : "${id}: for_auspice[${i}] ${f} does not exist"
+                    if (f.isDirectory()) {
+                        def fastas = f.listFiles().findAll { it.name.endsWith(".fasta") }
+                        assert fastas : "${id}: ancestral_aa/ in the bundle is empty"
+                        fastas.each { fa -> assert fa.length() > 0 : "${id}: ${fa.name} in ancestral_aa/ is empty" }
+                    } else {
+                        assert f.length() > 0 : "${id}: for_auspice[${i}] ${name} is empty"
+                    }
+                }
+                // Passed through byte-for-byte from the for_report bundle
+                assert path(b[2]).text == path("${fixtures}/phylo_tree.nwk").text
+                assert path(b[3]).text == path("${fixtures}/phylo_alignment.fasta").text
+                assert path(b[4]).text == path("${fixtures}/ancestral_nt.fasta").text
+                assert path(b[6]).text == path("${fixtures}/${expectedSegments[id]}").text
+                assert path(b[7]).text == path("${fixtures}/gene_map.tsv").text
+                assert new File(b[5].toString()).list().toList().sort() == new File("${fixtures}/ancestral_aa").list().toList().sort()
+                // annotations.tsv is this tree's own annotation table (same bytes as the `annotations` emit)
+                def ann = process.out.annotations.find { it[0] == id }
+                assert ann != null
+                assert path(b[8]).text == path(ann[1]).text
+                assert path(b[8]).text.readLines()[0].startsWith("id\t")
+
+                // The bundled ancestral_nt.fasta carries every internal node of the bundled tree
+                def treeText = path(b[2]).text
+                def internalNodes = (treeText =~ /\)([^(),:;]+)[:;]/).collect { it[1] }
+                assert internalNodes.size() == 6 : "${id}: expected 6 named internal nodes, got ${internalNodes}"
+                def ntIds = path(b[4]).text.readLines().findAll { it.startsWith(">") }.collect { it.substring(1).trim() } as Set
+                internalNodes.each { n -> assert ntIds.contains(n) : "${id}: internal node ${n} missing from the bundled ancestral_nt.fasta" }
+            }
         }
     }
 

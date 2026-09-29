@@ -26,10 +26,12 @@ process PhyloReport {
     // subtype_label names and tags every tree of the module: "H3N2"/"H1N1pdm09" for the (optional) whole-genome
     // tree, "H3N2_HA" etc. for a segment tree; used for the report filename/title. tree_folder is where this
     // tree's files live under the subtype's own output folder: "whole_genome" or the bare segment name e.g. "HA".
-    // tree/support/clusters/proteins/segments are joined by subtype_label before this call, since they come from
-    // separate per-tree PhyloTree/PhyloPostTree/PhyloAlignment(-Segment) invocations fanned out over one channel
-    // (see PHYLOGENETICS in subworkflows/Phylogenetics.nf).
-    tuple val(subtype_label), val(tree_folder), path(tree), path(support), path(clusters), path(proteins), path(segments)
+    // The whole tuple is PhyloPostTree's own `for_report` bundle, taken as-is (no join by subtype_label, see
+    // PHYLOGENETICS in subworkflows/Phylogenetics.nf). alignment, ancestral_nt (TreeTime's reconstruction, tips and
+    // internal nodes) and gene_map (this tree's rows of gene_map.tsv) are not read here: they are only passed on in
+    // the `for_auspice` bundle below, for the Auspice export.
+    tuple val(subtype_label), val(tree_folder), path(tree), path(support), path(clusters), path(proteins), path(segments),
+          path(alignment), path(ancestral_nt), path(gene_map)
     path(subclades)                             // subclades.tsv (shared: subclade assignment does not depend on the tree)
     path(positions)                             // aa_positions.tsv (shared; positions whose gene has no ancestral_aa/<gene>.fasta in `proteins` are dropped, so a segment tree only shows its own genes)
     path(metadata)                              // metadata CSV, or empty when --metadata is not given
@@ -58,6 +60,14 @@ process PhyloReport {
     tuple val(subtype_label), path("${tree_folder}/run_manifest.json"),      emit: manifest
     tuple val(subtype_label), path("${tree_folder}/PhylogeneticTreeReport_${subtype_label}.html"), emit: html
     tuple val(subtype_label), path("report.log"), emit: step_log   // this step's messages, collected into the tree's phylo.log
+    // Everything PhyloAuspice needs for this tree, in one bundle (the same pattern as PhyloPostTree's for_report: no
+    // join by tree_id downstream). Own copies in auspice_bundle/, never the ${tree_folder}/ paths declared above:
+    // reusing a path() pattern across two outputs of one process proved unreliable. Not published: the subworkflow
+    // only publishes PhyloLog's tree/log and the html emit. annotations.tsv is this report's own table (plan D9: one
+    // source of truth for subclade, cluster, season, age group and sex).
+    tuple val(subtype_label), val(tree_folder), path("auspice_bundle/tree.nwk"), path("auspice_bundle/alignment.fasta"),
+          path("auspice_bundle/ancestral_nt.fasta"), path("auspice_bundle/ancestral_aa"), path("auspice_bundle/segments.tsv"),
+          path("auspice_bundle/gene_map.tsv"), path("auspice_bundle/annotations.tsv"), emit: for_auspice
 
     script:
     """
@@ -794,5 +804,16 @@ PYEOF
     mkdir -p "${tree_folder}"
     mv annotations.tsv annotation_sources.tsv aa_states.tsv phylo_tree.svg phylo_tree.png panels_status.tsv \\
        run_manifest.json "PhylogeneticTreeReport_${subtype_label}.html" "${tree_folder}/"
+
+    # ---- Bundle for PhyloAuspice (own copies, see the comment on for_auspice above) ----
+    # Staged inputs are symlinks: plain cp dereferences files, and -L copies the ancestral_aa/ directory's contents
+    mkdir -p auspice_bundle
+    cp "${tree}" auspice_bundle/tree.nwk
+    cp "${alignment}" auspice_bundle/alignment.fasta
+    cp "${ancestral_nt}" auspice_bundle/ancestral_nt.fasta
+    cp -rL "${proteins}" auspice_bundle/ancestral_aa
+    cp "${segments}" auspice_bundle/segments.tsv
+    cp "${gene_map}" auspice_bundle/gene_map.tsv
+    cp "${tree_folder}/annotations.tsv" auspice_bundle/annotations.tsv
     """
 }

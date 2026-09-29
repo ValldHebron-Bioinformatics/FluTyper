@@ -23,6 +23,7 @@ process PhyloPostTree {
     // segment name e.g. "HA". This whole tuple is PhyloTree's own `for_post_tree` emit, taken as-is (no join by
     // tree_id): chained/grouped joins of several independently-scheduled per-tree channels proved unreliable (some
     // trees silently missing downstream), so every step instead re-emits what it was given, see `for_report` below.
+    // The alignment is only read here (TreeTime, tip states) but is re-emitted too: PhyloAuspice needs it downstream.
     // segments (phylo_segments.tsv) only lists the segment(s) actually in this tree's alignment; a gene_map.tsv row
     // for any other segment is skipped below, so a segment tree's ancestral_aa/ only has the genes of its own segment.
     tuple val(tree_id), val(tree_folder), path(tree), path(support), path(alignment), path(segments)
@@ -40,8 +41,12 @@ process PhyloPostTree {
     // report_bundle/ folder with its own copies, not the ${tree_folder}/... paths already declared above: reusing
     // the identical path() pattern across two output declarations of the same process proved unreliable (most
     // trees' PhyloReport calls silently never fired), so for_report gets its own, single-purpose copies instead.
+    // The last three (alignment, ancestral_nt.fasta and this tree's gene_map.tsv rows) are not used by PhyloReport:
+    // it passes them on in its own `for_auspice` bundle, so the Auspice export builds its branch mutations and gene
+    // annotations from this very reconstruction (plan D7) without a join by tree_id.
     tuple val(tree_id), val(tree_folder), path("report_bundle/tree.nwk"), path("report_bundle/support.tsv"),
-          path("report_bundle/clusters.tsv"), path("report_bundle/ancestral_aa"), path("report_bundle/segments.tsv"), emit: for_report
+          path("report_bundle/clusters.tsv"), path("report_bundle/ancestral_aa"), path("report_bundle/segments.tsv"),
+          path("report_bundle/alignment.fasta"), path("report_bundle/ancestral_nt.fasta"), path("report_bundle/gene_map.tsv"), emit: for_report
     tuple val(tree_id), path("posttree.log"), emit: step_log   // this step's messages, collected into the tree's phylo.log
 
     script:
@@ -87,6 +92,18 @@ with open("${gene_map}") as f:
             base = seg_start[row["segment"]] - 2  # 1-based segment coordinate -> 0-based alignment column
             cols = tuple(base + int(row[k]) for k in ("nt1", "nt2", "nt3"))
         codons.setdefault(row["gene"], []).append(cols)
+
+# This tree's own gene_map rows (same rule as above: only the segments listed in this tree's segments file), verbatim, for the report
+# bundle: the genes listed are exactly those with an ancestral_aa/<gene>.fasta file.
+with open("${gene_map}") as f:
+    gm_lines = f.read().splitlines(keepends=True)
+seg_col = gm_lines[0].rstrip("\\r\\n").split("\\t").index("segment")
+with open("gene_map_tree.tsv", "w") as out:
+    out.write(gm_lines[0])
+    for line in gm_lines[1:]:
+        fields = line.rstrip("\\r\\n").split("\\t")
+        if len(fields) > seg_col and fields[seg_col] in seg_start:
+            out.write(line)
 
 # Standard genetic code as a lookup table: only unambiguous ACGT codons are translated
 table = CodonTable.unambiguous_dna_by_id[1]
@@ -208,12 +225,15 @@ with open("posttree.log", "a") as log:
     log.write(f"PhyloPostTree: {len(clusters)} clusters; {sum(1 for v in cluster_of.values() if v == 'unclustered')} samples unclustered.\\n")
 PYEOF
 
-    # ---- 3. Bundle for PhyloReport (own copies, see the comment on for_report above) ----
+    # ---- 3. Bundle for PhyloReport, which passes the last three on to PhyloAuspice (own copies, see the comment on for_report above) ----
     mkdir -p report_bundle
     cp "${tree}" report_bundle/tree.nwk
     cp "${support}" report_bundle/support.tsv
     cp "${tree_folder}/clusters.tsv" report_bundle/clusters.tsv
     cp -r "${tree_folder}/ancestral_aa" report_bundle/ancestral_aa
     cp "${segments}" report_bundle/segments.tsv
+    cp "${alignment}" report_bundle/alignment.fasta
+    cp "${tree_folder}/ancestral_nt.fasta" report_bundle/ancestral_nt.fasta
+    cp gene_map_tree.tsv report_bundle/gene_map.tsv
     """
 }

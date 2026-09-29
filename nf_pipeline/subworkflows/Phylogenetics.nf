@@ -249,8 +249,10 @@ workflow PHYLOGENETICS {
     if (params.labMap) checksum_inputs << file(params.labMap)
 
     // PhyloReport runs once per tree, fanned out over PhyloPostTree.out.for_report: that emit already carries
-    // everything PhyloReport needs (tree_id, tree_folder, tree, support, clusters, proteins, segments) in the exact
-    // shape it takes, so no join by tree_id is needed here (see the comment on PhyloPostTree's call above).
+    // everything PhyloReport needs (tree_id, tree_folder, tree, support, clusters, proteins, segments, plus the
+    // alignment, ancestral_nt and gene_map rows it only passes on) in the exact shape it takes, so no join by
+    // tree_id is needed here (see the comment on PhyloPostTree's call above). Its `for_auspice` emit (one bundle per
+    // tree, for the Auspice export) is not consumed yet and nothing of it is published.
     PhyloReport(
         PhyloPostTree.out.for_report,
         PhyloSubclades.out.subclades,
@@ -294,7 +296,7 @@ workflow PHYLOGENETICS {
         .map { list -> [ids: list] }
     def tree_ok_ids_ch      = PhyloTree.out.tree.map { tree_id, _f -> tree_id }.toList()
         .map { list -> [ids: list] }
-    def posttree_ok_ids_ch  = PhyloPostTree.out.for_report.map { tree_id, _f, _t, _s, _c, _p, _seg -> tree_id }.toList()
+    def posttree_ok_ids_ch  = PhyloPostTree.out.for_report.map { tree_id, _f, _t, _s, _c, _p, _seg, _aln, _nt, _gm -> tree_id }.toList()
         .map { list -> [ids: list] }
     def report_ok_ids_ch    = PhyloReport.out.html.map { tree_id, _f -> tree_id }.toList()
         .map { list -> [ids: list] }
