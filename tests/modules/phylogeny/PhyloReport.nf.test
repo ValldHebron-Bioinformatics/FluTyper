@@ -846,7 +846,7 @@ nextflow_process {
         }
     }
 
-    test("Should emit exactly one for_auspice bundle per tree (tree, alignment, ancestral_nt, ancestral_aa, segments, gene_map, annotations), every element present and non-empty") {
+    test("Should emit exactly one for_auspice bundle per tree (tree, alignment, ancestral_nt, ancestral_aa, segments, gene_map, annotations, support), every element present and non-empty") {
 
         when {
             process {
@@ -916,10 +916,10 @@ nextflow_process {
             def expectedFolder = ["H3N2": "whole_genome", "H3N2_HA": "HA"]
             def expectedSegments = ["H3N2": "phylo_segments.tsv", "H3N2_HA": "phylo_segments_ha.tsv"]
             def names = [2: "tree.nwk", 3: "alignment.fasta", 4: "ancestral_nt.fasta", 5: "ancestral_aa",
-                         6: "segments.tsv", 7: "gene_map.tsv", 8: "annotations.tsv"]
+                         6: "segments.tsv", 7: "gene_map.tsv", 8: "annotations.tsv", 9: "support.tsv"]
             bundles.each { b ->
                 def id = b[0]
-                assert b.size() == 9 : "${id}: for_auspice should have 9 elements, got ${b.size()}: ${b}"
+                assert b.size() == 10 : "${id}: for_auspice should have 10 elements, got ${b.size()}: ${b}"
                 assert b[1] == expectedFolder[id]
                 names.each { i, name ->
                     def f = new File(b[i].toString())
@@ -940,6 +940,8 @@ nextflow_process {
                 assert path(b[4]).text == path("${fixtures}/ancestral_nt.fasta").text
                 assert path(b[6]).text == path("${fixtures}/${expectedSegments[id]}").text
                 assert path(b[7]).text == path("${fixtures}/gene_map.tsv").text
+                // D18: the bootstrap support table travels at the END of the bundle, byte-for-byte
+                assert path(b[9]).text == path("${fixtures}/node_support.tsv").text
                 assert new File(b[5].toString()).list().toList().sort() == new File("${fixtures}/ancestral_aa").list().toList().sort()
                 // annotations.tsv is this tree's own annotation table (same bytes as the `annotations` emit)
                 def ann = process.out.annotations.find { it[0] == id }

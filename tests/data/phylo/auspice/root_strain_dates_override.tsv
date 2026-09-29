@@ -1,0 +1,4 @@
+# TEST FIXTURE: synthetic override row (not a sourced collection date); exercises "a row wins over the name rule"
+strain	date	source
+# comment lines are skipped
+A/Sydney/1359/2024	2024-03-15	synthetic test row

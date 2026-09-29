@@ -65,9 +65,12 @@ process PhyloReport {
     // reusing a path() pattern across two outputs of one process proved unreliable. Not published: the subworkflow
     // only publishes PhyloLog's tree/log and the html emit. annotations.tsv is this report's own table (plan D9: one
     // source of truth for subclade, cluster, season, age group and sex).
+    // support.tsv (ultrafast bootstrap per internal node, the for_report copy) is appended LAST (plan D18) so the earlier
+    // positions do not move; PhyloAuspice turns it into branch labels (>= --minSupportLabel) and a hover attribute.
     tuple val(subtype_label), val(tree_folder), path("auspice_bundle/tree.nwk"), path("auspice_bundle/alignment.fasta"),
           path("auspice_bundle/ancestral_nt.fasta"), path("auspice_bundle/ancestral_aa"), path("auspice_bundle/segments.tsv"),
-          path("auspice_bundle/gene_map.tsv"), path("auspice_bundle/annotations.tsv"), emit: for_auspice
+          path("auspice_bundle/gene_map.tsv"), path("auspice_bundle/annotations.tsv"), path("auspice_bundle/support.tsv"),
+          emit: for_auspice
 
     script:
     """
@@ -815,5 +818,6 @@ PYEOF
     cp "${segments}" auspice_bundle/segments.tsv
     cp "${gene_map}" auspice_bundle/gene_map.tsv
     cp "${tree_folder}/annotations.tsv" auspice_bundle/annotations.tsv
+    cp "${support}" auspice_bundle/support.tsv
     """
 }
