@@ -5,7 +5,16 @@ process GetDatasets {
     // This process retrieves the appropriate Nextclade datasets based on the inferred H subtypes from the SubtypeDetection process.
     // It uses the Nextclade CLI to fetch datasets for H1, H3, H5, H7, and H9 subtypes, depending on the protocol (HUMAN or AVIAN).
     // The datasets are stored in subdirectories named after the H subtype, and the process emits the paths to these datasets for downstream use.
-    errorStrategy 'ignore'
+    // Downloads from the Nextstrain dataset server can fail transiently (DNS errors, timeouts): retry up to 3 times,
+    // waiting 4, 8 and 16 s, then ignore as before. Any failed `nextclade dataset get` fails the task (bash -e).
+    errorStrategy {
+        if (task.attempt <= 3) {
+            sleep(Math.pow(2, task.attempt + 1) * 1000 as long)
+            return 'retry'
+        }
+        return 'ignore'
+    }
+    maxRetries 3
     debug true
 
     input:
