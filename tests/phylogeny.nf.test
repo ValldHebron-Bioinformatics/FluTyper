@@ -52,6 +52,10 @@ nextflow_pipeline {
                    phyloLog.indexOf("## Alignment") < phyloLog.indexOf("## IQ-TREE") && phyloLog.indexOf("## IQ-TREE") < phyloLog.indexOf("## Report")
             // no other phylogenetics file is published, neither per tree nor for the subtype
             assert outputDir.resolve("phylogeny/H3N2").toFile().list().toList() == ["whole_genome"] : outputDir.resolve("phylogeny/H3N2").toFile().list().toList()
+            // --auspice is off by default: nothing Auspice-related is run, published, logged or printed
+            assert !outputDir.resolve("auspice").exists() : "auspice/ must not be published without --auspice"
+            assert !phyloLog.contains("## Auspice export") && !phyloLog.contains("PhyloAuspice") : phyloLog
+            assert !workflow.stdout.any { it.startsWith("AUSPICE(") }
 
             PhyloTestHelpers.checkQuietTerminal(workflow.stdout)
             assert PhyloTestHelpers.countLines(workflow.stdout, "PHYLOGENETICS(H3N2): whole-genome tree built (3 samples) -> phylogeny/H3N2/") == 1
@@ -225,6 +229,8 @@ nextflow_pipeline {
             assert !haLog.contains("has no PA segment") : "PA-only preflight notes must not appear in the HA tree's phylo.log"
             // the shared subtype-level files are not published, only the tree folders
             assert outputDir.resolve("phylogeny/H3N2").toFile().list().toList().every { it in ["PB2", "PB1", "PA", "HA", "NP", "NA", "MP", "NS"] }
+            assert !outputDir.resolve("auspice").exists() : "auspice/ must not be published without --auspice"
+            assert !haLog.contains("## Auspice export") : haLog
             PhyloTestHelpers.checkQuietTerminal(workflow.stdout)
             // exactly one summary line for the subtype, listing every built segment tree
             assert workflow.stdout.count { it.startsWith("PHYLOGENETICS(H3N2): ") && it.contains("segment trees built (") && it.contains("HA ") && it.contains("PA ") } == 1
@@ -396,4 +402,140 @@ nextflow_pipeline {
         }
     }
 
+    test("--auspice: one validated Nextstrain JSON per built tree in <outDir>/auspice/ plus lat_longs_resolved.tsv (never the config), PhyloAuspice/PhyloGeography lines in every phylo.log, one AUSPICE summary line") {
+
+        when {
+            params {
+                protocol = "HUMAN"
+                protocols = [
+                    HUMAN: [
+                        directory: "${projectDir}/protocols/HUMAN",
+                        resources: "${projectDir}/protocols/HUMAN/v1"
+                    ]
+                ]
+                inputFasta = "${projectDir}/tests/data/HUMAN.fasta"
+                outDir = "tests/results/phylo_test_auspice"
+                metadata = "${projectDir}/tests/data/humanmetadata.csv"
+                phylogenetics = true
+                phyloSubtype = "H3N2"
+                bootstrap = 0
+                auspice = true
+                auspiceMinDatedTips = 3      // the fixture has few samples; the default (10) would give divergence-only trees
+            }
+        }
+
+        then {
+            assert workflow.success
+            def outputDir = path("$baseDir/tests/results/phylo_test_auspice")
+            def auspiceDir = outputDir.resolve("auspice")
+            assert auspiceDir.exists() : "auspice/ was not published"
+
+            // One JSON per built tree (segment trees by default), named flutyper_<subtype>_<segment>.json
+            def built = outputDir.resolve("phylogeny/H3N2").toFile().list().toList().sort()
+            assert built.size() >= 2 : "expected several segment trees, got ${built}"
+            def expectedJsons = built.collect { seg -> "flutyper_h3n2_${seg.toLowerCase()}.json".toString() }
+            def published = auspiceDir.toFile().list().toList().sort()
+            assert published == (expectedJsons + ["lat_longs_resolved.tsv"]).sort() : "unexpected auspice/ content: ${published}"
+            assert !published.any { it.contains("auspice_config") }
+
+            built.each { seg ->
+                def js = new JsonSlurper().parse(auspiceDir.resolve("flutyper_h3n2_${seg.toLowerCase()}.json").toFile())
+                assert js.version == "v2" && js.meta && js.tree
+                // tip set == the published tree's tips
+                def tips = []
+                def walk
+                walk = { n -> if (n.children) n.children.each { walk(it) } else tips << n.name }
+                walk(js.tree)
+                def treeTips = (outputDir.resolve("phylogeny/H3N2/${seg}/tree.nwk").text =~ /[(,]([^(),:;]+):/).collect { it[1] }
+                assert tips.sort() == treeTips.sort() : "${seg}: JSON tips differ from tree.nwk"
+                // validated inside PhyloAuspice; its log is part of the tree's phylo.log
+                def phyloLog = PhyloTestHelpers.checkTreeFolder(outputDir.resolve("phylogeny/H3N2/${seg}"), "H3N2_${seg}")
+                assert phyloLog.contains("## Auspice export") : phyloLog
+                assert phyloLog.contains("PhyloGeography: INFO") : "${seg}: geography.log is missing from phylo.log"
+                assert phyloLog.contains("PhyloAuspice: INFO augur validate export-v2: flutyper_h3n2_${seg.toLowerCase()}.json is valid") : phyloLog
+                assert phyloLog.indexOf("## Report") < phyloLog.indexOf("## Auspice export")
+                // bootstrap 0 -> no support node-data at all; humanmetadata.csv has no AGE GROUP/SEX -> one WARNING per missing
+                // colouring from PhyloAuspice, not augur's duplicates
+                assert !phyloLog.contains("support.json") : phyloLog
+                assert phyloLog.contains("PhyloAuspice: WARNING colouring 'sex' is not in the dataset") : phyloLog
+                assert !phyloLog.contains("Requested color-by field") && !phyloLog.contains("does not appear as a property") : phyloLog
+            }
+            assert auspiceDir.resolve("lat_longs_resolved.tsv").text.contains("Barcelona")
+
+            // Terminal: one summary line, no step chatter; nothing to report in pipeline_errors.log
+            PhyloTestHelpers.checkQuietTerminal(workflow.stdout)
+            def summary = workflow.stdout.findAll { it.startsWith("AUSPICE(H3N2): ") }
+            assert summary.size() == 1 : workflow.stdout.join("\n")
+            assert summary[0].startsWith("AUSPICE(H3N2): ${built.size()} datasets -> auspice/ (view: npx auspice@3.0.0 view ") : summary[0]
+            def errors = outputDir.resolve("pipeline_errors.log")
+            assert !errors.exists() || !errors.text.contains("PhyloAuspice")
+        }
+    }
+
+    test("--auspice without --phylogenetics fails fast, before any process runs") {
+
+        when {
+            params {
+                protocol = "HUMAN"
+                protocols = [
+                    HUMAN: [
+                        directory: "${projectDir}/protocols/HUMAN",
+                        resources: "${projectDir}/protocols/HUMAN/v1"
+                    ]
+                ]
+                inputFasta = "${projectDir}/tests/data/HUMAN.fasta"
+                outDir = "tests/results/phylo_test_auspice_nophylo"
+                auspice = true
+            }
+        }
+
+        then {
+            assert workflow.failed
+            assert workflow.stdout.join("\n").contains("--auspice requires --phylogenetics") : workflow.stdout.join("\n")
+            assert workflow.trace.succeeded().size() == 0
+        }
+    }
+
+    test("--auspice: a tree whose PhyloAuspice fails is reported in pipeline_errors.log and the summary, never silently missing") {
+
+        when {
+            params {
+                protocol = "HUMAN"
+                protocols = [
+                    HUMAN: [
+                        directory: "${projectDir}/protocols/HUMAN",
+                        resources: "${projectDir}/protocols/HUMAN/v1"
+                    ]
+                ]
+                inputFasta = "${projectDir}/tests/data/HUMAN.fasta"
+                outDir = "tests/results/phylo_test_auspice_fail"
+                metadata = "${projectDir}/tests/data/humanmetadata.csv"
+                phylogenetics = true
+                phyloSubtype = "H3N2"
+                phyloSegmentTrees = "HA"
+                bootstrap = 0
+                auspice = true
+                auspiceMinDatedTips = 3
+                // forced failure: the H3N2 HA clock rate is not a number (the table is only checked for existence up front)
+                auspiceClockRates = "${projectDir}/tests/data/phylo/auspice/clock_rates_bad.tsv"
+            }
+        }
+
+        then {
+            assert workflow.success   // the rest of the pipeline is unaffected (errorStrategy 'ignore' + reported)
+            def outputDir = path("$baseDir/tests/results/phylo_test_auspice_fail")
+            // the tree itself is still built and published; only its dataset is missing
+            def phyloLog = PhyloTestHelpers.checkTreeFolder(outputDir.resolve("phylogeny/H3N2/HA"), "H3N2_HA")
+            assert phyloLog.contains("PhyloAuspice: ERROR clock-rate table") : phyloLog
+            assert !outputDir.resolve("auspice/flutyper_h3n2_ha.json").exists()
+            assert outputDir.resolve("auspice/lat_longs_resolved.tsv").exists()
+            def errors = outputDir.resolve("pipeline_errors.log")
+            assert errors.exists()
+            assert errors.text.contains("PHYLOGENETICS(H3N2): tree 'H3N2_HA' has no Auspice dataset: PhyloAuspice failed") : errors.text
+            assert errors.text.contains("clock-rate table") : errors.text
+            def summary = workflow.stdout.findAll { it.startsWith("AUSPICE(H3N2): ") }
+            assert summary.size() == 1 && summary[0].contains("0 datasets") && summary[0].contains("1 failed") : summary
+            assert workflow.stdout.any { it.contains("tree 'H3N2_HA' has no Auspice dataset") }
+        }
+    }
 }

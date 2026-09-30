@@ -24,6 +24,7 @@ include { GeographicReport          } from './modules/GeographicReport'
 include { MetadataMerge             } from './modules/MetadataMerge'
 include { MergeReports              } from './modules/MergeReports.nf'
 include { PhyloHistoricalNextclade; PhyloHistoricalNextcladeReuse } from './modules/phylogeny/PhyloHistoricalNextclade'
+include { PhyloGeography            } from './modules/phylogeny/PhyloGeography'
 include {
     PHYLOGENETICS as PHYLOGENETICS_H3N2; PHYLOGENETICS as PHYLOGENETICS_H1N1PDM09;
     parseAaPositions; parseAaPositionsFile; validatePhyloParams; resolvePhyloConfig; phyloSubtypeTag
@@ -57,6 +58,11 @@ workflow {
 
     // PHYLOGENETICS PARAMETER VALIDATION: fail fast, before any process runs
     def run_phylogenetics = params.get('phylogenetics', false).toString().toLowerCase() == 'true'
+    // --auspice exports the phylogenetic trees: meaningless (and nothing to export) without --phylogenetics
+    def run_auspice = params.get('auspice', false).toString().toLowerCase() == 'true'
+    if (run_auspice && !run_phylogenetics) {
+        exit 1, "AUSPICE ERROR: --auspice requires --phylogenetics (the Auspice datasets are exported from the phylogenetic trees)."
+    }
     def phylo_subtypes = []
     def phylo_positions_h3n2 = []
     def phylo_positions_h1n1 = []
@@ -312,6 +318,7 @@ workflow {
     ch_phylo_errors = channel.empty()
     ch_phylo_report = channel.empty()
     ch_phylo_tree_problems = channel.empty()
+    ch_auspice = channel.empty()
     if (run_phylogenetics) {
         // --append: MergeHistoricalData only merges the summary tables, so PHYLOGENETICS would otherwise only see
         // this run's samples. Build phylo-only genotyping/sample-dir/Nextclade channels covering both runs.
@@ -388,6 +395,25 @@ workflow {
             ch_phylo_hist_errors = channel.empty()
         }
 
+        // --auspice: geography (city -> country/division/coordinates, plan D12) is resolved ONCE per run, for every
+        // subtype and tree, then handed to each PHYLOGENETICS call as one value channel [geo, lat_longs, geography.log].
+        // lat_longs_resolved.tsv (audit table) is published next to the datasets; the auspice config never is.
+        ch_auspice_geography = channel.empty()
+        if (run_auspice) {
+            PhyloGeography(
+                final_metadata_ch.first(),
+                params.coordinates ? file(params.coordinates, checkIfExists: true) : [],
+                params.auspiceLatLongs ? file(params.auspiceLatLongs, checkIfExists: true) : [],
+                file("${projectDir}/../RESOURCES/geonames/admin1CodesASCII.txt", checkIfExists: true),
+                params.auspiceContinent
+            )
+            ch_auspice_geography = PhyloGeography.out.geo
+                .combine(PhyloGeography.out.lat_longs)
+                .combine(PhyloGeography.out.log)
+                .first()
+            ch_auspice = ch_auspice.mix(PhyloGeography.out.resolved)
+        }
+
         if ('H3N2' in phylo_subtypes) {
             def cfg_h3n2 = resolvePhyloConfig('H3N2', params)
             PHYLOGENETICS_H3N2(
@@ -402,12 +428,14 @@ workflow {
                 cfg_h3n2.reference,
                 cfg_h3n2.referenceFallback,
                 cfg_h3n2.rootStrains,
-                cfg_h3n2.outgroup
+                cfg_h3n2.outgroup,
+                ch_auspice_geography
             )
             ch_phylogeny_h3n2 = PHYLOGENETICS_H3N2.out.outputs
             ch_phylo_errors = ch_phylo_errors.mix(PHYLOGENETICS_H3N2.out.errors)
             ch_phylo_report = ch_phylo_report.mix(PHYLOGENETICS_H3N2.out.report)
             ch_phylo_tree_problems = ch_phylo_tree_problems.mix(PHYLOGENETICS_H3N2.out.tree_problems)
+            ch_auspice = ch_auspice.mix(PHYLOGENETICS_H3N2.out.auspice)
         }
         if ('H1N1pdm09' in phylo_subtypes) {
             def cfg_h1n1 = resolvePhyloConfig('H1N1pdm09', params)
@@ -423,12 +451,14 @@ workflow {
                 cfg_h1n1.reference,
                 cfg_h1n1.referenceFallback,
                 cfg_h1n1.rootStrains,
-                cfg_h1n1.outgroup
+                cfg_h1n1.outgroup,
+                ch_auspice_geography
             )
             ch_phylogeny_h1n1 = PHYLOGENETICS_H1N1PDM09.out.outputs
             ch_phylo_errors = ch_phylo_errors.mix(PHYLOGENETICS_H1N1PDM09.out.errors)
             ch_phylo_report = ch_phylo_report.mix(PHYLOGENETICS_H1N1PDM09.out.report)
             ch_phylo_tree_problems = ch_phylo_tree_problems.mix(PHYLOGENETICS_H1N1PDM09.out.tree_problems)
+            ch_auspice = ch_auspice.mix(PHYLOGENETICS_H1N1PDM09.out.auspice)
         }
         ch_phylo_errors = ch_phylo_errors.mix(ch_phylo_hist_errors)
     }
@@ -469,7 +499,7 @@ workflow {
         .mix(
             ch_phylo_tree_problems.map { log_file ->
                 "========================================\n" +
-                "Phylogenetics: trees requested but never produced a report\n" +
+                "Phylogenetics: trees requested but never produced a report (or, with --auspice, an Auspice dataset)\n" +
                 "========================================\n" +
                 "${log_file.text}\n"
             }
@@ -507,6 +537,7 @@ workflow {
     errors_merged = ErrorsMerged_ch
     phylogeny_h3n2 = ch_phylogeny_h3n2
     phylogeny_h1n1 = ch_phylogeny_h1n1
+    auspice = ch_auspice
     nextclade_csv = GenotypingNextclade.out.sample_csv
 
     onComplete:
@@ -587,6 +618,12 @@ output {
     }
     phylogeny_h1n1 {
         path { "${projectDir}/../${params.outDir}/phylogeny/H1N1pdm09" }
+        mode "copy"
+    }
+    // --auspice: flutyper_<subtype>_<segment>.json of every tree + lat_longs_resolved.tsv, all in one folder so that
+    // `npx auspice@3.0.0 view <outDir>/auspice` lists every dataset (no config JSON here: Auspice would list it too)
+    auspice {
+        path { "${projectDir}/../${params.outDir}/auspice" }
         mode "copy"
     }
 }

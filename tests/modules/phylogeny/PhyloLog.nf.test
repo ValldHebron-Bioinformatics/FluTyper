@@ -56,6 +56,8 @@ nextflow_process {
             // echoed to the terminal (the process has no `debug true`)
             assert process.out.summary.get(0)[2].toString().trim() == "6"
             assert !process.stdout.join("\n").contains("PhyloCoverageQC")
+            // no --auspice parts (geography.log, auspice.log): no Auspice section at all
+            assert !log.contains("## Auspice export") : log
         }
     }
 
@@ -116,4 +118,71 @@ nextflow_process {
         }
     }
 
+    test("--auspice: geography.log (once per run) and auspice.log form an 'Auspice export' section after the report") {
+
+        when {
+            process {
+                """
+                input[0] = tuple(
+                    "H3N2_HA", "HA",
+                    [
+                        file("${projectDir}/tests/data/phylo/log_parts/alignment.log", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/log_parts/iqtree.log", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/log_parts/phylo.treefile", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/log_parts/posttree.log", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/log_parts/report.log", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/log_parts/geography.log", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/log_parts/auspice.log", checkIfExists: true)
+                    ]
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/log_parts/preflight.log", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/log_parts/subclades.log", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
+                input[4] = "PB2,PB1,PA,HA,NP,NA,MP,NS"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def log = path(process.out.log.get(0)[1]).text
+            def i = { String s -> log.indexOf(s) }
+            assert i("## Report") < i("## Auspice export") : log
+            assert i("## Auspice export") < i("PhyloGeography: INFO 6 samples") : log
+            assert i("PhyloGeography: INFO 6 samples") < i("PhyloAuspice: INFO augur 34.1.4") : log
+            assert log.contains("PhyloAuspice: INFO augur validate export-v2: flutyper_h3n2_ha.json is valid")
+        }
+    }
+
+    test("--auspice: geography.log present but PhyloAuspice produced no auspice.log -> the section says the step did not finish") {
+
+        when {
+            process {
+                """
+                input[0] = tuple(
+                    "H3N2_HA", "HA",
+                    [
+                        file("${projectDir}/tests/data/phylo/log_parts/alignment.log", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/log_parts/iqtree.log", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/log_parts/phylo.treefile", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/log_parts/posttree.log", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/log_parts/report.log", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/log_parts/geography.log", checkIfExists: true)
+                    ]
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/log_parts/preflight.log", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/log_parts/subclades.log", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
+                input[4] = "PB2,PB1,PA,HA,NP,NA,MP,NS"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def log = path(process.out.log.get(0)[1]).text
+            assert log.contains("## Auspice export") : log
+            assert log.contains("(step did not finish: no auspice.log was produced)") : log
+        }
+    }
 }

@@ -69,6 +69,7 @@ nextflow_workflow {
                 input[9] = "A/Massachusetts/18/2022"
                 input[10] = "A/Darwin/6/2021,A/Massachusetts/18/2022,A/Croatia/10136RV/2023,A/Singapore/GP20238/2024,A/Sydney/1359/2024"
                 input[11] = "A/Darwin/6/2021"
+                input[12] = Channel.empty()   // auspice_geography: --auspice is off
                 """
             }
         }

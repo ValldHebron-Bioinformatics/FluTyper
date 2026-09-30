@@ -351,6 +351,7 @@ def main():
                     ll.add((p[0].strip().lower(), p[1].strip().lower()))
     else:
         say("WARNING", "no lat_longs.tsv: the map has no points.")
+    no_coords = set()     # (level, value) already WARNed here: augur export's own messages about them are not repeated
     for level in [g["key"] for g in cfg.get("geo_resolutions", [])]:
         used = {}
         for t in samples:
@@ -359,6 +360,7 @@ def main():
                 used[v] = used.get(v, 0) + 1
         for v, n in sorted(used.items()):
             if (level, v.lower()) not in ll:
+                no_coords.add((level, v.lower()))
                 say("WARNING", f"{level} '{v}' ({n} tip{'s' if n > 1 else ''}) has no coordinates in lat_longs.tsv: "
                                f"no map point at the {level} level.")
 
@@ -602,8 +604,9 @@ def main():
                 f"{', --minSupportLabel 0 labels every value' if MIN_SUPPORT <= 0 else ''}); no branch is removed for low support.")
     if dropped:
         say("INFO", f"{len(dropped)} support value(s) belonged to zero-length branches collapsed by augur refine (D6): not shown.")
-    json.dump({**generated_by, "nodes": {}, "branches": labels}, open("support.json", "w"), indent=1)
-    node_data.append("support.json")
+    if labels:     # no labels (e.g. --bootstrap 0): no node-data file, which augur would only warn about as empty
+        json.dump({**generated_by, "nodes": {}, "branches": labels}, open("support.json", "w"), indent=1)
+        node_data.append("support.json")
     # export-only metadata: meta.tsv + a 'support' column, with rows for the internal nodes (augur export matches
     # metadata rows by node name); refine and traits never see these rows
     with open("meta_export.tsv", "w", newline="", encoding="utf-8") as f:
@@ -660,14 +663,29 @@ def main():
     rc = run(cmd, "export.log")
     if rc != 0:
         raise Fail(f"augur export v2 failed, exit {rc}: {tail('export.log')}")
+    js = json.load(open("unvalidated.json"))
+    exported = {c["key"] for c in js["meta"].get("colorings", [])}
+    absent = {c["key"] for c in cfg.get("colorings", []) if c["key"] not in exported}   # WARNed once, below
     for line in open("export.log", errors="replace"):
         m = re.match(r"\\s*(WARNING|ERROR):?\\s*(.*)", line)
-        if m:
-            say("WARNING", f"augur export: {m.group(2).strip()}")
+        if not m:
+            continue
+        # augur's two messages about a value without coordinates duplicate our own WARNING above: skip exactly those
+        dup = re.search(r"(\\w+)->(.+?) did not have an associated lat/long", m.group(2))
+        if dup and (dup.group(1).lower(), dup.group(2).strip().lower()) in no_coords:
+            continue
+        dup = re.search(r'"(.+?)", a value of the geographic resolution "(\\w+)", appears in the tree but not in the metadata', m.group(2))
+        if dup and (dup.group(2).lower(), dup.group(1).strip().lower()) in no_coords:
+            continue
+        # augur's messages about a colouring/filter with no value duplicate our "colouring ... is not in the dataset"
+        dup = (re.search(r"color-by field '(\\w+)' does not exist", m.group(2))
+               or re.search(r'filter "(\\w+)" does not appear as a property', m.group(2)))
+        if dup and dup.group(1) in absent:
+            continue
+        say("WARNING", f"augur export: {m.group(2).strip()}")
     rc = run(["augur", "validate", "export-v2", "unvalidated.json"], "validate.log")
     if rc != 0:
         raise Fail(f"augur validate export-v2 rejected the dataset: {tail('validate.log')}")
-    js = json.load(open("unvalidated.json"))
     out_tips = []
     def walk(n):
         if n.get("children"):
@@ -678,9 +696,8 @@ def main():
     walk(js["tree"])
     if sorted(out_tips) != sorted(tips):
         raise Fail(f"the exported tree's tips differ from the input tree's ({len(out_tips)} vs {len(tips)})")
-    exported = {c["key"] for c in js["meta"].get("colorings", [])}
     for c in cfg.get("colorings", []):
-        if c["key"] not in exported:
+        if c["key"] in absent:
             say("WARNING", f"colouring '{c['key']}' is not in the dataset (no node has a value).")
     os.replace("unvalidated.json", dataset)
     say("INFO", f"augur validate export-v2: {dataset} is valid ({len(out_tips)} tips, "

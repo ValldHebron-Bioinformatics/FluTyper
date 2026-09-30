@@ -137,6 +137,8 @@ nextflow_process {
 
             // A location without coordinates is a WARNING (no map point), not a crash; unresolved values are logged
             assert log =~ /PhyloAuspice: WARNING location 'Atlantis' \(1 tip\) has no coordinates/ : log
+            // ... once: augur export's own two messages about the same value are not repeated in the log
+            assert !log.contains("did not have an associated lat/long") && !log.contains("appears in the tree but not in the metadata") : log
             assert log =~ /PhyloAuspice: WARNING country: 1 sample tip\(s\) have no value.*Atlantis/ : log
             // Map levels
             assert js.meta.geo_resolutions.collect { it.key }.containsAll(["country", "division", "location"])
@@ -360,7 +362,7 @@ nextflow_process {
                     file("${projectDir}/tests/data/phylo/auspice/ha_segments.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/auspice/ha_gene_map.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/auspice/annotations.tsv", checkIfExists: true),
-                    file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true)
+                    file("${projectDir}/tests/data/phylo/auspice/node_support_empty.tsv", checkIfExists: true)   // --bootstrap 0: no values
                 )
                 input[1] = file("${projectDir}/tests/data/phylo/auspice/geo.tsv", checkIfExists: true)
                 input[2] = file("${projectDir}/tests/data/phylo/auspice/lat_longs.tsv", checkIfExists: true)
@@ -381,6 +383,9 @@ nextflow_process {
             assert process.success
             def log = path(process.out.step_log.get(0)[1]).text
             assert log =~ /PhyloAuspice: WARNING no clock rate for H5N1 HA in .*: divergence-only tree/ : log
+            // no support values at all (--bootstrap 0): no labels, no hover values, and no empty node-data file for augur to warn about
+            assert log.contains("PhyloAuspice: INFO bootstrap support: 0 internal node(s) carry a value") : log
+            assert !log.contains("support.json") : log
             assert file(process.out.json.get(0)[1]).name == "flutyper_h5n1_ha.json"
             assert path(process.out.status.get(0)[2]).readLines()[1].split("\t")[2] == "divergence"
         }
