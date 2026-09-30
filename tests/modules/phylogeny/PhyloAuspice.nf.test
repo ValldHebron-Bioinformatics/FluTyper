@@ -49,6 +49,7 @@ nextflow_process {
                 input[9] = "country,region"
                 input[10] = "1.1.0"
                 input[11] = 70
+                input[12] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)   // AuspiceEnvCheck report (gate)
                 """
             }
         }
@@ -190,6 +191,7 @@ nextflow_process {
                 input[9] = "country,region"
                 input[10] = "1.1.0"
                 input[11] = 0
+                input[12] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)   // AuspiceEnvCheck report (gate)
                 """
             }
         }
@@ -239,6 +241,7 @@ nextflow_process {
                 input[9] = "country,region"
                 input[10] = "1.1.0"
                 input[11] = 70
+                input[12] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)   // AuspiceEnvCheck report (gate)
                 """
             }
         }
@@ -285,6 +288,7 @@ nextflow_process {
                 input[9] = "country,region"
                 input[10] = "1.1.0"
                 input[11] = 70
+                input[12] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)   // AuspiceEnvCheck report (gate)
                 """
             }
         }
@@ -321,7 +325,7 @@ nextflow_process {
                     file("${projectDir}/tests/data/phylo/auspice/ha_segments.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/auspice/ha_gene_map.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/auspice/annotations.tsv", checkIfExists: true),
-                    file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true)
+                    file("${projectDir}/tests/data/phylo/auspice/node_support_odd.tsv", checkIfExists: true)   // duplicate, unknown node, inf, non-number
                 )
                 input[1] = file("${projectDir}/tests/data/phylo/auspice/geo.tsv", checkIfExists: true)
                 input[2] = file("${projectDir}/tests/data/phylo/auspice/lat_longs.tsv", checkIfExists: true)
@@ -334,6 +338,7 @@ nextflow_process {
                 input[9] = "country,region"
                 input[10] = "1.1.0"
                 input[11] = 70
+                input[12] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)   // AuspiceEnvCheck report (gate)
                 """
             }
         }
@@ -344,6 +349,12 @@ nextflow_process {
             assert log =~ /PhyloAuspice: WARNING only 3 tip\(s\) dated to at least the month \(minimum 10\): divergence-only tree/ : log
             assert path(process.out.status.get(0)[2]).readLines()[1].split("\t")[2] == "divergence"
             assert process.out.json.size() == 1
+            // M5: a divergence-only row carries its reason in the status
+            assert path(process.out.status.get(0)[2]).readLines()[1].split("\t")[4].contains("only 3 tip(s) dated") 
+            // M1/L5: support rows that match no node, duplicates and non-finite values are reported, never silently dropped
+            assert log =~ /PhyloAuspice: WARNING support\.tsv: 1 row\(s\) name no node of this tree \(NODE_9999999\)/ : log
+            assert log =~ /PhyloAuspice: WARNING support\.tsv: 1 duplicated node row\(s\) \(NODE_0000003\)/ : log
+            assert log =~ /PhyloAuspice: WARNING 2 support value\(s\) are not finite numbers.*NODE_0000005=inf.*NODE_0000007=abc/ : log
         }
     }
 
@@ -358,10 +369,10 @@ nextflow_process {
                     file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/auspice/ha_alignment.fasta", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/auspice/ha_ancestral_nt.fasta", checkIfExists: true),
-                    file("${projectDir}/tests/data/phylo/auspice/ha_ancestral_aa", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_ancestral_aa_partial", checkIfExists: true),   // HA1 only
                     file("${projectDir}/tests/data/phylo/auspice/ha_segments.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/phylo/auspice/ha_gene_map.tsv", checkIfExists: true),
-                    file("${projectDir}/tests/data/phylo/auspice/annotations.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/annotations_ages.tsv", checkIfExists: true),   // 8 age groups
                     file("${projectDir}/tests/data/phylo/auspice/node_support_empty.tsv", checkIfExists: true)   // --bootstrap 0: no values
                 )
                 input[1] = file("${projectDir}/tests/data/phylo/auspice/geo.tsv", checkIfExists: true)
@@ -375,6 +386,7 @@ nextflow_process {
                 input[9] = "country,region"
                 input[10] = "1.1.0"
                 input[11] = 70
+                input[12] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)   // AuspiceEnvCheck report (gate)
                 """
             }
         }
@@ -388,6 +400,12 @@ nextflow_process {
             assert !log.contains("support.json") : log
             assert file(process.out.json.get(0)[1]).name == "flutyper_h5n1_ha.json"
             assert path(process.out.status.get(0)[2]).readLines()[1].split("\t")[2] == "divergence"
+            // M2: an annotated gene without an ancestral_aa FASTA is reported (its mutations are missing)
+            assert log.contains("PhyloAuspice: WARNING annotated gene(s) with no or empty ancestral_aa FASTA (no aa mutations exported): HA2") : log
+            // M-1: age_group legend ordered by the lower bound of the range; open ranges and non-ranges placed deterministically
+            def js = new JsonSlurper().parse(file(process.out.json.get(0)[1]))
+            def age = js.meta.colorings.find { it.key == "age_group" }
+            assert age.legend.collect { it.value } == ["<2", "0-2", "3-4", "5-14", "15-65", "65+", ">=65", "unknown"] : age.legend
         }
     }
 
@@ -419,6 +437,7 @@ nextflow_process {
                 input[9] = "country,region"
                 input[10] = "1.1.0"
                 input[11] = 70
+                input[12] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)   // AuspiceEnvCheck report (gate)
                 """
             }
         }
@@ -439,6 +458,11 @@ nextflow_process {
             assert Math.abs(byName["REF_A_Sydney_1359_2024"].node_attrs.num_date.value - 2024.2036) < 0.001
             def darwin = byName["REF_A_Darwin_6_2021"].node_attrs.num_date
             assert darwin.confidence[0] >= 2021.0 && darwin.confidence[1] <= 2022.0
+            // H3: the undated tip keeps TreeTime's inferred date (Auspice's time layout positions every node by num_date)
+            // but it is flagged as inferred ("Inferred collection date" in Auspice) and logged, never shown as a sampling date
+            def mass = byName["REF_A_Massachusetts_18_2022"].node_attrs.num_date
+            assert mass.inferred == true && !mass.containsKey("raw_value") : mass
+            assert log =~ /PhyloAuspice: WARNING 1 tip\(s\) without a date are placed at a TreeTime-inferred date in the time tree.*REF_A_Massachusetts_18_2022/ : log
         }
     }
 
@@ -470,6 +494,7 @@ nextflow_process {
                 input[9] = "country,region"
                 input[10] = "1.1.0"
                 input[11] = 70
+                input[12] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)   // AuspiceEnvCheck report (gate)
                 """
             }
         }
@@ -511,6 +536,7 @@ nextflow_process {
                 input[9] = "country,region"
                 input[10] = "1.1.0"
                 input[11] = 70
+                input[12] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)   // AuspiceEnvCheck report (gate)
                 """
             }
         }
@@ -525,6 +551,163 @@ nextflow_process {
             def status = path(process.out.status.get(0)[2]).readLines()
             assert status[1].startsWith("H3N2\tfailed\t") : status
             assert status[1].contains("coarsening") : status
+        }
+    }
+
+    test("H1 + COUNTRY join: partial ISO dates keep their precision, a non-ISO date is undated with a WARNING; COUNTRY 'NA' = Namibia; a (LOCATION, COUNTRY) missing from geo.tsv keeps its location only") {
+
+        when {
+            process {
+                """
+                input[0] = tuple(
+                    "H3N2_HA",
+                    "HA",
+                    file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_alignment.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_ancestral_nt.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_ancestral_aa", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_segments.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_gene_map.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/annotations.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true)
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/auspice/geo_country.tsv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/auspice/lat_longs.tsv", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/auspice/metadata_dates_country.csv", checkIfExists: true)
+                input[4] = file("${projectDir}/RESOURCES/auspice_config.json", checkIfExists: true)
+                input[5] = file("${projectDir}/RESOURCES/auspice_clock_rates.tsv", checkIfExists: true)
+                input[6] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
+                input[7] = []
+                input[8] = 3
+                input[9] = "country,region"
+                input[10] = "1.1.0"
+                input[11] = 70
+                input[12] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def log = path(process.out.step_log.get(0)[1]).text
+            def status = path(process.out.status.get(0)[2]).readLines()[1].split("\t", -1)
+            def js = new JsonSlurper().parse(file(process.out.json.get(0)[1]))
+            def byName = [:]
+            def walk
+            walk = { n -> byName[n.name] = n; (n.children ?: []).each { walk(it) } }
+            walk(js.tree)
+            // 2024-11 -> month precision, 2024 -> year only; 03/04/2024 is ambiguous (day/month) -> undated, never guessed
+            assert log.contains("PhyloAuspice: WARNING DATE '03/04/2024' of 01818936 is not an ISO date (YYYY, YYYY-MM, YYYY-MM-DD or the XX forms): left undated.") : log
+            assert log.contains("PhyloAuspice: INFO 8 tips: 0 dated to the day, 1 to the month, 6 to the year only, 1 undated.") : log
+            // too few tips dated to the month -> divergence-only; M5: the reason is in the status
+            assert status[1] == "ok" && status[2] == "divergence" && status[4].contains("only 1 tip(s) dated to at least the month") : status
+            // COUNTRY join: (Windhoek, NA) -> Namibia; (Barcelona, blank) -> Spain
+            assert byName["01816372"].node_attrs.country?.value == "Namibia" : byName["01816372"].node_attrs
+            assert byName["01818936"].node_attrs.country?.value == "Spain"
+            // not in geo.tsv: WARNING, the metadata location is kept, no country/division/region is made up
+            assert log.contains("PhyloAuspice: WARNING 198353883: (LOCATION 'Gotham', COUNTRY '') is not in geo.tsv") : log
+            assert byName["198353883"].node_attrs.location?.value == "Gotham"
+            assert !byName["198353883"].node_attrs.containsKey("country")
+
+        }
+    }
+
+    test("H1 (other forms) + --auspiceTraits none: 2024/03, 'Mar 2024' and an ISO timestamp are all undated with a WARNING each; no DTA at all") {
+
+        when {
+            process {
+                """
+                input[0] = tuple(
+                    "H3N2_HA",
+                    "HA",
+                    file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_alignment.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_ancestral_nt.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_ancestral_aa", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_segments.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_gene_map.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/annotations.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true)
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/auspice/geo.tsv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/auspice/lat_longs.tsv", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/auspice/metadata_bad_dates.csv", checkIfExists: true)
+                input[4] = file("${projectDir}/RESOURCES/auspice_config.json", checkIfExists: true)
+                input[5] = file("${projectDir}/RESOURCES/auspice_clock_rates.tsv", checkIfExists: true)
+                input[6] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
+                input[7] = []
+                input[8] = 3
+                input[9] = ""
+                input[10] = "1.1.0"
+                input[11] = 70
+                input[12] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def log = path(process.out.step_log.get(0)[1]).text
+            def status = path(process.out.status.get(0)[2]).readLines()[1].split("\t", -1)
+            def js = new JsonSlurper().parse(file(process.out.json.get(0)[1]))
+            def byName = [:]
+            def walk
+            walk = { n -> byName[n.name] = n; (n.children ?: []).each { walk(it) } }
+            walk(js.tree)
+            ["01816372": "2024/03", "01818936": "Mar 2024", "198353883": "2024-11-05T10:00"].each { tip, raw ->
+                assert log.contains("PhyloAuspice: WARNING DATE '${raw}' of ${tip} is not an ISO date") : log
+            }
+            assert log.contains("0 dated to the day, 0 to the month, 5 to the year only, 3 undated.") : log
+            // --auspiceTraits none (the subworkflow passes ""): no augur traits, so no inferred country on internal nodes
+            assert log.contains("PhyloAuspice: INFO no ancestral-state reconstruction (--auspiceTraits none).") : log
+            assert !byName["NODE_0000009"].node_attrs.containsKey("country") : byName["NODE_0000009"].node_attrs
+            assert byName["01816372"].node_attrs.country?.value == "Spain"     // tips keep their metadata
+
+        }
+    }
+
+    test("No --metadata + M3: samples have no date/location (WARNING), a sample missing from annotations.tsv is counted; still a validated divergence-only dataset") {
+
+        when {
+            process {
+                """
+                input[0] = tuple(
+                    "H3N2_HA",
+                    "HA",
+                    file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_alignment.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_ancestral_nt.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_ancestral_aa", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_segments.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_gene_map.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/annotations_partial.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true)
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/auspice/geo.tsv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/auspice/lat_longs.tsv", checkIfExists: true)
+                input[3] = []
+                input[4] = file("${projectDir}/RESOURCES/auspice_config.json", checkIfExists: true)
+                input[5] = file("${projectDir}/RESOURCES/auspice_clock_rates.tsv", checkIfExists: true)
+                input[6] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
+                input[7] = []
+                input[8] = 3
+                input[9] = "country,region"
+                input[10] = "1.1.0"
+                input[11] = 70
+                input[12] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def log = path(process.out.step_log.get(0)[1]).text
+            def status = path(process.out.status.get(0)[2]).readLines()[1].split("\t", -1)
+            assert log.contains("PhyloAuspice: WARNING no --metadata: samples have no date, location or country.") : log
+            assert log.contains("PhyloAuspice: WARNING 1 sample tip(s) are missing from annotations.tsv (subclade, cluster, season, age group and sex stay NA): 198353883") : log
+            assert status[1] == "ok" && status[2] == "divergence"
+            assert log.contains("augur validate export-v2: flutyper_h3n2_ha.json is valid") : log
+
         }
     }
 }

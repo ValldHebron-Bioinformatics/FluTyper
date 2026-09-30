@@ -25,6 +25,7 @@ include { MetadataMerge             } from './modules/MetadataMerge'
 include { MergeReports              } from './modules/MergeReports.nf'
 include { PhyloHistoricalNextclade; PhyloHistoricalNextcladeReuse } from './modules/phylogeny/PhyloHistoricalNextclade'
 include { PhyloGeography            } from './modules/phylogeny/PhyloGeography'
+include { AuspiceEnvCheck; auspiceEnvHelp } from './modules/phylogeny/AuspiceEnvCheck'
 include {
     PHYLOGENETICS as PHYLOGENETICS_H3N2; PHYLOGENETICS as PHYLOGENETICS_H1N1PDM09;
     parseAaPositions; parseAaPositionsFile; validatePhyloParams; resolvePhyloConfig; phyloSubtypeTag
@@ -72,6 +73,11 @@ workflow {
             exit 1, "PHYLOGENETICS ERROR:\n  " + phylo_errors.join("\n  ")
         }
         phylo_subtypes = params.phyloSubtype.toString().split(',').collect { s -> s.trim() }.findAll { s -> s }
+        // --auspice: build/verify the Nextstrain env first (no inputs to wait for: it starts with the run, in parallel
+        // with everything else); PhyloGeography and every PhyloAuspice task take its report as an input (plan D21)
+        if (run_auspice) {
+            AuspiceEnvCheck(file("${projectDir}/../envs/nextstrain.yaml", checkIfExists: true))
+        }
         phylo_positions_h3n2 = parseAaPositions(params.aaPositions, params.aaGene)
         phylo_positions_h1n1 = parseAaPositions(params.aaPositionsH1n1, params.aaGene)
         // --aa-positions-file replaces --aa-positions/--aa-positions-h1n1 (and the aaPositions default) for the
@@ -405,11 +411,13 @@ workflow {
                 params.coordinates ? file(params.coordinates, checkIfExists: true) : [],
                 params.auspiceLatLongs ? file(params.auspiceLatLongs, checkIfExists: true) : [],
                 file("${projectDir}/../RESOURCES/geonames/admin1CodesASCII.txt", checkIfExists: true),
-                params.auspiceContinent
+                params.auspiceContinent,
+                AuspiceEnvCheck.out.versions
             )
             ch_auspice_geography = PhyloGeography.out.geo
                 .combine(PhyloGeography.out.lat_longs)
                 .combine(PhyloGeography.out.log)
+                .combine(AuspiceEnvCheck.out.versions)
                 .first()
             ch_auspice = ch_auspice.mix(PhyloGeography.out.resolved)
         }
@@ -542,6 +550,14 @@ workflow {
 
     onComplete:
     // Processes use errorStrategy 'ignore', so a failed task silently drops its outputs: make that visible
+    // --auspice: Nextflow could not create/activate the Nextstrain env, or AuspiceEnvCheck failed. Verified on 26.04.6:
+    // an env-creation failure ends the run regardless of errorStrategy, with only the solver's output: add the fixes.
+    if (!workflow.success && params.get('auspice', false).toString().toLowerCase() == 'true') {
+        def report = (workflow.errorReport ?: '') + (workflow.errorMessage ?: '')
+        if (report.contains('AuspiceEnvCheck') || report.contains('Conda environment') || report.contains('Conda prefix path')) {
+            log.error "AUSPICE: the Nextstrain env could not be built or verified.\n" + auspiceEnvHelp()
+        }
+    }
     if (workflow.stats.ignoredCount > 0) {
         log.warn "${workflow.stats.ignoredCount} task(s) failed and were ignored, so some samples or reports may be missing. Check pipeline_errors.log and .nextflow.log for details."
     }

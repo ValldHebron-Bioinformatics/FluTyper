@@ -30,7 +30,7 @@ process PhyloGeography {
     // is logged. augur's bundled lat_longs.tsv is not relied on (no location level; "Catalunya" vs GeoNames
     // "Catalonia"), so every point used is written here.
     // Runs in the Nextstrain env (geonamescache is not in the FluTyper env), per D14 through moduleDir.
-    conda "${moduleDir}/../../../envs/nextstrain.yaml"
+    conda params.auspiceCondaEnv ?: "${moduleDir}/../../../envs/nextstrain.yaml"   // --auspiceCondaEnv: pre-built prefix (D21)
     errorStrategy 'ignore'   // a failure (bad --auspiceContinent / --auspiceLatLongs / coordinates table) exits 1 with
                              // a "PhyloGeography: ..." message on stderr and emits nothing; the caller reports it
 
@@ -42,6 +42,8 @@ process PhyloGeography {
     path(user_lat_longs, stageAs: "in_lat_longs/*")   // --auspiceLatLongs TSV (level<TAB>name<TAB>lat<TAB>long, no header), or []
     path(admin1)        // RESOURCES/geonames/admin1CodesASCII.txt (GeoNames admin-1 code -> name)
     val(continent)      // --auspiceContinent: comma-separated GeoNames continent codes (AF AN AS EU NA OC SA)
+    path(env_report, stageAs: "in_env/*")   // AuspiceEnvCheck's nextstrain_env.txt: this task never starts without a
+                                            // verified env (plan D21); its lines head geography.log, so every phylo.log
 
     output:
     path("lat_longs.tsv"),          emit: lat_longs   // augur export --lat-longs: country/division/location rows
@@ -71,7 +73,7 @@ def fail(msg):
     sys.stderr.write(f"{P}: {msg}\\n")
     sys.exit(1)
 
-log_lines = []
+log_lines = [line.rstrip("\\n") for line in open("${env_report}", encoding="utf-8") if line.strip()]
 def say(level, msg):
     log_lines.append(f"{P}: {level} {msg}")
 
@@ -129,7 +131,8 @@ keys = {}   # (city or None, country_input or None) -> number of samples
 if not META:
     say("WARNING", "no --metadata: no sample has a location, the Auspice map will be empty.")
 else:
-    df = pd.read_csv(META, dtype=str, skipinitialspace=True)
+    # keep_default_na=False: COUNTRY "NA" is Namibia's ISO code, not a missing value; blanks are missing (value())
+    df = pd.read_csv(META, dtype=str, skipinitialspace=True, keep_default_na=False)
     df.columns = [str(c).strip().upper() for c in df.columns]
     if "LOCATION" not in df.columns:
         say("WARNING", f"the metadata has no LOCATION column (columns: {', '.join(df.columns)}): no sample has a "
@@ -175,16 +178,17 @@ ES_COMUNIDAD = {fold_town(k): v for k, v in ES_COMUNIDAD.items()}   # same norma
 table = {}   # fold_town(town) -> [(town, division, admin1 code, lat, long)]
 TABLE_CC = "ES"
 if COORDS:
-    ct = pd.read_csv(COORDS, sep="\\t", dtype=str)
+    ct = pd.read_csv(COORDS, sep="\\t", dtype=str, keep_default_na=False, quoting=csv.QUOTE_NONE)
+    blank = lambda x: pd.isna(x) or not str(x).strip()
     need = ["Comunidad", "Población", "Latitud", "Longitud"]
     missing = [c for c in need if c not in ct.columns]
     if missing:
         fail(f"--coordinates {COORDS} lacks column(s) {', '.join(missing)} (expected {', '.join(need)})")
     unmapped = set()
     for _, r in ct.iterrows():
-        if pd.isna(r["Población"]) or pd.isna(r["Latitud"]) or pd.isna(r["Longitud"]):
+        if blank(r["Población"]) or blank(r["Latitud"]) or blank(r["Longitud"]):
             continue
-        comunidad = str(r["Comunidad"]).strip() if not pd.isna(r["Comunidad"]) else ""
+        comunidad = "" if blank(r["Comunidad"]) else str(r["Comunidad"]).strip()
         code = ES_COMUNIDAD.get(fold_town(comunidad))
         if code is None:
             unmapped.add(comunidad)
@@ -293,6 +297,24 @@ for (city, given), n in sorted(keys.items(), key=lambda kv: (kv[0][0] or "", kv[
             r["alternatives"] = "; ".join(f"{h[0]} ({h[1]}, {h[3]}, {h[4]})" for h in hits[1:])
             say("WARNING", f"'{city}' is ambiguous in the coordinates table ({len(hits)} rows): using the first row, "
                            f"{town} ({lat}, {lon}); others: {r['alternatives']}.")
+        # M4 (Phase 6): the table only knows Spain, so a hit must not hide in-scope namesakes elsewhere (Breda NL, Pau FR).
+        # D16g rule against the Spanish town's GeoNames population (none known -> close): WARNING if close, else INFO.
+        _, others = geonames_lookup(city, allowed - {TABLE_CC})
+        if others:
+            _, spanish = geonames_lookup(city, {TABLE_CC})
+            ref = spanish[0] if spanish else {}
+            r["alternatives"] = "; ".join(x for x in (r["alternatives"], "; ".join(describe(c) for c in others)) if x)
+            r["n_candidates"] += len(others)
+            shown = "; ".join(describe(c) for c in others[:MAX_ALTERNATIVES])
+            more = f" and {len(others) - MAX_ALTERNATIVES} more" if len(others) > MAX_ALTERNATIVES else ""
+            if any(is_close(ref, c) for c in others):
+                say("WARNING", f"'{city}' was placed with the coordinates table ({town}, {division}, Spain), but GeoNames "
+                               f"has a close namesake elsewhere in scope (>= {CLOSE_PERCENT}% of the Spanish town's population, "
+                               f">= {CLOSE_ABSOLUTE:,} people, or no population to compare): {shown}{more}. Add a COUNTRY "
+                               "column (or an --auspiceLatLongs location row) if this sample is not from Spain.")
+            else:
+                say("INFO", f"'{city}' was placed with the coordinates table ({town}, {division}, Spain); smaller GeoNames "
+                            f"namesake(s) elsewhere in scope: {shown}{more}.")
     else:
         tier, cand = geonames_lookup(city, allowed)
         if cand:
@@ -442,7 +464,8 @@ with open("geo.tsv", "w", newline="", encoding="utf-8") as f:
     w = csv.writer(f, delimiter="\\t", lineterminator="\\n")
     w.writerow(["location", "country_input", "auspice_location", "country", "division", "region"])
     for r in rows:
-        w.writerow([r["city"] or NA, r["given"] or NA, r["label"] or NA, r["country"], r["division"], region_name(r["cc"])])
+        # country_input: the COUNTRY as written, "" when there was none ("NA" would be Namibia's ISO code)
+        w.writerow([r["city"] or NA, r["given"] or "", r["label"] or NA, r["country"], r["division"], region_name(r["cc"])])
 
 with open("lat_longs_resolved.tsv", "w", newline="", encoding="utf-8") as f:
     w = csv.writer(f, delimiter="\\t", lineterminator="\\n")
@@ -454,7 +477,7 @@ with open("lat_longs_resolved.tsv", "w", newline="", encoding="utf-8") as f:
         lat = NA if r["lat"] is None else coord(r["lat"])
         lon = NA if r["long"] is None else coord(r["long"])
         w.writerow([r["city"], r["country"], r["division"], lat, lon, r["source"], r["n_candidates"],
-                    region_name(r["cc"]), r["given"] or NA, r["label"], r["n"], r["alternatives"] or NA])
+                    region_name(r["cc"]), r["given"] or "", r["label"], r["n"], r["alternatives"] or NA])
 
 n_city = sum(1 for r in rows if r["city"] is not None)
 n_point = sum(1 for r in rows if r["city"] is not None and r["lat"] is not None)

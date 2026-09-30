@@ -17,6 +17,7 @@ nextflow_process {
                 input[2] = []
                 input[3] = file("${projectDir}/RESOURCES/geonames/admin1CodesASCII.txt", checkIfExists: true)
                 input[4] = "EU"
+                input[5] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)
                 """
             }
         }
@@ -32,8 +33,8 @@ nextflow_process {
             def geo = table(process.out.geo.get(0))
             def res = table(process.out.resolved.get(0))
             def latlongs = path(process.out.lat_longs.get(0)).readLines()
-            def geoOf = { city, country_input = "NA" -> geo.find { it.location == city && it.country_input == country_input } }
-            def resOf = { city, country_input = "NA" -> res.find { it.city == city && it.country_input == country_input } }
+            def geoOf = { city, country_input = "" -> geo.find { it.location == city && it.country_input == country_input } }
+            def resOf = { city, country_input = "" -> res.find { it.city == city && it.country_input == country_input } }
 
             assert geo.collect { it.keySet() }.every { it as List == ["location", "country_input", "auspice_location", "country", "division", "region"] }
             assert (res[0].keySet() as List).take(7) == ["city", "country", "division", "lat", "long", "source", "n_candidates"]
@@ -100,6 +101,8 @@ nextflow_process {
             }
             assert !latlongs.any { it.startsWith("location\tCórdoba\t") }
             assert log.contains("PhyloGeography: INFO 11 samples, 8 distinct LOCATION values")
+            // the verified Nextstrain env (AuspiceEnvCheck, plan D21) is recorded once per run, and so in every phylo.log
+            assert log.readLines()[0] == "AuspiceEnvCheck: INFO Nextstrain env verified at /test/fixture/env: augur 34.1.4, treetime 0.12.1, python 3.13.15, geonamescache 3.0.2, biopython 1.88, pandas 2.3.3." : log
         }
     }
 
@@ -113,6 +116,7 @@ nextflow_process {
                 input[2] = file("${projectDir}/tests/data/phylo/geography/user_lat_longs.tsv", checkIfExists: true)
                 input[3] = file("${projectDir}/RESOURCES/geonames/admin1CodesASCII.txt", checkIfExists: true)
                 input[4] = "SA"
+                input[5] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)
                 """
             }
         }
@@ -124,9 +128,9 @@ nextflow_process {
             def res = path(process.out.resolved.get(0)).readLines()
             def latlongs = path(process.out.lat_longs.get(0)).readLines()
 
-            assert geo.any { it.startsWith("Valencia\tNA\tValencia\tVenezuela\t") && it.endsWith("\tSouth America") } : geo
+            assert geo.any { it.startsWith("Valencia\t\tValencia\tVenezuela\t") && it.endsWith("\tSouth America") } : geo
             // The Catalan table only holds Spanish places: outside the continent scope it is not used
-            assert geo.any { it.startsWith("Barcelona\tNA\tBarcelona\tVenezuela\t") } : geo
+            assert geo.any { it.startsWith("Barcelona\t\tBarcelona\tVenezuela\t") } : geo
             assert log.contains("PhyloGeography: INFO coordinates table skipped") : log
 
             // User lat_longs: a location point for a city GeoNames does not know (its country stays NA) ...
@@ -150,6 +154,7 @@ nextflow_process {
                 input[2] = []
                 input[3] = file("${projectDir}/RESOURCES/geonames/admin1CodesASCII.txt", checkIfExists: true)
                 input[4] = "EU,AS"
+                input[5] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)
                 """
             }
         }
@@ -183,6 +188,7 @@ nextflow_process {
                 input[2] = []
                 input[3] = file("${projectDir}/RESOURCES/geonames/admin1CodesASCII.txt", checkIfExists: true)
                 input[4] = "EU"
+                input[5] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)
                 """
             }
         }
@@ -207,6 +213,7 @@ nextflow_process {
                 input[2] = []
                 input[3] = file("${projectDir}/RESOURCES/geonames/admin1CodesASCII.txt", checkIfExists: true)
                 input[4] = "EU"
+                input[5] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)
                 """
             }
         }
@@ -228,6 +235,7 @@ nextflow_process {
                 input[2] = []
                 input[3] = file("${projectDir}/RESOURCES/geonames/admin1CodesASCII.txt", checkIfExists: true)
                 input[4] = "EU,XX"
+                input[5] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)
                 """
             }
         }
@@ -243,6 +251,47 @@ nextflow_process {
                 if (it.name == ".command.err") taskErr += it.text
             }
             assert taskErr.contains("PhyloGeography: unknown --auspiceContinent code(s) XX") : taskErr
+        }
+    }
+
+    test("M4: a Catalan-table hit still reports in-scope GeoNames namesakes outside Spain (D16g rule); L3: COUNTRY 'NA' is Namibia, not missing") {
+
+        when {
+            process {
+                """
+                input[0] = file("${projectDir}/tests/data/phylo/geography/metadata_geo_namesakes.csv", checkIfExists: true)
+                input[1] = file("${projectDir}/RESOURCES/coordenades_cat.tsv", checkIfExists: true)
+                input[2] = []
+                input[3] = file("${projectDir}/RESOURCES/geonames/admin1CodesASCII.txt", checkIfExists: true)
+                input[4] = "EU"
+                input[5] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def log = path(process.out.log.get(0)).text
+            def table = { p ->
+                def lines = path(p).readLines()
+                def header = lines[0].split('\t', -1) as List
+                lines.drop(1).collect { l -> [header, l.split('\t', -1) as List].transpose().collectEntries() }
+            }
+            def geo = table(process.out.geo.get(0))
+            def res = table(process.out.resolved.get(0))
+            // Breda: the Catalan table wins (Spain/Catalonia), but Breda NL (184,126 >= 50,000) is a close contender -> WARNING
+            def breda = geo.find { it.location == "Breda" }
+            assert breda.subMap(["country", "division", "country_input"]) == [country: "Spain", division: "Catalonia", country_input: ""] : breda
+            assert res.find { it.city == "Breda" }.alternatives.contains("Breda (NL") : res
+            assert log.readLines().any { it.startsWith("PhyloGeography: WARNING") && it.contains("'Breda'") && it.contains("Breda (NL") } : log
+            // Tiana: Tiana IT (521) is < 10% of Tiana ES (7,052) and < 50,000 -> INFO only
+            assert log.readLines().any { it.startsWith("PhyloGeography: INFO") && it.contains("'Tiana'") && it.contains("Tiana (IT") } : log
+            assert !log.readLines().any { it.startsWith("PhyloGeography: WARNING") && it.contains("'Tiana'") } : log
+            // COUNTRY "NA" is the ISO code of Namibia (pandas' default NA parsing would have dropped it)
+            def windhoek = geo.find { it.location == "Windhoek" }
+            assert windhoek.subMap(["country_input", "country", "region"]) == [country_input: "NA", country: "Namibia", region: "Africa"] : windhoek
+            // a blank COUNTRY is missing: the city is looked up in the continent scope
+            assert geo.find { it.location == "Barcelona" }.country_input == ""
         }
     }
 }

@@ -538,4 +538,72 @@ nextflow_pipeline {
             assert workflow.stdout.any { it.contains("tree 'H3N2_HA' has no Auspice dataset") }
         }
     }
+
+    test("--auspiceCondaEnv pointing to a missing prefix stops the run before any process runs, with the pre-build instructions") {
+
+        when {
+            params {
+                protocol = "HUMAN"
+                protocols = [
+                    HUMAN: [
+                        directory: "${projectDir}/protocols/HUMAN",
+                        resources: "${projectDir}/protocols/HUMAN/v1"
+                    ]
+                ]
+                inputFasta = "${projectDir}/tests/data/HUMAN.fasta"
+                outDir = "tests/results/phylo_test_auspice_badenv"
+                metadata = "${projectDir}/tests/data/humanmetadata.csv"
+                phylogenetics = true
+                phyloSubtype = "H3N2"
+                phyloSegmentTrees = "HA"
+                auspice = true
+                auspiceCondaEnv = "/nonexistent/flutyper_nextstrain_env"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            def out = workflow.stdout.join("\n")
+            assert out.contains("--auspiceCondaEnv '/nonexistent/flutyper_nextstrain_env' is not a conda environment prefix") : out
+            assert out.contains("mamba env create -p /nonexistent/flutyper_nextstrain_env -f") : out
+            assert workflow.trace.succeeded().size() == 0 && workflow.trace.failed().size() == 0
+        }
+    }
+
+    test("L-5: --auspice with two subtypes (H3N2 from the new FASTA, H1N1pdm09 from --append history): one dataset per subtype's tree in the same auspice/ folder, one AUSPICE line per subtype") {
+
+        when {
+            params {
+                protocol = "HUMAN"
+                protocols = [
+                    HUMAN: [
+                        directory: "${projectDir}/protocols/HUMAN",
+                        resources: "${projectDir}/protocols/HUMAN/v1"
+                    ]
+                ]
+                inputFasta = "${projectDir}/tests/data/phylo/gate_test.fasta"
+                outDir = "tests/results/phylo_test_auspice_two"
+                append = "${projectDir}/tests/data/phylo/append_source"
+                phylogenetics = true
+                phyloSegmentTrees = "HA"
+                bootstrap = 0
+                auspice = true
+            }
+        }
+
+        then {
+            assert workflow.success
+            def outputDir = path("$baseDir/tests/results/phylo_test_auspice_two")
+            def published = outputDir.resolve("auspice").toFile().list().toList().sort()
+            assert published == ["flutyper_h1n1pdm09_ha.json", "flutyper_h3n2_ha.json", "lat_longs_resolved.tsv"] : published
+            ["H3N2": "flutyper_h3n2_ha.json", "H1N1pdm09": "flutyper_h1n1pdm09_ha.json"].each { subtype, name ->
+                def js = new JsonSlurper().parse(outputDir.resolve("auspice/${name}").toFile())
+                assert js.version == "v2" && js.tree
+                def phyloLog = PhyloTestHelpers.checkTreeFolder(outputDir.resolve("phylogeny/${subtype}/HA"), "${subtype}_HA")
+                assert phyloLog.contains("PhyloAuspice: INFO augur validate export-v2: ${name} is valid") : phyloLog
+                // no --metadata: no sampling dates -> divergence-only, counted in the summary
+                assert workflow.stdout.count { it.startsWith("AUSPICE(${subtype}): 1 dataset -> auspice/") && it.contains("1 divergence-only") } == 1 : workflow.stdout.join("\n")
+            }
+        }
+    }
 }

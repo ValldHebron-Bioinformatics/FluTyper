@@ -22,6 +22,7 @@ process PhyloLog {
     path(subclades_log)
     path(qc_table)                                      // merged coverage QC table of all candidate samples
     val(segment_order)                                  // comma-separated segment names
+    val(auspice_on)                                     // --auspice: a tree with neither Auspice part gets a note (L1)
 
     output:
     tuple val(tree_id), path("${tree_folder}/phylo.log"), emit: log
@@ -120,6 +121,11 @@ if os.path.isfile("geography.log") or os.path.isfile("auspice.log"):
     out.extend(read_lines("geography.log"))
     out.extend(read_lines("auspice.log") if os.path.isfile("auspice.log")
                else ["(step did not finish: no auspice.log was produced)"])
+elif "${auspice_on}" == "true":
+    # geography.log is attached to every tree that reached PhyloReport: without it the tree never got to the export
+    out.append("")
+    out.append("## Auspice export")
+    out.append("(not attempted: --auspice is on, but this tree has no report, so there is nothing to export)")
 
 with open(f"{tree_folder}/phylo.log", "w") as f:
     f.write("\\n".join(out) + "\\n")

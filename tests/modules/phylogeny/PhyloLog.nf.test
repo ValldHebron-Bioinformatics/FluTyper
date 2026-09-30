@@ -23,6 +23,7 @@ nextflow_process {
                 input[2] = file("${projectDir}/tests/data/phylo/log_parts/subclades.log", checkIfExists: true)
                 input[3] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
                 input[4] = "PB2,PB1,PA,HA,NP,NA,MP,NS"
+                input[5] = false   // --auspice
                 """
             }
         }
@@ -77,6 +78,7 @@ nextflow_process {
                 input[2] = file("${projectDir}/tests/data/phylo/log_parts/subclades.log", checkIfExists: true)
                 input[3] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
                 input[4] = "PB2,PB1,PA,HA,NP,NA,MP,NS"
+                input[5] = false   // --auspice
                 """
             }
         }
@@ -104,6 +106,7 @@ nextflow_process {
                 input[2] = file("${projectDir}/tests/data/phylo/log_parts/subclades.log", checkIfExists: true)
                 input[3] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
                 input[4] = "PB2,PB1,PA,HA,NP,NA,MP,NS"
+                input[5] = false   // --auspice
                 """
             }
         }
@@ -139,6 +142,7 @@ nextflow_process {
                 input[2] = file("${projectDir}/tests/data/phylo/log_parts/subclades.log", checkIfExists: true)
                 input[3] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
                 input[4] = "PB2,PB1,PA,HA,NP,NA,MP,NS"
+                input[5] = true   // --auspice
                 """
             }
         }
@@ -174,6 +178,7 @@ nextflow_process {
                 input[2] = file("${projectDir}/tests/data/phylo/log_parts/subclades.log", checkIfExists: true)
                 input[3] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
                 input[4] = "PB2,PB1,PA,HA,NP,NA,MP,NS"
+                input[5] = true   // --auspice
                 """
             }
         }
@@ -183,6 +188,37 @@ nextflow_process {
             def log = path(process.out.log.get(0)[1]).text
             assert log.contains("## Auspice export") : log
             assert log.contains("(step did not finish: no auspice.log was produced)") : log
+        }
+    }
+
+    test("L1: --auspice on but the tree never reached the export (no geography.log, no auspice.log) -> phylo.log says so") {
+
+        when {
+            process {
+                """
+                input[0] = tuple(
+                    "H3N2_HA", "HA",
+                    [
+                        file("${projectDir}/tests/data/phylo/log_parts/alignment.log", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/log_parts/iqtree.log", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/log_parts/phylo.treefile", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/log_parts/posttree.log", checkIfExists: true)
+                    ]
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/log_parts/preflight.log", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/log_parts/subclades.log", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
+                input[4] = "PB2,PB1,PA,HA,NP,NA,MP,NS"
+                input[5] = true   // --auspice
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def log = path(process.out.log.get(0)[1]).text
+            assert log.contains("## Auspice export") : log
+            assert log.contains("(not attempted: --auspice is on, but this tree has no report, so there is nothing to export)") : log
         }
     }
 }

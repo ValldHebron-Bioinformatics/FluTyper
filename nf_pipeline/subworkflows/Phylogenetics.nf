@@ -29,7 +29,8 @@ workflow PHYLOGENETICS {
     reference_fallback    // resolved coordinate reference for segments the alignment reference lacks
     root_strains          // resolved comma-separated root strains for this subtype
     outgroup               // resolved root strain used to root this subtype's tree
-    auspice_geography      // --auspice: value channel [geo.tsv, lat_longs.tsv, geography.log] from PhyloGeography (run ONCE per
+    auspice_geography      // --auspice: value channel [geo.tsv, lat_longs.tsv, geography.log, nextstrain_env.txt] from
+                           // PhyloGeography + AuspiceEnvCheck (run ONCE per
                            // run in main.nf and shared by every subtype and tree); channel.empty() without --auspice
 
     main:
@@ -287,8 +288,8 @@ workflow PHYLOGENETICS {
     if (auspice_on) {
         PhyloAuspice(
             PhyloReport.out.for_auspice,
-            auspice_geography.map { geo, _ll, _log -> geo },
-            auspice_geography.map { _geo, ll, _log -> ll },
+            auspice_geography.map { geo, _ll, _log, _env -> geo },
+            auspice_geography.map { _geo, ll, _log, _env -> ll },
             metadata.first(),
             file(params.auspiceConfig, checkIfExists: true),
             file(params.auspiceClockRates, checkIfExists: true),
@@ -297,7 +298,8 @@ workflow PHYLOGENETICS {
             params.auspiceMinDatedTips,
             auspiceTraitList(params.auspiceTraits).join(','),
             params.version,
-            params.minSupportLabel
+            params.minSupportLabel,
+            auspice_geography.map { _geo, _ll, _log, env -> env }   // AuspiceEnvCheck report: no task without a verified env
         )
         auspice_json_ch = PhyloAuspice.out.json.map { _tree_id, f -> f }
         // phylo.log parts: the run-level geography.log (the same file for every tree whose report exists) and the tree's
@@ -305,8 +307,8 @@ workflow PHYLOGENETICS {
         // that never ran still leaves a visible "did not finish" note in that tree's phylo.log.
         auspice_log_parts_ch = PhyloReport.out.for_auspice
             .map { tree_id, tree_folder, _t, _a, _n, _p, _s, _g, _an, _su -> tuple(tree_id, tree_folder) }
-            .combine(auspice_geography.map { _geo, _ll, log -> log })
-            .mix(PhyloAuspice.out.step_log.map { tree_id, f -> tuple(tree_id, tree_id == subtype ? "whole_genome" : tree_id.substring(subtype.length() + 1), f) })
+            .combine(auspice_geography.map { _geo, _ll, log, _env -> log })
+            .mix(PhyloAuspice.out.step_log.map { tree_id, f -> tuple(tree_id, phyloTreeFolder(tree_id, subtype), f) })
         // Each status file: tree_id status mode dataset reason (one row). Read here, wrapped in a one-key Map for combine().
         auspice_status_ch = PhyloAuspice.out.status
             .map { tree_id, _folder, f ->
@@ -368,12 +370,15 @@ workflow PHYLOGENETICS {
             if (auspice_m.items != null) {
                 expected.findAll { tree_id -> report_ok.contains(tree_id) }.each { tree_id ->
                     def st = auspice_m.items.find { it.id == tree_id }
-                    def folder = tree_id == subtype ? "whole_genome" : tree_id.substring(subtype.length() + 1)
+                    def folder = phyloTreeFolder(tree_id, subtype)
                     def msg = null
                     if (st == null) {
                         msg = "PHYLOGENETICS(${subtype}): tree '${tree_id}' has no Auspice dataset: PhyloAuspice never reported a status (the task failed before it ran, e.g. the Nextstrain conda env could not be built, or PhyloGeography failed). Check .nextflow.log."
                     } else if (st.status != 'ok') {
                         msg = "PHYLOGENETICS(${subtype}): tree '${tree_id}' has no Auspice dataset: PhyloAuspice failed: ${st.reason} (see phylogeny/${subtype}/${folder}/phylo.log)."
+                    } else if (st.reason.startsWith('augur refine --timetree failed')) {
+                        // M5: exported, but only divergence-only because the time tree crashed (not "no dates"/"no rate")
+                        msg = "PHYLOGENETICS(${subtype}): tree '${tree_id}' was exported divergence-only because the time tree failed: ${st.reason} (see phylogeny/${subtype}/${folder}/phylo.log)."
                     }
                     if (msg) {
                         println "WARN: ${msg}"
@@ -394,15 +399,15 @@ workflow PHYLOGENETICS {
     // tree_folder is recovered from tree_id ("H3N2" -> whole_genome, "H3N2_HA" -> HA) for the steps that only carry the id.
     def log_parts_ch = whole_genome_log_ch
         .mix(PhyloSegmentAlignment.out.log.map { seg, f -> tuple("${subtype}_${seg}".toString(), seg, f) })
-        .mix(PhyloTree.out.step_log.map { tree_id, f -> tuple(tree_id, tree_id == subtype ? "whole_genome" : tree_id.substring(subtype.length() + 1), f) })
-        .mix(PhyloTree.out.raw_tree.map { tree_id, f -> tuple(tree_id, tree_id == subtype ? "whole_genome" : tree_id.substring(subtype.length() + 1), f) })
-        .mix(PhyloPostTree.out.step_log.map { tree_id, f -> tuple(tree_id, tree_id == subtype ? "whole_genome" : tree_id.substring(subtype.length() + 1), f) })
-        .mix(PhyloReport.out.step_log.map { tree_id, f -> tuple(tree_id, tree_id == subtype ? "whole_genome" : tree_id.substring(subtype.length() + 1), f) })
+        .mix(PhyloTree.out.step_log.map { tree_id, f -> tuple(tree_id, phyloTreeFolder(tree_id, subtype), f) })
+        .mix(PhyloTree.out.raw_tree.map { tree_id, f -> tuple(tree_id, phyloTreeFolder(tree_id, subtype), f) })
+        .mix(PhyloPostTree.out.step_log.map { tree_id, f -> tuple(tree_id, phyloTreeFolder(tree_id, subtype), f) })
+        .mix(PhyloReport.out.step_log.map { tree_id, f -> tuple(tree_id, phyloTreeFolder(tree_id, subtype), f) })
         .mix(auspice_log_parts_ch)
         // 5 parts per tree, + geography.log and auspice.log with --auspice
         .groupTuple(by: [0, 1], size: auspice_on ? 7 : 5, remainder: true)
     // qc_table.first(): collectFile emits one item on a queue channel, which would make PhyloLog run only once
-    PhyloLog(log_parts_ch, PhyloPreflight.out.log, PhyloSubclades.out.log, qc_table.first(), params.phyloSegmentOrder)
+    PhyloLog(log_parts_ch, PhyloPreflight.out.log, PhyloSubclades.out.log, qc_table.first(), params.phyloSegmentOrder, auspice_on)
 
     // One terminal line per subtype once all its trees are done. Built = has a report (like tree_problems above).
     // Lists are wrapped in one-key Maps before combine(), see the note above tree_problems_ch.
@@ -727,6 +732,7 @@ def validateAuspiceParams(Map p) {
     if (!(p.auspiceMinDatedTips.toString() ==~ /^\d+$/)) {
         errors << "--auspiceMinDatedTips must be a non-negative integer (got '${p.auspiceMinDatedTips}')."
     }
+    // keep in sync with FIELDS in modules/phylogeny/PhyloAuspice.nf (the categorical columns of its meta.tsv)
     def trait_columns = ['region', 'country', 'division', 'location', 'subclade', 'cluster', 'season', 'age_group', 'sex']
     def traits = auspiceTraitList(p.auspiceTraits)
     def bad_traits = traits == null ? [] : traits.findAll { t -> !(t in trait_columns) }
@@ -734,6 +740,16 @@ def validateAuspiceParams(Map p) {
         errors << "--auspiceTraits must be 'none' or a comma-separated list of ${trait_columns.join(', ')} (got '${p.auspiceTraits}')."
     } else if (bad_traits) {
         errors << "--auspiceTraits has unknown column(s) ${bad_traits.join(', ')}: must be among ${trait_columns.join(', ')} (or 'none')."
+    }
+    // --auspiceCondaEnv: an existing pre-built prefix (offline / HPC). Nextflow would only fail later, at the first
+    // task, with "Conda prefix path does not exist"; reject it now, with the way to build one.
+    if (p.auspiceCondaEnv) {
+        def prefix = p.auspiceCondaEnv == true ? '' : p.auspiceCondaEnv.toString()
+        if (!prefix || !file(prefix).isDirectory() || !file("${prefix}/conda-meta").isDirectory()) {
+            errors << ("--auspiceCondaEnv '${prefix}' is not a conda environment prefix (no ${prefix}/conda-meta folder). " +
+                       "Build it once, on a machine with internet: mamba env create -p ${prefix} -f envs/nextstrain.yaml " +
+                       "(or drop --auspiceCondaEnv to let the pipeline build the env itself).")
+        }
     }
     def continents = ['AF', 'AN', 'AS', 'EU', 'NA', 'OC', 'SA']
     def codes = (p.auspiceContinent && p.auspiceContinent != true) ? p.auspiceContinent.toString().split(',').collect { c -> c.trim().toUpperCase() }.findAll { c -> c } : []
@@ -748,6 +764,12 @@ def auspiceTraitList(v) {
     if (v == true) return null
     if (v == null || v.toString().trim() == '' || v.toString().trim().equalsIgnoreCase('none')) return []
     return v.toString().split(',').collect { t -> t.trim() }.findAll { t -> t }
+}
+
+// Folder of a tree under phylogeny/<subtype>/: "whole_genome" for the whole-genome tree (tree_id == subtype), else the
+// bare segment ("H3N2_HA" -> "HA")
+def phyloTreeFolder(String tree_id, String subtype) {
+    return tree_id == subtype ? "whole_genome" : tree_id.substring(subtype.length() + 1)
 }
 
 // True for a boolean-like flag that is set (true, 'true'); false for null/false/'false'

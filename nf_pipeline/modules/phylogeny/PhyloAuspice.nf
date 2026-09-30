@@ -46,7 +46,7 @@ process PhyloAuspice {
     // still exits 0 so that auspice.log and auspice_status.tsv are emitted (errorStrategy 'ignore' would discard
     // them), with status 'failed', an ERROR line and no JSON. Only a crash before Python runs (e.g. the conda env)
     // emits nothing: the caller must also report trees with no status (expected ids minus emitted ids).
-    conda "${moduleDir}/../../../envs/nextstrain.yaml"
+    conda params.auspiceCondaEnv ?: "${moduleDir}/../../../envs/nextstrain.yaml"   // --auspiceCondaEnv: pre-built prefix (D21)
     errorStrategy 'ignore'
 
     input:
@@ -67,6 +67,8 @@ process PhyloAuspice {
     val(traits)                                     // --auspiceTraits: comma-separated DTA columns (default country,region)
     val(flutyper_version)                           // params.version (generated_by of the node-data JSONs)
     val(min_support_label)                          // --minSupportLabel (default 70; 0 = label every node with a value)
+    path(env_report, stageAs: "in_env/*")           // AuspiceEnvCheck's report: gate only (plan D21), no task starts
+                                                    // before the Nextstrain env is verified; it is logged by PhyloGeography
 
     output:
     tuple val(tree_id), path("flutyper_*.json"), optional: true, emit: json    // only when exported AND validated
@@ -85,7 +87,7 @@ ROOTS, ROOT_DATES = "${root_strains}".strip(), "${root_dates}".strip()
 MIN_DATED = int("${min_dated_tips}")
 TRAITS, FLUTYPER_VERSION = "${traits}", "${flutyper_version}"
 SUPPORT, MIN_SUPPORT = "${support}", float("${min_support_label}")
-import csv, glob, json, os, re, subprocess, sys, traceback
+import csv, glob, json, math, os, re, subprocess, sys, traceback
 from datetime import date as Date
 import pandas as pd
 from Bio import Phylo, SeqIO
@@ -96,6 +98,65 @@ NT_OK = set("ACGT")
 AA_SKIP = set("-X")
 ORDINAL_COLOURS = ["#440154", "#482878", "#3E4A89", "#31688E", "#26828E", "#1F9E89", "#35B779", "#6DCD59",
                    "#B4DE2C", "#FDE725"]   # viridis, 10 steps: ordinal legends (age_group, season)
+AUGUR_TIMEOUT = 6 * 3600   # s per augur call (refine of ~700 tips takes ~20 s): generous, but a hang is a reported failure
+ANN_FIELDS = ["subclade", "cluster", "season", "age_group", "sex"]    # from PhyloReport's annotations.tsv (plan D9)
+GEO_FIELDS = ["region", "country", "division", "location"]           # from PhyloGeography's geo.tsv (plan D12)
+FIELDS = ANN_FIELDS + GEO_FIELDS   # the categorical columns of meta.tsv; also the only valid --auspiceTraits columns
+                                   # (keep in sync with validateAuspiceParams' trait_columns in subworkflows/Phylogenetics.nf)
+
+# ---- Pure helpers (no I/O) -------------------------------------------------------------------------------------------
+def augur_date(raw):
+    # -> (augur date, precision) or (None, None). Only ISO forms (plan H1, Phase 6): YYYY-MM-DD (a real calendar day),
+    # YYYY-MM, YYYY and augur's explicit ambiguity YYYY-MM-XX / YYYY-XX-XX. Partial dates stay partial (TreeTime
+    # infers within the range), never completed to a day. Anything else (03/04/2024 is day/month-ambiguous, 2024/03,
+    # "Mar 2024", timestamps) is rejected: the caller leaves it undated with a WARNING.
+    m = re.fullmatch(r"(\\d{4})-(\\d{2}|XX)-(\\d{2}|XX)", raw)
+    if m:
+        y, mo, d = m.groups()
+        try:
+            if mo != "XX" and d != "XX":
+                Date(int(y), int(mo), int(d))
+                return raw, "day"
+            if mo != "XX" and d == "XX" and 1 <= int(mo) <= 12:
+                return raw, "month"
+            if mo == "XX" and d == "XX":
+                return raw, "year"
+        except ValueError:
+            pass
+        return None, None
+    m = re.fullmatch(r"(\\d{4})-(\\d{2})", raw)
+    if m:
+        return (f"{raw}-XX", "month") if 1 <= int(m.group(2)) <= 12 else (None, None)
+    if re.fullmatch(r"\\d{4}", raw):
+        return f"{raw}-XX-XX", "year"
+    return None, None
+
+def age_key(v):
+    # sort key of an age-group label by its lower bound: "0-2"/"65+" -> the bound; "<2"/"<=2" before 0; ">65" just
+    # after 65, ">=65" at 65 (ties: by the label); anything that is not an age range after all ranges, alphabetically
+    m = re.fullmatch(r"\\s*(\\d+(?:\\.\\d+)?)\\s*(?:-\\s*\\d+(?:\\.\\d+)?|\\+)\\s*", v)
+    if m:
+        return (0, float(m.group(1)), v)
+    m = re.fullmatch(r"\\s*(>=?|<=?)\\s*(\\d+(?:\\.\\d+)?)\\s*", v)
+    if m:
+        x = float(m.group(2))
+        return (0, {">": x + 0.5, ">=": x, "<": -1.0, "<=": -1.0}[m.group(1)], v)
+    return (1, 0.0, v)
+
+def diffs(a, b, keep, what):
+    # parent -> child differences as REFpositionALT (1-based); both sequences must be aligned (equal length): zip()
+    # would otherwise silently drop the tail
+    if len(a) != len(b):
+        raise ValueError(f"{what}: sequences of different length ({len(a)} vs {len(b)})")
+    return [f"{x}{i}{y}" for i, (x, y) in enumerate(zip(a, b), start=1) if x != y and keep(x) and keep(y)]
+
+def load_json(path):
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+def dump_json(obj, path):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(obj, f, indent=1)
 
 log_lines = []
 def say(level, msg):
@@ -114,9 +175,29 @@ def tail(path, n=6):
         return ""
     return " | ".join(lines[-n:])
 
-def run(cmd, logfile):
+def run(cmd, logfile, timeout=AUGUR_TIMEOUT):
+    # exit code of cmd; a timeout is exit 124 with a note at the end of the log (then reported like any failure)
     with open(logfile, "w") as f:
-        return subprocess.run(cmd, stdout=f, stderr=subprocess.STDOUT).returncode
+        try:
+            return subprocess.run(cmd, stdout=f, stderr=subprocess.STDOUT, timeout=timeout).returncode
+        except subprocess.TimeoutExpired:
+            f.write(f"\\nPhyloAuspice: timed out after {timeout} s\\n")
+            return 124
+
+def forward_warnings(logfile, label, skip=lambda msg: False):
+    # augur/TreeTime WARNING/ERROR lines of a finished step (also when it succeeded), deduplicated, into auspice.log
+    seen = set()
+    try:
+        with open(logfile, errors="replace") as f:
+            lines = f.readlines()
+    except OSError:
+        return
+    for line in lines:
+        m = re.match(r"\\s*(WARNING|ERROR):?\\s*(.*)", line)
+        if not m or not m.group(2).strip() or skip(m.group(2)) or m.group(2) in seen:
+            continue
+        seen.add(m.group(2))
+        say("WARNING", f"{label}: {m.group(2).strip()}")
 
 def tool_version(tool):
     try:
@@ -127,10 +208,20 @@ def tool_version(tool):
         return f"{tool} (not runnable: {e})"
 
 def read_table(path):
-    # TSV with a header; '#' lines (comments) and blank lines skipped
+    # TSV with a header; '#' lines (comments) and blank lines skipped; no quote processing (a '"' is data)
     with open(path, encoding="utf-8") as f:
         lines = [l for l in f if l.strip() and not l.startswith("#")]
-    return list(csv.DictReader(lines, delimiter="\\t"))
+    return list(csv.DictReader(lines, delimiter="\\t", quoting=csv.QUOTE_NONE))
+
+def write_meta(path, tips, dates, values, extra=None):
+    # augur metadata TSV: strain, date, FIELDS (missing -> '?'), + optional extra column {name: {node: value}}
+    extra = extra or {}
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f, delimiter="\\t", lineterminator="\\n")
+        w.writerow(["strain", "date"] + FIELDS + list(extra))
+        for t in tips:
+            w.writerow([t, dates.get(t, "")] + [values.get(t, {}).get(c) or MISSING for c in FIELDS]
+                       + [col.get(t, MISSING) for col in extra.values()])
 
 def na(v):
     # the NA spellings of the upstream tables -> None (never a value)
@@ -179,18 +270,26 @@ def main():
             roots[r["tip_id"].strip()] = r["strain"].strip()
     is_root = {t: t in roots or (ann.get(t, {}).get("tip_type") == "root_strain") for t in tips}
     samples = [t for t in tips if not is_root[t]]
+    if ANNOT and not ann:
+        say("WARNING", "annotations.tsv is empty: subclade, cluster, season, age group and sex are NA for every tip.")
+    elif ANNOT:
+        no_ann = [t for t in samples if t not in ann]
+        if no_ann:
+            say("WARNING", f"{len(no_ann)} sample tip(s) are missing from annotations.tsv (subclade, cluster, season, age "
+                           f"group and sex stay NA): {', '.join(no_ann[:10])}{' ...' if len(no_ann) > 10 else ''}")
 
     # ---- Metadata (DATE, LOCATION, COUNTRY) and geography (PhyloGeography geo.tsv) -----------------------------------
     meta = {}
     cols = {}
     if META:
-        df = pd.read_csv(META, dtype=str, skipinitialspace=True)
+        # keep_default_na=False: "NA" is a value (COUNTRY NA = Namibia); blanks are handled explicitly by mval()
+        df = pd.read_csv(META, dtype=str, skipinitialspace=True, keep_default_na=False)
         df.columns = [str(c).strip() for c in df.columns]
         id_col = next((c for c in df.columns if c.lower().replace("_", "").replace(" ", "") in ("id", "sampleid")), None)
         if id_col is None:
             raise Fail(f"no sample ID column ('ID', 'Sample_ID' or 'SampleID') in the metadata; columns: {list(df.columns)}")
-        df = df[df[id_col].notna()].copy()
         df[id_col] = df[id_col].astype(str).str.strip()
+        df = df[df[id_col] != ""].copy()
         df = df.drop_duplicates(subset=[id_col], keep="first")    # first row wins, as MetadataMerge / PhyloReport
         for _, row in df.iterrows():
             meta[row[id_col]] = row
@@ -208,7 +307,7 @@ def main():
     geo = {}
     if GEO:
         for r in read_table(GEO):
-            geo[(r["location"], r["country_input"])] = r
+            geo[(r["location"], r["country_input"])] = r     # country_input "" = no COUNTRY ("NA" is Namibia)
 
     no_meta_row = [t for t in samples if META and t not in meta]
     if no_meta_row:
@@ -216,33 +315,6 @@ def main():
                        f"{', '.join(no_meta_row[:10])}{' ...' if len(no_meta_row) > 10 else ''}")
 
     # ---- Dates -------------------------------------------------------------------------------------------------------
-    def augur_date(raw):
-        # -> (augur date string or None, precision). Partial dates stay partial, written as augur's explicit
-        # ambiguity (YYYY-MM-XX / YYYY-XX-XX: TreeTime infers within the range); never completed to a day.
-        m = re.fullmatch(r"(\\d{4})-(\\d{2}|XX)-(\\d{2}|XX)", raw)
-        if m:
-            y, mo, d = m.groups()
-            try:
-                if mo != "XX" and d != "XX":
-                    Date(int(y), int(mo), int(d))
-                    return raw, "day"
-                if mo != "XX" and d == "XX" and 1 <= int(mo) <= 12:
-                    return raw, "month"
-                if mo == "XX" and d == "XX":
-                    return raw, "year"
-            except ValueError:
-                pass
-            return None, None
-        m = re.fullmatch(r"(\\d{4})-(\\d{2})", raw)
-        if m:
-            return (f"{raw}-XX", "month") if 1 <= int(m.group(2)) <= 12 else (None, None)
-        if re.fullmatch(r"\\d{4}", raw):
-            return f"{raw}-XX-XX", "year"
-        d = pd.to_datetime(raw, errors="coerce")      # same parser as PhyloReport's season
-        if pd.isna(d):
-            return None, None
-        return f"{d.year:04d}-{d.month:02d}-{d.day:02d}", "day"
-
     override = {}
     if ROOT_DATES:
         for r in read_table(ROOT_DATES):
@@ -257,7 +329,6 @@ def main():
             override[strain] = (parsed, prec, (r.get("source") or "").strip() or "no source given")
 
     dates, precision = {}, {}
-    unparsed = []
     for t in tips:
         if is_root[t]:
             strain = roots.get(t)
@@ -281,19 +352,15 @@ def main():
             continue
         d, p = augur_date(raw)
         if d is None:
-            unparsed.append(f"{t}={raw}")
+            say("WARNING", f"DATE '{raw}' of {t} is not an ISO date (YYYY, YYYY-MM, YYYY-MM-DD or the XX forms): left undated.")
             continue
         dates[t], precision[t] = d, p
-    if unparsed:
-        say("WARNING", f"{len(unparsed)} DATE value(s) could not be parsed and are left undated: {', '.join(unparsed[:10])}")
     n_prec = {k: sum(1 for t in tips if precision.get(t) == k) for k in ("day", "month", "year")}
     n_dated = n_prec["day"] + n_prec["month"]
     say("INFO", f"{len(tips)} tips: {n_prec['day']} dated to the day, {n_prec['month']} to the month, {n_prec['year']} "
                 f"to the year only, {len(tips) - len(dates)} undated.")
 
     # ---- meta.tsv ----------------------------------------------------------------------------------------------------
-    ANN_FIELDS = ["subclade", "cluster", "season", "age_group", "sex"]
-    GEO_FIELDS = ["region", "country", "division", "location"]
     for c in ANN_FIELDS:
         if ann and c not in ann_cols:
             say("INFO", f"annotations.tsv has no '{c}' column: '{c}' is NA for every tip.")
@@ -309,9 +376,9 @@ def main():
             continue
         city = mval(t, "LOCATION")
         given = mval(t, "COUNTRY")
-        g = geo.get((city or "NA", given or "NA"))
+        g = geo.get((city or "", given or ""))
         if g is None and (city is not None or given is not None):
-            say("WARNING", f"{t}: (LOCATION '{city}', COUNTRY '{given}') is not in geo.tsv: location kept as written, "
+            say("WARNING", f"{t}: (LOCATION '{city or ''}', COUNTRY '{given or ''}') is not in geo.tsv: location kept as written, "
                            "country/division/region NA.")
             values[t].update(location=city, country=None, division=None, region=None)
         elif g is None:
@@ -332,16 +399,10 @@ def main():
     if n_roots:
         say("INFO", f"{n_roots} root strain tip(s) have no geography, season, age group or sex (reference strains, not imputed).")
 
-    columns = ["strain", "date"] + ANN_FIELDS + GEO_FIELDS
-    with open("meta.tsv", "w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f, delimiter="\\t", lineterminator="\\n")
-        w.writerow(columns)
-        for t in tips:
-            w.writerow([t, dates.get(t, "")] + [values[t][c] if values[t][c] is not None else MISSING
-                                                for c in ANN_FIELDS + GEO_FIELDS])
+    write_meta("meta.tsv", tips, dates, values)
 
     # ---- Map points: every value shown at a map level needs a lat_longs row -----------------------------------------
-    cfg = json.load(open(CONFIG, encoding="utf-8"))
+    cfg = load_json(CONFIG)
     ll = set()
     if LATLONGS:
         with open(LATLONGS, encoding="utf-8") as f:
@@ -410,19 +471,34 @@ def main():
                   "--timetree", "--keep-root", "--keep-polytomies", "--date-inference", "marginal", "--date-confidence",
                   "--coalescent", "opt", "--clock-rate", repr(clock), "--clock-std-dev", repr(clock / 5),
                   "--divergence-units", "mutations-per-site", "--seed", "1",
-                  "--output-tree", "refined.nwk", "--output-node-data", "branch_lengths.json"], "refine.log")
+                  "--output-tree", "refined.nwk", "--output-node-data", "branch_lengths.json"], "refine_timetree.log")
+        forward_warnings("refine_timetree.log", "augur refine --timetree")
         if rc == 0:
             mode = "timetree"
         else:
-            why_no_time = f"augur refine --timetree failed (exit {rc}: {tail('refine.log', 3)}): divergence-only tree"
+            # "augur refine --timetree failed" (the status reason) is what PHYLOGENETICS reports in tree_problems: unlike
+            # "no dates"/"no rate", a crash is unexpected (plan M5, Phase 6)
+            why_no_time = (f"augur refine --timetree failed (exit {rc}{', timed out' if rc == 124 else ''}: "
+                           f"{tail('refine_timetree.log', 3)}): divergence-only tree")
     if mode != "timetree":
         say("WARNING", why_no_time)
         rc = run(["augur", "refine", "--tree", TREE, "--metadata", "meta.tsv", "--keep-root", "--keep-polytomies",
                   "--divergence-units", "mutations-per-site",
-                  "--output-tree", "refined.nwk", "--output-node-data", "branch_lengths.json"], "refine.log")
+                  "--output-tree", "refined.nwk", "--output-node-data", "branch_lengths.json"], "refine_divergence.log")
+        forward_warnings("refine_divergence.log", "augur refine")
         if rc != 0:
-            raise Fail(f"augur refine (divergence only) failed, exit {rc}: {tail('refine.log')}")
+            raise Fail(f"augur refine (divergence only) failed, exit {rc}: {tail('refine_divergence.log')}")
     status["mode"] = mode
+    status["reason"] = why_no_time or ""
+    if mode == "timetree":
+        # H3 (Phase 6, verified): TreeTime gives an undated tip an inferred date and augur exports it as num_date with
+        # "inferred": true. It is kept (Auspice positions every node of the time tree by num_date; a tip without it has
+        # no place in that layout) and Auspice shows it as "Inferred collection date"; it is never a sampling date.
+        undated = [t for t in tips if t not in dates]
+        if undated:
+            say("WARNING", f"{len(undated)} tip(s) without a date are placed at a TreeTime-inferred date in the time tree "
+                           "(num_date.inferred=true, shown as 'Inferred collection date' in Auspice; not a sampling date): "
+                           f"{', '.join(undated[:10])}{' ...' if len(undated) > 10 else ''}")
 
     # D6: accept only a pure coarsening of the input tree (TreeTime collapses zero-length branches)
     refined = Phylo.read("refined.nwk", "newick")
@@ -461,7 +537,7 @@ def main():
                     "reconstructed nucleotide changes (D6: pure coarsening; shown as polytomies in Auspice).")
     else:
         say("INFO", "augur refine kept every internal node of the input tree.")
-    bl = json.load(open("branch_lengths.json"))["nodes"]
+    bl = load_json("branch_lengths.json")["nodes"]
     if mode == "timetree":
         root = refined.root.name
         def when(n):
@@ -483,22 +559,28 @@ def main():
     if lacking:
         raise Fail(f"nodes of the refined tree without a nucleotide sequence: {', '.join(lacking[:10])}")
     L = len(next(iter(observed.values())))
-    def diffs(a, b, keep):
-        return [f"{x}{i}{y}" for i, (x, y) in enumerate(zip(a, b), start=1) if x != y and keep(x) and keep(y)]
     nodes_nt = {refined.root.name: {"muts": []}}
-    for p, c in edges:
-        nodes_nt[c] = {"muts": diffs(nt[p], nt[c], lambda s: s in NT_OK)}
+    try:
+        for p, c in edges:
+            nodes_nt[c] = {"muts": diffs(nt[p], nt[c], lambda s: s in NT_OK, f"nucleotides {p} -> {c}")}
+    except ValueError as e:
+        raise Fail(str(e))
 
     seg_start = {r["segment"]: int(r["start"]) for r in read_table(SEGMENTS)}
-    gene_cols, unmapped = {}, {}
+    gene_cols, unmapped, other_segment = {}, {}, 0
     for r in read_table(GENE_MAP):
         if r["segment"] not in seg_start:
+            other_segment += 1
             continue
         if r["ref_aa"] == "?":
             unmapped[r["gene"]] = unmapped.get(r["gene"], 0) + 1
             continue
         base = seg_start[r["segment"]] - 1          # 1-based alignment column = segment start - 1 + segment nt
         gene_cols.setdefault(r["gene"], []).extend(base + int(r[k]) for k in ("nt1", "nt2", "nt3"))
+    if other_segment:
+        say("INFO", f"{other_segment} gene_map.tsv row(s) of segment(s) not in this tree skipped (not in the annotation).")
+    for gene, n in sorted(unmapped.items()):
+        say("INFO", f"{gene}: {n} codon(s) without a reference mapping (ref_aa '?') are left out of the annotation.")
     annotations = {"nuc": {"start": 1, "end": L, "strand": "+", "type": "source"}}
     for gene, pos in gene_cols.items():
         runs, s = [], pos[0]
@@ -523,6 +605,8 @@ def main():
             say("WARNING", f"ancestral_aa/{gene}.fasta has no coordinates in gene_map.tsv: its mutations are not exported.")
             continue
         aa = {r.id: str(r.seq).upper() for r in SeqIO.parse(fa, "fasta")}
+        if not aa:
+            continue           # empty FASTA: reported with the missing ones below
         lacking = [n for n in nodes_nt if n not in aa]
         if lacking:
             raise Fail(f"ancestral_aa/{gene}.fasta lacks node(s) {', '.join(lacking[:10])}")
@@ -530,10 +614,16 @@ def main():
         if len(aa[refined.root.name]) != ncod:
             say("WARNING", f"{gene}: protein length {len(aa[refined.root.name])} != {ncod} codons in gene_map.tsv.")
         aa_nodes[refined.root.name]["aa_muts"][gene] = []
-        for p, c in edges:
-            aa_nodes[c]["aa_muts"][gene] = diffs(aa[p], aa[c], lambda s: s not in AA_SKIP)
+        try:
+            for p, c in edges:
+                aa_nodes[c]["aa_muts"][gene] = diffs(aa[p], aa[c], lambda s: s not in AA_SKIP, f"{gene} {p} -> {c}")
+        except ValueError as e:
+            raise Fail(str(e))
         aa_ref[gene] = aa[refined.root.name]
         genes_done.append(gene)
+    no_aa = [g for g in annotations if g != "nuc" and g not in genes_done]
+    if no_aa:
+        say("WARNING", f"annotated gene(s) with no or empty ancestral_aa FASTA (no aa mutations exported): {', '.join(no_aa)}")
     generated_by = {}
     try:
         from packaging.version import Version
@@ -542,10 +632,8 @@ def main():
     except Exception:
         say("WARNING", f"FluTyper version '{FLUTYPER_VERSION}' is not a PEP 440 version (augur export rejects it): "
                        "node-data written without generated_by.")
-    json.dump({**generated_by, "nodes": nodes_nt, "reference": {"nuc": nt[refined.root.name]}},
-              open("nt_muts.json", "w"), indent=1)
-    json.dump({**generated_by, "annotations": annotations, "nodes": aa_nodes, "reference": aa_ref},
-              open("aa_muts.json", "w"), indent=1)
+    dump_json({**generated_by, "nodes": nodes_nt, "reference": {"nuc": nt[refined.root.name]}}, "nt_muts.json")
+    dump_json({**generated_by, "annotations": annotations, "nodes": aa_nodes, "reference": aa_ref}, "aa_muts.json")
     n_nt = sum(len(v["muts"]) for v in nodes_nt.values())
     n_aa = sum(len(m) for v in aa_nodes.values() for m in v["aa_muts"].values())
     say("INFO", f"branch mutations from FluTyper's parsimony reconstruction on the refined tree: {n_nt} nt, {n_aa} aa "
@@ -554,10 +642,12 @@ def main():
     # ---- DTA: augur traits (D10, D13) --------------------------------------------------------------------------------
     node_data = ["branch_lengths.json", "nt_muts.json", "aa_muts.json"]
     wanted = [c.strip() for c in TRAITS.split(",") if c.strip()]
+    if not wanted:
+        say("INFO", "no ancestral-state reconstruction (--auspiceTraits none).")
     usable = []
     for c in wanted:
-        if c not in ANN_FIELDS + GEO_FIELDS:
-            say("WARNING", f"trait '{c}' is not a metadata column of the dataset ({', '.join(ANN_FIELDS + GEO_FIELDS)}): skipped.")
+        if c not in FIELDS:
+            say("WARNING", f"trait '{c}' is not a metadata column of the dataset ({', '.join(FIELDS)}): skipped.")
         elif not any(values[t][c] is not None for t in tips):
             say("WARNING", f"trait '{c}': no tip has a value: no ancestral-state reconstruction.")
         else:
@@ -565,11 +655,12 @@ def main():
     if usable:
         rc = run(["augur", "traits", "--tree", "refined.nwk", "--metadata", "meta.tsv", "--columns", *usable,
                   "--confidence", "--output-node-data", "traits_raw.json"], "traits.log")   # + mugration model files
+        forward_warnings("traits.log", "augur traits")
         if rc != 0:
             say("WARNING", f"augur traits failed (exit {rc}: {tail('traits.log', 3)}): exported without inferred "
                            "ancestral states (no transmission lines on the map); tips keep their metadata.")
         else:
-            d = json.load(open("traits_raw.json"))
+            d = load_json("traits_raw.json")
             n_strip = 0
             for c in usable:
                 for t in tips:
@@ -578,45 +669,51 @@ def main():
                         for k in [k for k in node if k == c or k.startswith(c + "_")]:
                             del node[k]
                             n_strip += 1
-            json.dump(d, open("traits.json", "w"), indent=1)
+            dump_json(d, "traits.json")
             node_data.append("traits.json")
             say("INFO", f"ancestral {', '.join(usable)} by DTA (augur traits --confidence; exploratory: sampling-biased); "
                         f"{n_strip} state(s) augur imputed to tips with a missing value were removed (never impute).")
 
     # ---- Bootstrap support (D18): hover attribute on every surviving internal node, label when >= threshold -------
-    support = {}
+    def examples(xs):
+        return ", ".join(xs[:10]) + (" ..." if len(xs) > 10 else "")
+    support, dups = {}, []
     for r in read_table(SUPPORT):
-        v = na(r.get("support"))
+        n, v = (r.get("node") or "").strip(), na(r.get("support"))
+        if n in support or n in dups:
+            dups.append(n)             # the first row is used
+            continue
         if v is not None:
-            support[r["node"].strip()] = v
+            support[n] = v
+    if dups:
+        say("WARNING", f"support.tsv: {len(dups)} duplicated node row(s) ({examples(dups)}): the first row is used.")
+    unknown = [n for n in support if n not in out_clades and n not in removed]
+    if unknown:
+        say("WARNING", f"support.tsv: {len(unknown)} row(s) name no node of this tree ({examples(unknown)}): ignored.")
     kept = {n: v for n, v in support.items() if n in out_clades}
     dropped = [n for n in support if n in removed]
     labels, odd = {}, []
     for n, v in kept.items():
         try:
-            if float(v) >= MIN_SUPPORT:
-                labels[n] = {"labels": {"support": v}}
+            x = float(v)
         except ValueError:
+            x = float("nan")
+        if not math.isfinite(x):
             odd.append(f"{n}={v}")
+        elif x >= MIN_SUPPORT:
+            labels[n] = {"labels": {"support": v}}
     if odd:
-        say("WARNING", f"{len(odd)} support value(s) are not numbers (shown on hover, never labelled): {', '.join(odd[:10])}")
+        say("WARNING", f"{len(odd)} support value(s) are not finite numbers (shown on hover, never labelled): {examples(odd)}")
     say("INFO", f"bootstrap support: {len(kept)} internal node(s) carry a value; {len(labels)} labelled (>= {MIN_SUPPORT:g}"
                 f"{', --minSupportLabel 0 labels every value' if MIN_SUPPORT <= 0 else ''}); no branch is removed for low support.")
     if dropped:
         say("INFO", f"{len(dropped)} support value(s) belonged to zero-length branches collapsed by augur refine (D6): not shown.")
     if labels:     # no labels (e.g. --bootstrap 0): no node-data file, which augur would only warn about as empty
-        json.dump({**generated_by, "nodes": {}, "branches": labels}, open("support.json", "w"), indent=1)
+        dump_json({**generated_by, "nodes": {}, "branches": labels}, "support.json")
         node_data.append("support.json")
     # export-only metadata: meta.tsv + a 'support' column, with rows for the internal nodes (augur export matches
     # metadata rows by node name); refine and traits never see these rows
-    with open("meta_export.tsv", "w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f, delimiter="\\t", lineterminator="\\n")
-        w.writerow(columns + ["support"])
-        for t in tips:
-            w.writerow([t, dates.get(t, "")] + [values[t][c] if values[t][c] is not None else MISSING
-                                                for c in ANN_FIELDS + GEO_FIELDS] + [MISSING])
-        for n, v in kept.items():
-            w.writerow([n, ""] + [MISSING] * len(ANN_FIELDS + GEO_FIELDS) + [v])
+    write_meta("meta_export.tsv", tips + list(kept), dates, values, extra={"support": kept})
 
     # ---- Dataset config: mode and ordinal legends --------------------------------------------------------------------
     cfg["title"] = f"{cfg.get('title', 'FluTyper')}: {label}"
@@ -629,15 +726,6 @@ def main():
         if dd.get("color_by") == "num_date":
             dd.pop("color_by")
         cfg["filters"] = [f for f in cfg.get("filters", []) if f != "num_date"]
-    def age_key(v):
-        m = re.fullmatch(r"\\s*(\\d+(?:\\.\\d+)?)\\s*(?:-\\s*\\d+(?:\\.\\d+)?|\\+)\\s*", v)
-        if m:
-            return (0, float(m.group(1)), v)
-        m = re.fullmatch(r"\\s*(>=?|<=?)\\s*(\\d+(?:\\.\\d+)?)\\s*", v)
-        if m:
-            x = float(m.group(2))
-            return (0, {">": x + 0.5, ">=": x, "<": -1.0, "<=": -1.0}[m.group(1)], v)
-        return (1, 0.0, v)          # not an age range: after the ranges, alphabetically
     for c in cfg.get("colorings", []):
         if c.get("key") not in ("age_group", "season") or "scale" in c or "legend" in c:
             continue
@@ -653,7 +741,7 @@ def main():
         idx = [round(i * (len(ORDINAL_COLOURS) - 1) / (n - 1)) if n > 1 else 0 for i in range(n)]
         c["scale"] = [[v, ORDINAL_COLOURS[i]] for v, i in zip(present, idx)]
         c["legend"] = [{"value": v} for v in present]
-    json.dump(cfg, open("dataset_config.json", "w"), indent=1)
+    dump_json(cfg, "dataset_config.json")
 
     # ---- augur export v2 + validate ----------------------------------------------------------------------------------
     cmd = ["augur", "export", "v2", "--tree", "refined.nwk", "--metadata", "meta_export.tsv", "--node-data", *node_data,
@@ -663,27 +751,23 @@ def main():
     rc = run(cmd, "export.log")
     if rc != 0:
         raise Fail(f"augur export v2 failed, exit {rc}: {tail('export.log')}")
-    js = json.load(open("unvalidated.json"))
+    js = load_json("unvalidated.json")
     exported = {c["key"] for c in js["meta"].get("colorings", [])}
     absent = {c["key"] for c in cfg.get("colorings", []) if c["key"] not in exported}   # WARNed once, below
-    for line in open("export.log", errors="replace"):
-        m = re.match(r"\\s*(WARNING|ERROR):?\\s*(.*)", line)
-        if not m:
-            continue
-        # augur's two messages about a value without coordinates duplicate our own WARNING above: skip exactly those
-        dup = re.search(r"(\\w+)->(.+?) did not have an associated lat/long", m.group(2))
-        if dup and (dup.group(1).lower(), dup.group(2).strip().lower()) in no_coords:
-            continue
-        dup = re.search(r'"(.+?)", a value of the geographic resolution "(\\w+)", appears in the tree but not in the metadata', m.group(2))
-        if dup and (dup.group(2).lower(), dup.group(1).strip().lower()) in no_coords:
-            continue
-        # augur's messages about a colouring/filter with no value duplicate our "colouring ... is not in the dataset"
-        dup = (re.search(r"color-by field '(\\w+)' does not exist", m.group(2))
-               or re.search(r'filter "(\\w+)" does not appear as a property', m.group(2)))
-        if dup and dup.group(1) in absent:
-            continue
-        say("WARNING", f"augur export: {m.group(2).strip()}")
+    def duplicate(msg):
+        # augur's messages that repeat a WARNING this process already gave: a value without coordinates (two messages)
+        # and a colouring/filter with no value (reported once below, "colouring ... is not in the dataset")
+        m = re.search(r"(\\w+)->(.+?) did not have an associated lat/long", msg)
+        if m and (m.group(1).lower(), m.group(2).strip().lower()) in no_coords:
+            return True
+        m = re.search(r'"(.+?)", a value of the geographic resolution "(\\w+)", appears in the tree but not in the metadata', msg)
+        if m and (m.group(2).lower(), m.group(1).strip().lower()) in no_coords:
+            return True
+        m = re.search(r"color-by field '(\\w+)' does not exist", msg) or re.search(r'filter "(\\w+)" does not appear as a property', msg)
+        return bool(m and m.group(1) in absent)
+    forward_warnings("export.log", "augur export", skip=duplicate)
     rc = run(["augur", "validate", "export-v2", "unvalidated.json"], "validate.log")
+    forward_warnings("validate.log", "augur validate", skip=duplicate)
     if rc != 0:
         raise Fail(f"augur validate export-v2 rejected the dataset: {tail('validate.log')}")
     out_tips = []
@@ -702,7 +786,7 @@ def main():
     os.replace("unvalidated.json", dataset)
     say("INFO", f"augur validate export-v2: {dataset} is valid ({len(out_tips)} tips, "
                 f"{'time tree' if mode == 'timetree' else 'divergence-only tree'}).")
-    status.update(status="ok", reason="")
+    status["status"] = "ok"    # reason: why_no_time for a divergence-only tree (plan M5), empty otherwise
 
 
 try:
