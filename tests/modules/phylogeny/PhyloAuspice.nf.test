@@ -119,6 +119,13 @@ nextflow_process {
             assert log.contains("REF_A_Darwin_6_2021 (A/Darwin/6/2021): date 2021-XX-XX from the strain name") : log
             assert byName["01816372"].node_attrs.num_date.value > 2024.84 && byName["01816372"].node_attrs.num_date.value < 2024.85
 
+            // D23: no tip carries a collection date augur invented: "inferred" only for a partial metadata date
+            // (root strains YYYY-XX-XX, placed within that year), never without one
+            nodes.findAll { !it.children }.each { n ->
+                def nd = n.node_attrs.num_date
+                assert nd && (!nd.inferred || (nd.raw_value ?: "").contains("XX")) : "${n.name}: ${nd}"
+            }
+
             // No imputation: the unresolved city has its metadata location but no country/region, and the DTA did
             // not give it one (D10: imputed tip states are stripped); internal nodes keep their DTA state
             def atl = byName["198353883"].node_attrs
@@ -306,6 +313,13 @@ nextflow_process {
             def hasDate
             hasDate = { n -> n.node_attrs?.containsKey("num_date") || (n.children ?: []).any { hasDate(it) } }
             assert !hasDate(js.tree)
+            // divergence-only: every tip of the input tree is exported (nothing dropped, no dropped-samples table)
+            def exportedTips = []
+            def walkTips
+            walkTips = { n -> if (n.children) n.children.each { walkTips(it) } else exportedTips << n.name }
+            walkTips(new JsonSlurper().parse(file(process.out.json.get(0)[1])).tree)
+            assert exportedTips.size() == 8 && exportedTips.contains("198353883") : exportedTips
+            assert process.out.dropped.size() == 0
             assert js.meta.colorings.collect { it.key }.containsAll(["subclade", "cluster", "region", "country", "division", "location", "age_group", "sex", "season"])
         }
     }
@@ -349,6 +363,13 @@ nextflow_process {
             assert log =~ /PhyloAuspice: WARNING only 3 tip\(s\) dated to at least the month \(minimum 10\): divergence-only tree/ : log
             assert path(process.out.status.get(0)[2]).readLines()[1].split("\t")[2] == "divergence"
             assert process.out.json.size() == 1
+            // divergence-only: every tip of the input tree is exported (nothing dropped, no dropped-samples table)
+            def exportedTips = []
+            def walkTips
+            walkTips = { n -> if (n.children) n.children.each { walkTips(it) } else exportedTips << n.name }
+            walkTips(new JsonSlurper().parse(file(process.out.json.get(0)[1])).tree)
+            assert exportedTips.size() == 8 && exportedTips.contains("198353883") : exportedTips
+            assert process.out.dropped.size() == 0
             // M5: a divergence-only row carries its reason in the status
             assert path(process.out.status.get(0)[2]).readLines()[1].split("\t")[4].contains("only 3 tip(s) dated") 
             // M1/L5: support rows that match no node, duplicates and non-finite values are reported, never silently dropped
@@ -409,7 +430,7 @@ nextflow_process {
         }
     }
 
-    test("Root strain dates: YYYY-XX-XX from the name's 4-digit year, no date + WARNING without one, an override row wins") {
+    test("Root strain dates: YYYY-XX-XX from the name's 4-digit year, an override row wins (time tree)") {
 
         when {
             process {
@@ -431,7 +452,7 @@ nextflow_process {
                 input[3] = file("${projectDir}/tests/data/phylo/auspice/metadata_auspice.csv", checkIfExists: true)
                 input[4] = file("${projectDir}/RESOURCES/auspice_config.json", checkIfExists: true)
                 input[5] = file("${projectDir}/RESOURCES/auspice_clock_rates.tsv", checkIfExists: true)
-                input[6] = file("${projectDir}/tests/data/phylo/auspice/root_strains_noyear.tsv", checkIfExists: true)
+                input[6] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
                 input[7] = file("${projectDir}/tests/data/phylo/auspice/root_strain_dates_override.tsv", checkIfExists: true)
                 input[8] = 3
                 input[9] = "country,region"
@@ -447,7 +468,6 @@ nextflow_process {
             def log = path(process.out.step_log.get(0)[1]).text
             assert log.contains("REF_A_Darwin_6_2021 (A/Darwin/6/2021): date 2021-XX-XX from the strain name") : log
             assert log.contains("REF_A_Sydney_1359_2024 (A/Sydney/1359/2024): date 2024-03-15 from") : log
-            assert log =~ /PhyloAuspice: WARNING root strain REF_A_Massachusetts_18_2022 \(A\/Massachusetts\/18\/22\): the last '\/' field is not a 4-digit year: left undated/ : log
             def js = new JsonSlurper().parse(file(process.out.json.get(0)[1]))
             def nodes = []
             def walk
@@ -458,11 +478,7 @@ nextflow_process {
             assert Math.abs(byName["REF_A_Sydney_1359_2024"].node_attrs.num_date.value - 2024.2036) < 0.001
             def darwin = byName["REF_A_Darwin_6_2021"].node_attrs.num_date
             assert darwin.confidence[0] >= 2021.0 && darwin.confidence[1] <= 2022.0
-            // H3: the undated tip keeps TreeTime's inferred date (Auspice's time layout positions every node by num_date)
-            // but it is flagged as inferred ("Inferred collection date" in Auspice) and logged, never shown as a sampling date
-            def mass = byName["REF_A_Massachusetts_18_2022"].node_attrs.num_date
-            assert mass.inferred == true && !mass.containsKey("raw_value") : mass
-            assert log =~ /PhyloAuspice: WARNING 1 tip\(s\) without a date are placed at a TreeTime-inferred date in the time tree.*REF_A_Massachusetts_18_2022/ : log
+            assert path(process.out.status.get(0)[2]).readLines()[1].split("\t")[2] == "timetree"
         }
     }
 
@@ -707,6 +723,190 @@ nextflow_process {
             assert log.contains("PhyloAuspice: WARNING 1 sample tip(s) are missing from annotations.tsv (subclade, cluster, season, age group and sex stay NA): 198353883") : log
             assert status[1] == "ok" && status[2] == "divergence"
             assert log.contains("augur validate export-v2: flutyper_h3n2_ha.json is valid") : log
+
+        }
+    }
+
+    test("D23: an undated sample is left out of the time tree before refine (logged + TSV); a year-only sample is kept; mutations are recomputed on the pruned tree; no inferred dates") {
+
+        when {
+            process {
+                """
+                input[0] = tuple(
+                    "H3N2_HA",
+                    "HA",
+                    file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_alignment.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_ancestral_nt.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_ancestral_aa", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_segments.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_gene_map.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/annotations.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true)
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/auspice/geo.tsv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/auspice/lat_longs.tsv", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/auspice/metadata_undated.csv", checkIfExists: true)
+                input[4] = file("${projectDir}/RESOURCES/auspice_config.json", checkIfExists: true)
+                input[5] = file("${projectDir}/RESOURCES/auspice_clock_rates.tsv", checkIfExists: true)
+                input[6] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
+                input[7] = []
+                input[8] = 1
+                input[9] = "country,region"
+                input[10] = "1.1.0"
+                input[11] = 70
+                input[12] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def log = path(process.out.step_log.get(0)[1]).text
+            def status = path(process.out.status.get(0)[2]).readLines()[1].split("\t", -1)
+            def js = new JsonSlurper().parse(file(process.out.json.get(0)[1]))
+            def byName = [:]
+            def parentOf = [:]
+            def walk
+            walk = { n -> byName[n.name] = n; (n.children ?: []).each { c -> parentOf[c.name] = n.name; walk(c) } }
+            walk(js.tree)
+            def tips = byName.values().findAll { !it.children }.collect { it.name }
+            // time tree without 198353883 (no DATE); 01818936 (DATE 2024 = 2024-XX-XX) is kept, placed within 2024
+            assert status[1] == "ok" && status[2] == "timetree" : status
+            assert status[4].contains("1 undated sample(s) left out of the time tree") : status
+            assert tips.size() == 7 && !tips.contains("198353883") && tips.contains("01818936") : tips
+            def d = byName["01818936"].node_attrs.num_date
+            assert d.raw_value == "2024-XX-XX" && d.confidence[0] >= 2024.0 && d.confidence[1] <= 2025.0 : d
+            assert log.contains("PhyloAuspice: WARNING 1 undated sample(s) left out of the time tree (no usable DATE; partial dates such as YYYY-XX-XX are kept): 198353883") : log
+            assert log.contains("auspice_dropped_undated.tsv") : log
+            def dropped = path(process.out.dropped.get(0)[1]).readLines()
+            assert dropped == ["tip\treason", "198353883\tno DATE"] : dropped
+            // NODE_0000010 only joined 01816372 and 198353883: it is gone, 01816372 hangs from the surviving ancestor
+            assert !byName.containsKey("NODE_0000010")
+            assert log.contains("pruning removed 1 internal node(s) left with a single child (NODE_0000010)") : log
+            // branch mutations on the pruned tree = parent -> child differences of FluTyper's own sequences
+            def fasta = { p ->
+                def seqs = [:]; def name = null
+                path(p).readLines().each { l -> if (l.startsWith(">")) { name = l.substring(1).trim(); seqs[name] = "" } else seqs[name] += l.trim().toUpperCase() }
+                seqs
+            }
+            def seq = fasta("${projectDir}/tests/data/phylo/auspice/ha_ancestral_nt.fasta") + fasta("${projectDir}/tests/data/phylo/auspice/ha_alignment.fasta")
+            def parent = parentOf["01816372"]
+            def expected = []
+            def a = seq[parent], b = seq["01816372"]
+            (0..<a.length()).each { i -> if (a[i] != b[i] && "ACGT".contains(a[i]) && "ACGT".contains(b[i])) expected << "${a[i]}${i + 1}${b[i]}".toString() }
+            assert expected.size() > 0
+            assert byName["01816372"].branch_attrs.mutations.nuc == expected : "${parent} -> 01816372"
+            // no tip has a collection date augur invented
+            byName.values().findAll { !it.children }.each { n ->
+                def nd = n.node_attrs.num_date
+                assert nd && (!nd.inferred || (nd.raw_value ?: "").contains("XX")) : "${n.name}: ${nd}"
+            }
+
+        }
+    }
+
+    test("D23: a root strain without a date is never dropped: the tree is exported divergence-only with all tips and a WARNING") {
+
+        when {
+            process {
+                """
+                input[0] = tuple(
+                    "H3N2_HA",
+                    "HA",
+                    file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_alignment.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_ancestral_nt.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_ancestral_aa", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_segments.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_gene_map.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/annotations.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true)
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/auspice/geo.tsv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/auspice/lat_longs.tsv", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/auspice/metadata_undated.csv", checkIfExists: true)
+                input[4] = file("${projectDir}/RESOURCES/auspice_config.json", checkIfExists: true)
+                input[5] = file("${projectDir}/RESOURCES/auspice_clock_rates.tsv", checkIfExists: true)
+                input[6] = file("${projectDir}/tests/data/phylo/auspice/root_strains_noyear.tsv", checkIfExists: true)
+                input[7] = []
+                input[8] = 1
+                input[9] = "country,region"
+                input[10] = "1.1.0"
+                input[11] = 70
+                input[12] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def log = path(process.out.step_log.get(0)[1]).text
+            def status = path(process.out.status.get(0)[2]).readLines()[1].split("\t", -1)
+            def js = new JsonSlurper().parse(file(process.out.json.get(0)[1]))
+            def byName = [:]
+            def parentOf = [:]
+            def walk
+            walk = { n -> byName[n.name] = n; (n.children ?: []).each { c -> parentOf[c.name] = n.name; walk(c) } }
+            walk(js.tree)
+            def tips = byName.values().findAll { !it.children }.collect { it.name }
+            assert status[1] == "ok" && status[2] == "divergence" : status
+            assert status[4].contains("root strain(s) without a date (REF_A_Massachusetts_18_2022)") : status
+            assert log =~ /PhyloAuspice: WARNING root strain\(s\) without a date \(REF_A_Massachusetts_18_2022\).*divergence-only tree with all tips/ : log
+            assert tips.size() == 8 && tips.contains("198353883") : tips
+            assert process.out.dropped.size() == 0
+
+        }
+    }
+
+    test("D23: pruning is not attempted when fewer dated samples than --auspiceMinDatedTips remain: divergence-only with all tips") {
+
+        when {
+            process {
+                """
+                input[0] = tuple(
+                    "H3N2_HA",
+                    "HA",
+                    file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_alignment.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_ancestral_nt.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_ancestral_aa", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_segments.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_gene_map.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/annotations.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true)
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/auspice/geo.tsv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/auspice/lat_longs.tsv", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/auspice/metadata_undated.csv", checkIfExists: true)
+                input[4] = file("${projectDir}/RESOURCES/auspice_config.json", checkIfExists: true)
+                input[5] = file("${projectDir}/RESOURCES/auspice_clock_rates.tsv", checkIfExists: true)
+                input[6] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
+                input[7] = []
+                input[8] = 3
+                input[9] = "country,region"
+                input[10] = "1.1.0"
+                input[11] = 70
+                input[12] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def log = path(process.out.step_log.get(0)[1]).text
+            def status = path(process.out.status.get(0)[2]).readLines()[1].split("\t", -1)
+            def js = new JsonSlurper().parse(file(process.out.json.get(0)[1]))
+            def byName = [:]
+            def parentOf = [:]
+            def walk
+            walk = { n -> byName[n.name] = n; (n.children ?: []).each { c -> parentOf[c.name] = n.name; walk(c) } }
+            walk(js.tree)
+            def tips = byName.values().findAll { !it.children }.collect { it.name }
+            assert status[2] == "divergence" && status[4].contains("only 1 tip(s) dated to at least the month (minimum 3)") : status
+            assert tips.size() == 8 && tips.contains("198353883") : tips
+            assert process.out.dropped.size() == 0
+            assert !log.contains("left out of the time tree") : log
 
         }
     }

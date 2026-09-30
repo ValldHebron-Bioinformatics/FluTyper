@@ -285,6 +285,7 @@ workflow PHYLOGENETICS {
     def auspice_json_ch = channel.empty()
     def auspice_log_parts_ch = channel.empty()
     def auspice_status_ch = channel.value([items: null])   // null = --auspice off (tree_problems/summary skip it)
+    def auspice_dropped_ch = channel.value([n: 0])          // D23: distinct undated samples left out of this subtype's time trees
     if (auspice_on) {
         PhyloAuspice(
             PhyloReport.out.for_auspice,
@@ -317,6 +318,11 @@ workflow PHYLOGENETICS {
             }
             .toList()
             .map { list -> [items: list] }
+        auspice_dropped_ch = PhyloAuspice.out.dropped
+            .flatMap { _tree_id, f -> f.readLines().drop(1).collect { line -> line.split('\t')[0] } }
+            .unique()
+            .count()
+            .map { n -> [n: n] }
     }
 
     // Every phylo step below PhyloAlignment/PhyloSegmentAlignment uses errorStrategy 'ignore': a failed task just
@@ -439,8 +445,8 @@ workflow PHYLOGENETICS {
     // --auspice: one terminal line per subtype, e.g. "AUSPICE(H3N2): 8 datasets -> auspice/ (view: npx auspice@3.0.0 view
     // <outDir>/auspice)", plus the divergence-only and failed counts (failed = status failed, or no status at all)
     if (auspice_on) {
-        report_ok_ids_ch.combine(auspice_status_ch)
-            .map { report_m, auspice_m ->
+        report_ok_ids_ch.combine(auspice_status_ch).combine(auspice_dropped_ch)
+            .map { report_m, auspice_m, dropped_m ->
                 if (!report_m.ids) return ''
                 def items = auspice_m.items.findAll { it.id in report_m.ids }
                 def ok = items.findAll { it.status == 'ok' }
@@ -449,6 +455,7 @@ workflow PHYLOGENETICS {
                 def line = "AUSPICE(${subtype}): ${ok.size()} dataset${ok.size() == 1 ? '' : 's'} -> auspice/ (view: npx auspice@3.0.0 view ${params.outDir}/auspice)"
                 if (divergence) line += "; ${divergence} divergence-only (no time tree, see phylo.log)"
                 if (failed) line += "; ${failed} failed (see pipeline_errors.log)"
+                if (dropped_m.n) line += "; ${dropped_m.n} undated sample(s) left out of the time tree(s) (see phylo.log)"
                 line
             }
             .filter { line -> line }

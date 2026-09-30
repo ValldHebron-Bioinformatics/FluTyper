@@ -13,6 +13,15 @@ process PhyloAuspice {
     //     Root strains have no metadata: their date is YYYY-XX-XX when the last '/' field of the strain name
     //     (root_strains.tsv) is a 4-digit year, else undated with a WARNING; a root_strain_dates.tsv row (sourced
     //     collection date) wins.
+    //     D23 (user decision 2026-09-30): augur never infers a collection date. For a time tree, samples with NO usable
+    //     date (missing, or not an ISO/XX form) are pruned from the tree BEFORE refine, so they cannot influence the
+    //     dating (unary nodes collapsed, surviving nodes keep their names, the D6 check and the branch mutations use the
+    //     pruned tree); partial dates (YYYY-MM-XX, YYYY-XX-XX) are kept: TreeTime only places them within the stated
+    //     range. Root strains are never dropped (the rooting would change): an undated root strain means a
+    //     divergence-only export with all tips, as does a failed time tree or too few dated samples. The dropped samples
+    //     are listed in auspice.log and auspice_dropped_undated.tsv; they stay in the static report, the tree.nwk and the
+    //     support table, only the Auspice time tree omits them. Every exported tip is checked: an inferred date without a
+    //     partial metadata date fails the tree.
     //  2. augur refine --timetree with a fixed clock (D8): the subtype x segment rate of --auspiceClockRates
     //     (nextstrain/seasonal-flu core.smk@a1e704c7; MP/NS generic 0.001 -> WARNING), std-dev = rate/5, no clock
     //     filter; the whole-genome rate is the length-weighted mean of the 8 segment rates (logged). With no rate for
@@ -73,6 +82,7 @@ process PhyloAuspice {
     output:
     tuple val(tree_id), path("flutyper_*.json"), optional: true, emit: json    // only when exported AND validated
     tuple val(tree_id), val(tree_folder), path("auspice_status.tsv"), emit: status  // tree_id status(ok|failed) mode dataset reason
+    tuple val(tree_id), path("auspice_dropped_undated.tsv"), optional: true, emit: dropped   // D23: samples left out of the time tree
     tuple val(tree_id), path("auspice.log"), emit: step_log   // this step's messages, collected into the tree's phylo.log
 
     script:
@@ -149,6 +159,15 @@ def diffs(a, b, keep, what):
     if len(a) != len(b):
         raise ValueError(f"{what}: sequences of different length ({len(a)} vs {len(b)})")
     return [f"{x}{i}{y}" for i, (x, y) in enumerate(zip(a, b), start=1) if x != y and keep(x) and keep(y)]
+
+def prune_tips(tree, drop):
+    # D23: remove tips `drop` from a Bio.Phylo tree (in place). Bio.Phylo's prune() splices out a parent left with a
+    # single child: the child keeps its name and inherits the summed branch length. Returns the internal node names
+    # that disappeared. The caller must check the root survived (an emptied root child would re-root the tree).
+    before = {c.name for c in tree.get_nonterminals()}
+    for name in drop:
+        tree.prune(name)
+    return sorted(before - {c.name for c in tree.get_nonterminals()})
 
 def load_json(path):
     with open(path, encoding="utf-8") as f:
@@ -464,10 +483,32 @@ def main():
     if why_no_time is None and n_dated < MIN_DATED:
         why_no_time = (f"only {n_dated} tip(s) dated to at least the month (minimum {MIN_DATED}): divergence-only tree")
 
+    # ---- D23: which samples can be in a time tree -------------------------------------------------------------------
+    undated_roots = [t for t in tips if is_root[t] and t not in dates]
+    if why_no_time is None and undated_roots:
+        why_no_time = (f"root strain(s) without a date ({', '.join(undated_roots)}): divergence-only tree with all tips "
+                       "(root strains are never dropped, the rooting would change; add a sourced root_strain_dates.tsv row)")
+    undated_samples = [t for t in samples if t not in dates]
+    tree_in, aln_in, pruned, gone = TREE, ALN, None, []
+    if why_no_time is None and undated_samples:
+        pruned = Phylo.read(TREE, "newick")
+        gone = prune_tips(pruned, undated_samples)
+        if pruned.root.name != tree.root.name:
+            why_no_time = (f"leaving out the {len(undated_samples)} undated sample(s) would re-root the tree: "
+                           "divergence-only tree with all tips")
+            pruned, gone = None, []
+        else:
+            Phylo.write(pruned, "tree_timetree_input.nwk", "newick", format_branch_length="%.10g")
+            with open("alignment_timetree_input.fasta", "w") as out:
+                for r in SeqIO.parse(ALN, "fasta"):
+                    if r.id not in undated_samples:
+                        out.write(f">{r.id}\\n{r.seq}\\n")
+            tree_in, aln_in = "tree_timetree_input.nwk", "alignment_timetree_input.fasta"
+
     # ---- augur refine (D2, D6, D8) -----------------------------------------------------------------------------------
     mode = "divergence"
     if why_no_time is None:
-        rc = run(["augur", "refine", "--tree", TREE, "--alignment", ALN, "--metadata", "meta.tsv",
+        rc = run(["augur", "refine", "--tree", tree_in, "--alignment", aln_in, "--metadata", "meta.tsv",
                   "--timetree", "--keep-root", "--keep-polytomies", "--date-inference", "marginal", "--date-confidence",
                   "--coalescent", "opt", "--clock-rate", repr(clock), "--clock-std-dev", repr(clock / 5),
                   "--divergence-units", "mutations-per-site", "--seed", "1",
@@ -475,6 +516,28 @@ def main():
         forward_warnings("refine_timetree.log", "augur refine --timetree")
         if rc == 0:
             mode = "timetree"
+            if pruned is not None:
+                # from here on, the tree is the pruned one: D6 check, mutations, meta, traits, export and tip checks
+                tree = pruned
+                internal = [c.name for c in tree.get_nonterminals()]
+                tips = [t.name for t in tree.get_terminals()]
+                samples = [t for t in tips if not is_root[t]]
+                write_meta("meta.tsv", tips, dates, values)
+                with open("auspice_dropped_undated.tsv", "w", newline="", encoding="utf-8") as f:
+                    w = csv.writer(f, delimiter="\\t", lineterminator="\\n")
+                    w.writerow(["tip", "reason"])
+                    for t in undated_samples:
+                        raw = mval(t, "DATE")
+                        w.writerow([t, f"DATE '{raw}' is not an ISO date" if raw else "no DATE"])
+                say("WARNING", f"{len(undated_samples)} undated sample(s) left out of the time tree (no usable DATE; partial "
+                               f"dates such as YYYY-XX-XX are kept): {', '.join(undated_samples[:10])}"
+                               f"{f' and {len(undated_samples) - 10} more' if len(undated_samples) > 10 else ''} (full list: "
+                               "auspice_dropped_undated.tsv in the task folder). They stay in the static report, tree.nwk "
+                               "and the support table; only the Auspice time tree omits them (D23).")
+                if gone:
+                    say("INFO", f"pruning removed {len(gone)} internal node(s) left with a single child "
+                                f"({', '.join(gone[:10])}{' ...' if len(gone) > 10 else ''}); their child keeps its name and "
+                                "the summed branch length.")
         else:
             # "augur refine --timetree failed" (the status reason) is what PHYLOGENETICS reports in tree_problems: unlike
             # "no dates"/"no rate", a crash is unexpected (plan M5, Phase 6)
@@ -489,16 +552,10 @@ def main():
         if rc != 0:
             raise Fail(f"augur refine (divergence only) failed, exit {rc}: {tail('refine_divergence.log')}")
     status["mode"] = mode
-    status["reason"] = why_no_time or ""
-    if mode == "timetree":
-        # H3 (Phase 6, verified): TreeTime gives an undated tip an inferred date and augur exports it as num_date with
-        # "inferred": true. It is kept (Auspice positions every node of the time tree by num_date; a tip without it has
-        # no place in that layout) and Auspice shows it as "Inferred collection date"; it is never a sampling date.
-        undated = [t for t in tips if t not in dates]
-        if undated:
-            say("WARNING", f"{len(undated)} tip(s) without a date are placed at a TreeTime-inferred date in the time tree "
-                           "(num_date.inferred=true, shown as 'Inferred collection date' in Auspice; not a sampling date): "
-                           f"{', '.join(undated[:10])}{' ...' if len(undated) > 10 else ''}")
+    if mode == "timetree" and pruned is not None:
+        status["reason"] = f"{len(undated_samples)} undated sample(s) left out of the time tree (auspice_dropped_undated.tsv)"
+    else:
+        status["reason"] = why_no_time or ""
 
     # D6: accept only a pure coarsening of the input tree (TreeTime collapses zero-length branches)
     refined = Phylo.read("refined.nwk", "newick")
@@ -687,7 +744,11 @@ def main():
             support[n] = v
     if dups:
         say("WARNING", f"support.tsv: {len(dups)} duplicated node row(s) ({examples(dups)}): the first row is used.")
-    unknown = [n for n in support if n not in out_clades and n not in removed]
+    pruned_away = [n for n in support if n in gone and mode == "timetree"]
+    if pruned_away:
+        say("INFO", f"support.tsv: {len(pruned_away)} value(s) belong to node(s) removed with the undated samples "
+                    f"({examples(pruned_away)}): not shown.")
+    unknown = [n for n in support if n not in out_clades and n not in removed and n not in pruned_away]
     if unknown:
         say("WARNING", f"support.tsv: {len(unknown)} row(s) name no node of this tree ({examples(unknown)}): ignored.")
     kept = {n: v for n, v in support.items() if n in out_clades}
@@ -780,6 +841,24 @@ def main():
     walk(js["tree"])
     if sorted(out_tips) != sorted(tips):
         raise Fail(f"the exported tree's tips differ from the input tree's ({len(out_tips)} vs {len(tips)})")
+    # D23, permanent: no tip may carry a collection date augur invented. "inferred" is only allowed for a partial
+    # metadata date (YYYY-MM-XX / YYYY-XX-XX, placed within that range), never for a tip without one.
+    invented = []
+    def tip_dates(n):
+        if n.get("children"):
+            for ch in n["children"]:
+                tip_dates(ch)
+            return
+        nd = n.get("node_attrs", {}).get("num_date")
+        if isinstance(nd, dict) and nd.get("inferred") and "XX" not in str(nd.get("raw_value", "")):
+            invented.append(n["name"])
+        b = bl.get(n["name"], {})
+        if b.get("date_inferred") and "XX" not in str(b.get("raw_date", "")):
+            invented.append(n["name"])
+    tip_dates(js["tree"])
+    if invented:
+        raise Fail(f"tip(s) with an inferred collection date and no partial metadata date: {', '.join(sorted(set(invented))[:10])} "
+                   "(D23: augur must never infer a sampling date)")
     for c in cfg.get("colorings", []):
         if c["key"] in absent:
             say("WARNING", f"colouring '{c['key']}' is not in the dataset (no node has a value).")
