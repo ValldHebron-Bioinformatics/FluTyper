@@ -1,0 +1,100 @@
+MARKER_ID,POSITION,AA,EFFECT,FOUND_IN,REFERENCE
+1,110,F,NI/RI Oseltamivir | RI Zanamivir,H1N1,Huang et al. 2018 | Lackenby et al. 2018
+2,117,R,NI Oseltamivir | RI Zanamivir,H1N1,Gubareva et al. 2017
+3,119,A,NI/RI Oseltamivir | RI Zanamivir | NI/RI Peramivir | RI Laninamivir,H1N1,Samson et al. 2014 | Baek et al. 2015
+4,119,D,RI Oseltamivir | HRI Zanamivir | HRI Peramivir | HRI Laninamivir,H1N1,Baek et al. 2015 | L'Huillier et al. 2015 | Lloren et al. 2019
+5,119,G,NI Oseltamivir | HRI Zanamivir | HRI Peramivir | HRI Laninamivir,H1N1,Baek et al. 2015 | Lloren et al. 2019 | Pizzorno et al. 2011 | Tamura et al. 2015
+6,119,V,RI Oseltamivir | HRI Zanamivir | RI Peramivir,H1N1,Pizzorno et al. 2011
+7,136,K,NI Oseltamivir | HRI Zanamivir | HRI Peramivir | RI Laninamivir,H1N1,Samson et al. 2014 | Kaminski et al. 2013 | Pizzorno et al. 2013
+8,136,R,NI Oseltamivir | HRI Zanamivir | HRI Peramivir | RI Laninamivir,H1N1,Meijer et al. 2014
+9,152,K,RI Oseltamivir | NI/RI Zanamivir | NI Peramivir | RI Laninamivir,H1N1,Baek et al. 2015 | Lloren et al. 2019
+10,199,E,RI Oseltamivir | NI Zanamivir | NI Peramivir | NI Laninamivir,H1N1,Lloren et al. 2019 | Takashite et al. 2015
+11,199,G,RI Oseltamivir | NI Zanamivir | NI Peramivir | NI Laninamivir,H1N1,Samson et al. 2014 | Pizorno et al. 2011
+12,199,Y,RI Oseltamivir | RI Zanamivir | NI Peramivir | NI Laninamivir,H1N1,Takashita et al. 2020
+13,223,K,RI Oseltamivir | NI Zanamivir | NI Peramivir | NI Laninamivir,H1N1,Takashita et al. 2015 | Huang et al. 2014 | Nguyen et al. 2010
+14,223,L,RI Oseltamivir | NI Zanamivir | NI Peramivir | NI Laninamivir,H1N1,Govorkova et al. 2022
+15,223,M,RI Oseltamivir | NI Zanamivir | NI Peramivir | NI Laninamivir,H1N1,Govorkova et al. 2022
+16,223,R,RI Oseltamivir | NI/RI Zanamivir | NI/RI Peramivir | NI Laninamivir,H1N1,Takashita et al. 2015 | Huang et al. 2014 | Govorkova et al. 2022 | van der Vries et al. 2010 | Eshaghi et al. 2011 | Pizzorno et al. 2012 | Hurt et al. 2016
+17,223,T,NI/RI Oseltamivir | NI Zanamivir | NI Peramivir | NI Laninamivir,H1N1,Takashita et al. 2015
+18,223,V,NI Oseltamivir | NI Zanamivir | NI Peramivir | NI Laninamivir,H1N1,Samson et al. 2014 | Pizzorno et al. 2011 | Hurt et al. 2011
+19,247,G,RI Oseltamivir | NI Zanamivir | NI Peramivir | NI Laninamivir,H1N1,Takashita et al. 2015
+20,247,N,NI Oseltamivir | NI Zanamivir | NI Peramivir | NI Laninamivir,H1N1,Hurt et al. 2011 | Baz et al. 2009
+21,247,R,RI Oseltamivir | RI Zanamivir | HRI Peramivir | HRI Laninamivir,H1N1,Gubareva et al. 2017
+22,275,Y,HRI Oseltamivir | NI Zanamivir | HRI Peramivir | NI Laninamivir,H1N1,Okomo-Adhiambo et al. 2010 | Nguyen et al. 2010 | Nguyen et al. 2012 | Ikematsu et al. 2012 | Leang et al. 2014 | Takashita et al. 2013 | Takashita et al. 2013 | Okomo-Adhiambo et al. 2013 | Dapat et al. 2013 | Okomo-Adhiambo et al. 2014
+23,293,K,RI Oseltamivir | NI Zanamivir | NI Peramivir,H1N1,Baek et al. 2015 | Tamura et al. 2015
+24,295,S,HRI Oseltamivir | NI Zanamivir | NI/RI Peramivir | NI Laninamivir,H1N1,Samson et al. 2014 | Baek et al. 2015 | Pizzorno et al. 2011 | Meijer et al. 2014
+25,427,T,RI Oseltamivir | RI Zanamivir | NI Peramivir | RI Laninamivir,H1N1,Takashita et al. 2020
+26,436,N,RI Oseltamivir | RI Zanamivir | RI Peramivir | RI Laninamivir,H1N1,Kwon et al. 2018
+27,458,T,HRI Oseltamivir | HRI Zanamivir | HRI Peramivir | HRI Laninamivir,H1N1,Lloren et al. 2019
+28,275,Y,HRI Oseltamivir | RI Zanamivir | HRI Peramivir | RI Laninamivir,H1N1,Kwon et al. 2018
+28,436,N,HRI Oseltamivir | RI Zanamivir | HRI Peramivir | RI Laninamivir,H1N1,Kwon et al. 2018
+29,199,N,HRI Oseltamivir | NI Zanamivir | HRI Peramivir,H1N1,Okomo-Adhiambo et al. 2013 | Ghedin et al. 2011
+29,275,Y,HRI Oseltamivir | NI Zanamivir | HRI Peramivir,H1N1,Okomo-Adhiambo et al. 2013 | Ghedin et al. 2011
+30,147,R,HRI Oseltamivir | NI Zanamivir | HRI Peramivir | NI Laninamivir,H1N1,Gubareva et al. 2017
+30,275,Y,HRI Oseltamivir | NI Zanamivir | HRI Peramivir | NI Laninamivir,H1N1,Gubareva et al. 2017
+31,119,A,HRI Oseltamivir | RI Zanamivir | NI Peramivir,H1N1,Baek et al. 2015
+31,275,Y,HRI Oseltamivir | RI Zanamivir | NI Peramivir,H1N1,Baek et al. 2015
+32,119,D,HRI Oseltamivir | HRI Zanamivir | HRI Peramivir | HRI Laninamivir,H1N1,Baek et al. 2015 | L'Huillier et al. 2015
+32,275,Y,HRI Oseltamivir | HRI Zanamivir | HRI Peramivir | HRI Laninamivir,H1N1,Baek et al. 2015 | L'Huillier et al. 2015
+33,119,G,HRI Oseltamivir | HRI Zanamivir | HRI Peramivir | HRI Laninamivir,H1N1,Baek et al. 2015 | Tamura et al. 2015
+33,275,Y,HRI Oseltamivir | HRI Zanamivir | HRI Peramivir | HRI Laninamivir,H1N1,Baek et al. 2015 | Tamura et al. 2015
+34,223,V,RI Oseltamivir | NI Zanamivir | NI Peramivir | NI Laninamivir,H1N1,Hurt et al. 2011 | Leung et al. 2024
+34,247,N,RI Oseltamivir | NI Zanamivir | NI Peramivir | NI Laninamivir,H1N1,Hurt et al. 2011 | Leung et al. 2024
+35,223,K,HRI Oseltamivir | RI Zanamivir | HRI Peramivir | RI Laninamivir,H1N1,Ikematsu et al. 2012
+35,275,Y,HRI Oseltamivir | RI Zanamivir | HRI Peramivir | RI Laninamivir,H1N1,Ikematsu et al. 2012
+36,223,R,HRI Oseltamivir | RI Zanamivir | HRI Peramivir | RI Laninamivir,H1N1,Nguyen et al. 2010 | Pizzorno et al. 2012 | Ikematsu et al. 2012
+36,275,Y,HRI Oseltamivir | RI Zanamivir | HRI Peramivir | RI Laninamivir,H1N1,Nguyen et al. 2010 | Pizzorno et al. 2012 | Ikematsu et al. 2012
+37,223,V,HRI Oseltamivir | NI Zanamivir | HRI Peramivir,H1N1,Pizzorno et al. 2011 | Centers for Disease C 2009
+37,275,Y,HRI Oseltamivir | NI Zanamivir | HRI Peramivir,H1N1,Pizzorno et al. 2011 | Centers for Disease C 2009
+38,247,N,HRI Oseltamivir | NI Zanamivir | HRI Peramivir,H1N1,Baz et al. 2009
+38,275,Y,HRI Oseltamivir | NI Zanamivir | HRI Peramivir,H1N1,Baz et al. 2009
+39,313,Y,RI Oseltamivir | NI/RI Zanamivir | NI Peramivir,H1N1,Nguyen et al. 2010 | Hurt et al. 2012
+39,427,T,RI Oseltamivir | NI/RI Zanamivir | NI Peramivir,H1N1,Nguyen et al. 2010 | Hurt et al. 2012
+100,119,D,NI Oseltamivir | RI Zanamivir | NI Peramivir,H3N2,Zurcher et al. 2006
+101,119,I,HRI Oseltamivir | RI Zanamivir | NI Peramivir,H3N2,Okomo-Adhiambo et al. 2010
+102,119,V,HRI Oseltamivir | NI Zanamivir | NI Peramivir | NI Laninamivir,H3N2,Abed et al. 2006 | Mishin et al. 2005 | Zurcher et al. 2006 | Okomo-Adhiambo et al. 2010 | Tamura et al. 2011 | Ison et al. 2006 | Simon et al. 2011 | Tamura et al. 2013
+103,136,K,NI Oseltamivir | HRI Zanamivir | NI Peramivir | NI Laninamivir,H3N2,Hurt et al. 2016 | Okomo-Adhiambo et al. 2014 | Dapat et al. 2010
+104,142,S,HRI Oseltamivir | HRI Zanamivir | RI Peramivir | RI Laninamivir,H3N2,Hurt et al. 2016
+105,151,A,NI Oseltamivir | RI Zanamivir | RI Peramivir | NI Laninamivir,H3N2,Hurt et al. 2016 | Sheu et al. 2008
+106,151,E,RI Oseltamivir | NI Zanamivir,H3N2,Yen et al. 2006
+107,151,G,NI Oseltamivir | HRI Zanamivir,H3N2,Mishin et al. 2014
+108,222,L,NI Oseltamivir | NI Zanamivir,H3N2,Richard et al. 2011
+109,224,K,HRI Oseltamivir | RI Zanamivir,H3N2,Yen et al. 2006
+110,245,Y,RI Oseltamivir | NI Zanamivir | NI Peramivir | NI Laninamivir,H3N2,Govorkova et al. 2022
+111,245,-,HRI Oseltamivir | NI/RI Zanamivir | NI Peramivir | NI Laninamivir,H3N2,Abed et al. 2009 | Tamura et al. 2015
+111,246,-,HRI Oseltamivir | NI/RI Zanamivir | NI Peramivir | NI Laninamivir,H3N2,Abed et al. 2009 | Tamura et al. 2015
+111,247,-,HRI Oseltamivir | NI/RI Zanamivir | NI Peramivir | NI Laninamivir,H3N2,Abed et al. 2009 | Tamura et al. 2015
+111,248,-,HRI Oseltamivir | NI/RI Zanamivir | NI Peramivir | NI Laninamivir,H3N2,Abed et al. 2009 | Tamura et al. 2015
+112,247,-,HRI Oseltamivir | RI Zanamivir | NI Peramivir | NI Laninamivir,H3N2,Tamura et al. 2015
+112,248,-,HRI Oseltamivir | RI Zanamivir | NI Peramivir | NI Laninamivir,H3N2,Tamura et al. 2015
+112,249,-,HRI Oseltamivir | RI Zanamivir | NI Peramivir | NI Laninamivir,H3N2,Tamura et al. 2015
+112,250,-,HRI Oseltamivir | RI Zanamivir | NI Peramivir | NI Laninamivir,H3N2,Tamura et al. 2015
+113,249,E,RI Oseltamivir | NI Zanamivir | NI Peramivir | NI Laninamivir,H3N2,Gubareva et al. 2017
+114,276,D,RI Oseltamivir | HRI Zanamivir,H3N2,Yen et al. 2006
+115,292,K,HRI Oseltamivir | HRI Zanamivir | HRI Peramivir | NI Laninamivir,H3N2,Meijer et al. 2014 | Hurt et al. 2016 | Abed et al. 2006 | Sheu et al. 2008 | Zurcher et al. 2006 | Tamura et al. 2011 | Yen et al. 2006 | Carr et al. 2002 | Yen et al. 2005 | Kiso et al. 2004
+116,294,S,HRI Oseltamivir | NI Zanamivir | NI Peramivir,H3N2,Abed et al. 2006 | Kiso et al. 2004
+117,329,K,NI/RI Oseltamivir | NI/RI Zanamivir,H3N2,Takashita et al. 2015 | McCauley et al. 2017 | Hussain et al. 2021
+118,329,R,RI Oseltamivir | NI Zanamivir,H3N2,Hussain et al. 2021
+119,331,R,NI/RI Oseltamivir | NI/RI Zanamivir,H3N2,Takashita et al. 2015 | McCauley et al. 2017 | Hussain et al. 2021
+120,334,R,NI Oseltamivir | NI Zanamivir,H3N2,Hussain et al. 2021
+121,371,K,RI Oseltamivir | RI Zanamivir,H3N2,Yen et al. 2006
+122,119,V,HRI Oseltamivir | HRI Zanamivir | HRI Peramivir | HRI Laninamivir,H3N2,Tamura et al. 2013
+122,148,I,HRI Oseltamivir | HRI Zanamivir | HRI Peramivir | HRI Laninamivir,H3N2,Tamura et al. 2013
+123,119,V,HRI Oseltamivir | NI Zanamivir,H3N2,Richard et al. 2011
+123,222,L,HRI Oseltamivir | NI Zanamivir,H3N2,Richard et al. 2011
+124,119,V,HRI Oseltamivir | NI Zanamivir | NI Peramivir,H3N2,Simon et al. 2011 | Baz et al. 2006
+124,222,V,HRI Oseltamivir | NI Zanamivir | NI Peramivir,H3N2,Simon et al. 2011 | Baz et al. 2006
+125,222,T,RI Oseltamivir | NI Zanamivir | NI Peramivir | NI Laninamivir,H3N2,Hurt et al. 2016
+125,331,R,RI Oseltamivir | NI Zanamivir | NI Peramivir | NI Laninamivir,H3N2,Hurt et al. 2016
+126,249,E,RI Oseltamivir | RI Zanamivir | RI Peramivir | NI Laninamivir,H3N2,Gubareva et al. 2017
+126,391,K,RI Oseltamivir | RI Zanamivir | RI Peramivir | NI Laninamivir,H3N2,Gubareva et al. 2017
+448,136,H,NI Oseltamivir |NI Zanamivir | NI Peramivir | NI Laninamivir,H1N1,Wang et al. 2013
+449,199,V,NI Oseltamivir |NI Zanamivir | NI Peramivir | NI Laninamivir,H1N1,Wang et al. 2013
+450,246,V,NI Oseltamivir | RI Zanamivir | ? Peramivir | ? Laninamivir,H3N2,Hussain et al. 2025
+451,119,V,HRI Oseltamivir | HRI Zanamivir | HRI Peramivir | ? Laninamivir,H3N2,Eshaghi et al. 2014
+451,136,K,HRI Oseltamivir | HRI Zanamivir | HRI Peramivir | ? Laninamivir,H3N2,Eshaghi et al. 2014
+452,119,V,? Oseltamivir | ? Zanamivir | ? Peramivir | ? Laninamivir,H3N2,Eshaghi et al. 2014
+452,247,-,? Oseltamivir | ? Zanamivir | ? Peramivir | ? Laninamivir,H3N2,Eshaghi et al. 2014
+452,248,-,? Oseltamivir | ? Zanamivir | ? Peramivir | ? Laninamivir,H3N2,Eshaghi et al. 2014
+452,249,-,? Oseltamivir | ? Zanamivir | ? Peramivir | ? Laninamivir,H3N2,Eshaghi et al. 2014
+452,250,-,? Oseltamivir | ? Zanamivir | ? Peramivir | ? Laninamivir,H3N2,Eshaghi et al. 2014
