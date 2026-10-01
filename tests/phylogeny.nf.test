@@ -13,7 +13,7 @@ nextflow_pipeline {
                 protocols = [
                     HUMAN: [
                         directory: "${projectDir}/protocols/HUMAN",
-                        resources: "${projectDir}/protocols/HUMAN/v1"
+                        resources: "${projectDir}/protocols/HUMAN/v2"
                     ]
                 ]
                 inputFasta = "${projectDir}/tests/data/HUMAN.fasta"
@@ -70,7 +70,7 @@ nextflow_pipeline {
                 protocols = [
                     HUMAN: [
                         directory: "${projectDir}/protocols/HUMAN",
-                        resources: "${projectDir}/protocols/HUMAN/v1"
+                        resources: "${projectDir}/protocols/HUMAN/v2"
                     ]
                 ]
                 inputFasta = "${projectDir}/tests/data/HUMAN.fasta"
@@ -136,7 +136,7 @@ nextflow_pipeline {
                 protocols = [
                     HUMAN: [
                         directory: "${projectDir}/protocols/HUMAN",
-                        resources: "${projectDir}/protocols/HUMAN/v1"
+                        resources: "${projectDir}/protocols/HUMAN/v2"
                     ]
                 ]
                 inputFasta = "${projectDir}/tests/data/HUMAN.fasta"
@@ -164,7 +164,7 @@ nextflow_pipeline {
                 protocols = [
                     HUMAN: [
                         directory: "${projectDir}/protocols/HUMAN",
-                        resources: "${projectDir}/protocols/HUMAN/v1"
+                        resources: "${projectDir}/protocols/HUMAN/v2"
                     ]
                 ]
                 inputFasta = "${projectDir}/tests/data/HUMAN.fasta"
@@ -192,7 +192,7 @@ nextflow_pipeline {
                 protocols = [
                     HUMAN: [
                         directory: "${projectDir}/protocols/HUMAN",
-                        resources: "${projectDir}/protocols/HUMAN/v1"
+                        resources: "${projectDir}/protocols/HUMAN/v2"
                     ]
                 ]
                 inputFasta = "${projectDir}/tests/data/HUMAN.fasta"
@@ -256,7 +256,7 @@ nextflow_pipeline {
                 protocols = [
                     HUMAN: [
                         directory: "${projectDir}/protocols/HUMAN",
-                        resources: "${projectDir}/protocols/HUMAN/v1"
+                        resources: "${projectDir}/protocols/HUMAN/v2"
                     ]
                 ]
                 inputFasta = "${projectDir}/tests/data/phylo/gate_test.fasta"
@@ -296,7 +296,7 @@ nextflow_pipeline {
                 protocols = [
                     HUMAN: [
                         directory: "${projectDir}/protocols/HUMAN",
-                        resources: "${projectDir}/protocols/HUMAN/v1"
+                        resources: "${projectDir}/protocols/HUMAN/v2"
                     ]
                 ]
                 // gate_test.fasta only has H3N2 samples (01816372, 01818936, 198353883): H1N1pdm09 should find none
@@ -334,7 +334,7 @@ nextflow_pipeline {
                 protocols = [
                     HUMAN: [
                         directory: "${projectDir}/protocols/HUMAN",
-                        resources: "${projectDir}/protocols/HUMAN/v1"
+                        resources: "${projectDir}/protocols/HUMAN/v2"
                     ]
                 ]
                 // The new run's own FASTA is H3N2-only (same 3 samples as gate_test.fasta); every H1N1pdm09 sample

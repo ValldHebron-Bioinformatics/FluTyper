@@ -10,7 +10,7 @@ nextflow_workflow {
             params {
                 protocol = "HUMAN"
                 protocols = [
-                    HUMAN: [ resources: "${projectDir}/protocols/HUMAN/v1" ]
+                    HUMAN: [ resources: "${projectDir}/protocols/HUMAN/v2" ]
                 ]
                 version = "1.1.0"
                 inputFasta = "${projectDir}/tests/data/HUMAN.fasta"
@@ -60,7 +60,7 @@ nextflow_workflow {
                 input[2] = Channel.of(
                     tuple("01816372", file("${projectDir}/tests/data/phylo/nextclade/nextclade_results_01816372.csv", checkIfExists: true))
                 )
-                input[3] = Channel.of(file("${projectDir}/protocols/HUMAN/v1/resources/H3/nextclade_H3_dataset", checkIfExists: true))
+                input[3] = Channel.of(file("${projectDir}/protocols/HUMAN/v2/resources/H3/nextclade_H3_dataset", checkIfExists: true))
                 input[4] = Channel.of(file("${projectDir}/tests/data/phylo/metadata_lab.csv", checkIfExists: true))
                 input[5] = ["HA1:62", "HA1:145", "HA1:239"]
                 input[6] = "H3N2"

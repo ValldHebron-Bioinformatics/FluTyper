@@ -87,7 +87,7 @@ nextflow_pipeline {
                 protocol = "HUMAN"
                 protocols = [
                     HUMAN: [
-                        resources : "${projectDir}/protocols/HUMAN/v1"
+                        resources : "${projectDir}/protocols/HUMAN/v2"
                     ]
                 ]
                 inputFasta = "${projectDir}/tests/data/HUMAN.fasta"

@@ -142,7 +142,7 @@ The threshold parameter establishes a baseline frequency cutoff that impacts dat
 
 ### HUMAN Protocol Notes
 
-The HUMAN protocol utilizes dedicated resources located under `protocols/HUMAN/v1` and introduces marker annotations specifically tailored to human seasonal influenza. It supports genotyping for `H1` (using Nextclade dataset `flu_h1n1pdm_ha`) and `H3` (using Nextclade dataset `flu_h3n2_ha`). Marker files are read directly from the protocol's marker directory rather than querying FluMutDB. When metadata is provided, the human protocol fully supports generating time-evolution frequency reports.
+The HUMAN protocol utilizes dedicated resources located under `protocols/HUMAN/v2` and introduces marker annotations specifically tailored to human seasonal influenza. It supports genotyping for `H1` (using Nextclade dataset `flu_h1n1pdm_ha`) and `H3` (using Nextclade dataset `flu_h3n2_ha`). Marker files are read directly from the protocol's marker directory rather than querying FluMutDB. When metadata is provided, the human protocol fully supports generating time-evolution frequency reports.
 
 ### Integrating Extra Markers
 

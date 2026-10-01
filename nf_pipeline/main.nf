@@ -207,7 +207,7 @@ workflow {
         ch_database = FluMutDB.out
         MarkersFiles(FluMutDB.out) 
     } else {
-        def humanMarkersDir = file("${projectDir}/../protocols/HUMAN/v1/markers")
+        def humanMarkersDir = file("${projectDir}/../protocols/HUMAN/v2/markers")
         MarkersFiles(humanMarkersDir)
     }
     ch_markerfiles = MarkersFiles.out
