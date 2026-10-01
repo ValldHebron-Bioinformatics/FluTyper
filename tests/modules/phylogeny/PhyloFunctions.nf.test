@@ -1,0 +1,863 @@
+nextflow_function {
+
+    name "Test Functions Phylogenetics"
+    script "nf_pipeline/subworkflows/Phylogenetics.nf"
+
+    // ---------------------------------------------------------------------------------------
+    // parseAaPositions
+    // ---------------------------------------------------------------------------------------
+
+    test("parseAaPositions: GENE:POS comma-separated list") {
+        function "parseAaPositions"
+        when {
+            function {
+                """
+                input[0] = "HA1:62,HA1:145,HA1:239"
+                input[1] = "HA1"
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == [
+                [gene: "HA1", pos: 62, label: "HA1:62"],
+                [gene: "HA1", pos: 145, label: "HA1:145"],
+                [gene: "HA1", pos: 239, label: "HA1:239"]
+            ]
+        }
+    }
+
+    test("parseAaPositions: bare integers fall back to the default gene") {
+        function "parseAaPositions"
+        when {
+            function {
+                """
+                input[0] = "62,145"
+                input[1] = "HA1"
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == [
+                [gene: "HA1", pos: 62, label: "HA1:62"],
+                [gene: "HA1", pos: 145, label: "HA1:145"]
+            ]
+        }
+    }
+
+    test("parseAaPositions: mixed GENE:POS and bare integers, order preserved") {
+        function "parseAaPositions"
+        when {
+            function {
+                """
+                input[0] = "239,HA1:62,NA:10"
+                input[1] = "HA1"
+                """
+            }
+        }
+        then {
+            assert function.success
+            // Order of the input tokens must be preserved in the output list
+            assert function.result == [
+                [gene: "HA1", pos: 239, label: "HA1:239"],
+                [gene: "HA1", pos: 62, label: "HA1:62"],
+                [gene: "NA", pos: 10, label: "NA:10"]
+            ]
+        }
+    }
+
+    test("parseAaPositions: lowercase gene name is normalised to upper case") {
+        function "parseAaPositions"
+        when {
+            function {
+                """
+                input[0] = "ha1:62"
+                input[1] = "HA1"
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == [[gene: "HA1", pos: 62, label: "HA1:62"]]
+        }
+    }
+
+    test("parseAaPositions: list input (params-file style)") {
+        function "parseAaPositions"
+        when {
+            function {
+                """
+                input[0] = ["HA1:62", "145"]
+                input[1] = "HA1"
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == [
+                [gene: "HA1", pos: 62, label: "HA1:62"],
+                [gene: "HA1", pos: 145, label: "HA1:145"]
+            ]
+        }
+    }
+
+    test("parseAaPositions: null value means no amino acid columns") {
+        function "parseAaPositions"
+        when {
+            function {
+                """
+                input[0] = null
+                input[1] = "HA1"
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == []
+        }
+    }
+
+    test("parseAaPositions: empty string means no amino acid columns") {
+        function "parseAaPositions"
+        when {
+            function {
+                """
+                input[0] = ""
+                input[1] = "HA1"
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == []
+        }
+    }
+
+    test("parseAaPositions: value-less flag (true) means no amino acid columns") {
+        function "parseAaPositions"
+        when {
+            function {
+                """
+                input[0] = true
+                input[1] = "HA1"
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == []
+        }
+    }
+
+    test("parseAaPositions: malformed entry 'HA1:' (missing position) fails and names the entry") {
+        function "parseAaPositions"
+        when {
+            function {
+                """
+                input[0] = "HA1:"
+                input[1] = "HA1"
+                """
+            }
+        }
+        then {
+            assert !function.success
+            assert function.failed
+            assert function.stdout.join("\n").contains("HA1:")
+            assert function.stdout.join("\n").contains("malformed entry")
+        }
+    }
+
+    test("parseAaPositions: malformed entry ':62' (missing gene) fails and names the entry") {
+        function "parseAaPositions"
+        when {
+            function {
+                """
+                input[0] = ":62"
+                input[1] = "HA1"
+                """
+            }
+        }
+        then {
+            assert !function.success
+            assert function.failed
+            assert function.stdout.join("\n").contains(":62")
+            assert function.stdout.join("\n").contains("malformed entry")
+        }
+    }
+
+    test("parseAaPositions: malformed entry 'HA1:x' (non-numeric position) fails and names the entry") {
+        function "parseAaPositions"
+        when {
+            function {
+                """
+                input[0] = "HA1:x"
+                input[1] = "HA1"
+                """
+            }
+        }
+        then {
+            assert !function.success
+            assert function.failed
+            assert function.stdout.join("\n").contains("HA1:x")
+            assert function.stdout.join("\n").contains("malformed entry")
+        }
+    }
+
+    test("parseAaPositions: malformed entry '62a' fails and names the entry") {
+        function "parseAaPositions"
+        when {
+            function {
+                """
+                input[0] = "62a"
+                input[1] = "HA1"
+                """
+            }
+        }
+        then {
+            assert !function.success
+            assert function.failed
+            assert function.stdout.join("\n").contains("62a")
+            assert function.stdout.join("\n").contains("malformed entry")
+        }
+    }
+
+    test("parseAaPositions: empty entry between commas 'HA1:62,,145' fails and names the list") {
+        function "parseAaPositions"
+        when {
+            function {
+                """
+                input[0] = "HA1:62,,145"
+                input[1] = "HA1"
+                """
+            }
+        }
+        then {
+            assert !function.success
+            assert function.failed
+            assert function.stdout.join("\n").contains("empty entry")
+            assert function.stdout.join("\n").contains("HA1:62,,145")
+        }
+    }
+
+    test("parseAaPositions: position 0 is out of range and fails, naming the entry") {
+        function "parseAaPositions"
+        when {
+            function {
+                """
+                input[0] = "HA1:0"
+                input[1] = "HA1"
+                """
+            }
+        }
+        then {
+            assert !function.success
+            assert function.failed
+            assert function.stdout.join("\n").contains("HA1:0")
+        }
+    }
+
+    test("parseAaPositions: duplicate position fails and names the entry") {
+        function "parseAaPositions"
+        when {
+            function {
+                """
+                input[0] = "HA1:62,HA1:62"
+                input[1] = "HA1"
+                """
+            }
+        }
+        then {
+            assert !function.success
+            assert function.failed
+            assert function.stdout.join("\n").contains("HA1:62")
+            assert function.stdout.join("\n").contains("more than once")
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // validatePhyloParams
+    // ---------------------------------------------------------------------------------------
+
+    test("validatePhyloParams: valid HUMAN default params return no errors") {
+        function "validatePhyloParams"
+        when {
+            function {
+                """
+                input[0] = [
+                    protocol: "HUMAN",
+                    phyloSubtype: "H3N2",
+                    phyloMinCoverage: 0.95,
+                    minPanelCoverage: 0.8,
+                    clusterThreshold: 0.005,
+                    minSupportLabel: 70,
+                    phyloSegmentTrees: "all",
+                    bootstrap: 1000,
+                    seed: 12345,
+                    model: "GTR+G4",
+                    periodBin: "month",
+                    width: 12,
+                    height: 10,
+                    dpi: 300,
+                    phyloSegmentOrder: "PB2,PB1,PA,HA,NP,NA,MP,NS",
+                    segments: ["PB2","PB1","PA","HA","NP","NA","MP","NS"],
+                    phyloRootStrains: "A/Darwin/6/2021,A/Massachusetts/18/2022,A/Croatia/10136RV/2023,A/Singapore/GP20238/2024,A/Sydney/1359/2024",
+                    phyloReference: "A/Darwin/6/2021",
+                    phyloOutgroup: "A/Darwin/6/2021",
+                    labMap: null,
+                    aaPositions: null,
+                    aaGene: "HA1"
+                ]
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == []
+        }
+    }
+
+    test("validatePhyloParams: AVIAN protocol is rejected") {
+        function "validatePhyloParams"
+        when {
+            function {
+                """
+                input[0] = [
+                    protocol: "AVIAN",
+                    phyloSubtype: "H3N2",
+                    phyloMinCoverage: 0.95,
+                    minPanelCoverage: 0.8,
+                    clusterThreshold: 0.005,
+                    minSupportLabel: 70,
+                    phyloSegmentTrees: "all",
+                    bootstrap: 1000,
+                    seed: 12345,
+                    model: "GTR+G4",
+                    periodBin: "month",
+                    width: 12,
+                    height: 10,
+                    dpi: 300,
+                    phyloSegmentOrder: "PB2,PB1,PA,HA,NP,NA,MP,NS",
+                    segments: ["PB2","PB1","PA","HA","NP","NA","MP","NS"],
+                    phyloRootStrains: "A/Darwin/6/2021,A/Massachusetts/18/2022,A/Croatia/10136RV/2023,A/Singapore/GP20238/2024,A/Sydney/1359/2024",
+                    phyloReference: "A/Darwin/6/2021",
+                    phyloOutgroup: "A/Darwin/6/2021",
+                    labMap: null,
+                    aaPositions: null,
+                    aaGene: "HA1"
+                ]
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result.any { it.contains("--phylogenetics is only available for the HUMAN protocol") }
+        }
+    }
+
+    test("validatePhyloParams: bootstrap 500 is rejected (must be 0 or >= 1000)") {
+        function "validatePhyloParams"
+        when {
+            function {
+                """
+                input[0] = [
+                    protocol: "HUMAN",
+                    phyloSubtype: "H3N2",
+                    phyloMinCoverage: 0.95,
+                    minPanelCoverage: 0.8,
+                    clusterThreshold: 0.005,
+                    minSupportLabel: 70,
+                    phyloSegmentTrees: "all",
+                    bootstrap: 500,
+                    seed: 12345,
+                    model: "GTR+G4",
+                    periodBin: "month",
+                    width: 12,
+                    height: 10,
+                    dpi: 300,
+                    phyloSegmentOrder: "PB2,PB1,PA,HA,NP,NA,MP,NS",
+                    segments: ["PB2","PB1","PA","HA","NP","NA","MP","NS"],
+                    phyloRootStrains: "A/Darwin/6/2021,A/Massachusetts/18/2022,A/Croatia/10136RV/2023,A/Singapore/GP20238/2024,A/Sydney/1359/2024",
+                    phyloReference: "A/Darwin/6/2021",
+                    phyloOutgroup: "A/Darwin/6/2021",
+                    labMap: null,
+                    aaPositions: null,
+                    aaGene: "HA1"
+                ]
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result.any { it.contains("--bootstrap must be 0") && it.contains("500") }
+        }
+    }
+
+    test("validatePhyloParams: periodBin 'year' is rejected") {
+        function "validatePhyloParams"
+        when {
+            function {
+                """
+                input[0] = [
+                    protocol: "HUMAN",
+                    phyloSubtype: "H3N2",
+                    phyloMinCoverage: 0.95,
+                    minPanelCoverage: 0.8,
+                    clusterThreshold: 0.005,
+                    minSupportLabel: 70,
+                    phyloSegmentTrees: "all",
+                    bootstrap: 1000,
+                    seed: 12345,
+                    model: "GTR+G4",
+                    periodBin: "year",
+                    width: 12,
+                    height: 10,
+                    dpi: 300,
+                    phyloSegmentOrder: "PB2,PB1,PA,HA,NP,NA,MP,NS",
+                    segments: ["PB2","PB1","PA","HA","NP","NA","MP","NS"],
+                    phyloRootStrains: "A/Darwin/6/2021,A/Massachusetts/18/2022,A/Croatia/10136RV/2023,A/Singapore/GP20238/2024,A/Sydney/1359/2024",
+                    phyloReference: "A/Darwin/6/2021",
+                    phyloOutgroup: "A/Darwin/6/2021",
+                    labMap: null,
+                    aaPositions: null,
+                    aaGene: "HA1"
+                ]
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result.any { it.contains("--periodBin must be one of month, week or none") && it.contains("year") }
+        }
+    }
+
+    test("validatePhyloParams: minPanelCoverage 1.5 is rejected (must be between 0 and 1)") {
+        function "validatePhyloParams"
+        when {
+            function {
+                """
+                input[0] = [
+                    protocol: "HUMAN",
+                    phyloSubtype: "H3N2",
+                    phyloMinCoverage: 0.95,
+                    minPanelCoverage: 1.5,
+                    clusterThreshold: 0.005,
+                    minSupportLabel: 70,
+                    phyloSegmentTrees: "all",
+                    bootstrap: 1000,
+                    seed: 12345,
+                    model: "GTR+G4",
+                    periodBin: "month",
+                    width: 12,
+                    height: 10,
+                    dpi: 300,
+                    phyloSegmentOrder: "PB2,PB1,PA,HA,NP,NA,MP,NS",
+                    segments: ["PB2","PB1","PA","HA","NP","NA","MP","NS"],
+                    phyloRootStrains: "A/Darwin/6/2021,A/Massachusetts/18/2022,A/Croatia/10136RV/2023,A/Singapore/GP20238/2024,A/Sydney/1359/2024",
+                    phyloReference: "A/Darwin/6/2021",
+                    phyloOutgroup: "A/Darwin/6/2021",
+                    labMap: null,
+                    aaPositions: null,
+                    aaGene: "HA1"
+                ]
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result.any { it.contains("--minPanelCoverage must be a number between 0 and 1") && it.contains("1.5") }
+        }
+    }
+
+    test("validatePhyloParams: phyloSegmentOrder missing a segment is rejected") {
+        function "validatePhyloParams"
+        when {
+            function {
+                """
+                input[0] = [
+                    protocol: "HUMAN",
+                    phyloSubtype: "H3N2",
+                    phyloMinCoverage: 0.95,
+                    minPanelCoverage: 0.8,
+                    clusterThreshold: 0.005,
+                    minSupportLabel: 70,
+                    phyloSegmentTrees: "all",
+                    bootstrap: 1000,
+                    seed: 12345,
+                    model: "GTR+G4",
+                    periodBin: "month",
+                    width: 12,
+                    height: 10,
+                    dpi: 300,
+                    phyloSegmentOrder: "PB2,PB1,PA,HA,NP,NA,MP",
+                    segments: ["PB2","PB1","PA","HA","NP","NA","MP","NS"],
+                    phyloRootStrains: "A/Darwin/6/2021,A/Massachusetts/18/2022,A/Croatia/10136RV/2023,A/Singapore/GP20238/2024,A/Sydney/1359/2024",
+                    phyloReference: "A/Darwin/6/2021",
+                    phyloOutgroup: "A/Darwin/6/2021",
+                    labMap: null,
+                    aaPositions: null,
+                    aaGene: "HA1"
+                ]
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result.any { it.contains("--phyloSegmentOrder must list each of") }
+        }
+    }
+
+    test("validatePhyloParams: outgroup not in root strains is rejected") {
+        function "validatePhyloParams"
+        when {
+            function {
+                """
+                input[0] = [
+                    protocol: "HUMAN",
+                    phyloSubtype: "H3N2",
+                    phyloMinCoverage: 0.95,
+                    minPanelCoverage: 0.8,
+                    clusterThreshold: 0.005,
+                    minSupportLabel: 70,
+                    phyloSegmentTrees: "all",
+                    bootstrap: 1000,
+                    seed: 12345,
+                    model: "GTR+G4",
+                    periodBin: "month",
+                    width: 12,
+                    height: 10,
+                    dpi: 300,
+                    phyloSegmentOrder: "PB2,PB1,PA,HA,NP,NA,MP,NS",
+                    segments: ["PB2","PB1","PA","HA","NP","NA","MP","NS"],
+                    phyloRootStrains: "A/Darwin/6/2021,A/Massachusetts/18/2022,A/Croatia/10136RV/2023,A/Singapore/GP20238/2024,A/Sydney/1359/2024",
+                    phyloReference: "A/Darwin/6/2021",
+                    phyloOutgroup: "A/Nonexistent/1/2020",
+                    labMap: null,
+                    aaPositions: null,
+                    aaGene: "HA1"
+                ]
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result.any { it.contains("--phyloOutgroup 'A/Nonexistent/1/2020' must be one of --phyloRootStrains") }
+        }
+    }
+
+    test("validatePhyloParams: both H3N2 and H1N1pdm09 requested are valid (built-in H1N1pdm09 defaults)") {
+        function "validatePhyloParams"
+        when {
+            function {
+                """
+                input[0] = [
+                    protocol: "HUMAN",
+                    phyloSubtype: "H3N2,H1N1pdm09",
+                    phyloMinCoverage: 0.95,
+                    minPanelCoverage: 0.8,
+                    clusterThreshold: 0.005,
+                    minSupportLabel: 70,
+                    phyloSegmentTrees: "all",
+                    bootstrap: 1000,
+                    seed: 12345,
+                    model: "GTR+G4",
+                    periodBin: "month",
+                    width: 12,
+                    height: 10,
+                    dpi: 300,
+                    phyloSegmentOrder: "PB2,PB1,PA,HA,NP,NA,MP,NS",
+                    segments: ["PB2","PB1","PA","HA","NP","NA","MP","NS"],
+                    phyloRootStrains: "A/Darwin/6/2021,A/Massachusetts/18/2022,A/Croatia/10136RV/2023,A/Singapore/GP20238/2024,A/Sydney/1359/2024",
+                    phyloReference: "A/Darwin/6/2021",
+                    phyloOutgroup: "A/Darwin/6/2021",
+                    labMap: null,
+                    aaPositions: null,
+                    aaGene: "HA1"
+                ]
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == []
+        }
+    }
+
+    test("validatePhyloParams: H1N1pdm09 alone is valid (built-in defaults, no H3N2 flat overrides needed)") {
+        function "validatePhyloParams"
+        when {
+            function {
+                """
+                input[0] = [
+                    protocol: "HUMAN",
+                    phyloSubtype: "H1N1pdm09",
+                    phyloMinCoverage: 0.95,
+                    minPanelCoverage: 0.8,
+                    clusterThreshold: 0.005,
+                    minSupportLabel: 70,
+                    phyloSegmentTrees: "all",
+                    bootstrap: 1000,
+                    seed: 12345,
+                    model: "GTR+G4",
+                    periodBin: "month",
+                    width: 12,
+                    height: 10,
+                    dpi: 300,
+                    phyloSegmentOrder: "PB2,PB1,PA,HA,NP,NA,MP,NS",
+                    segments: ["PB2","PB1","PA","HA","NP","NA","MP","NS"],
+                    labMap: null,
+                    aaPositions: null,
+                    aaGene: "HA1"
+                ]
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == []
+        }
+    }
+
+    test("validatePhyloParams: unknown subtype (H5N1) is rejected") {
+        function "validatePhyloParams"
+        when {
+            function {
+                """
+                input[0] = [
+                    protocol: "HUMAN",
+                    phyloSubtype: "H3N2,H5N1",
+                    phyloMinCoverage: 0.95,
+                    minPanelCoverage: 0.8,
+                    clusterThreshold: 0.005,
+                    minSupportLabel: 70,
+                    phyloSegmentTrees: "all",
+                    bootstrap: 1000,
+                    seed: 12345,
+                    model: "GTR+G4",
+                    periodBin: "month",
+                    width: 12,
+                    height: 10,
+                    dpi: 300,
+                    phyloSegmentOrder: "PB2,PB1,PA,HA,NP,NA,MP,NS",
+                    segments: ["PB2","PB1","PA","HA","NP","NA","MP","NS"],
+                    phyloRootStrains: "A/Darwin/6/2021,A/Massachusetts/18/2022,A/Croatia/10136RV/2023,A/Singapore/GP20238/2024,A/Sydney/1359/2024",
+                    phyloReference: "A/Darwin/6/2021",
+                    phyloOutgroup: "A/Darwin/6/2021",
+                    labMap: null,
+                    aaPositions: null,
+                    aaGene: "HA1"
+                ]
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result.any { it.contains("H5N1") && it.contains("unknown subtype") }
+        }
+    }
+
+    test("validatePhyloParams: H1N1pdm09 outgroup not in its root strains is rejected") {
+        function "validatePhyloParams"
+        when {
+            function {
+                """
+                input[0] = [
+                    protocol: "HUMAN",
+                    phyloSubtype: "H1N1pdm09",
+                    phyloMinCoverage: 0.95,
+                    minPanelCoverage: 0.8,
+                    clusterThreshold: 0.005,
+                    minSupportLabel: 70,
+                    phyloSegmentTrees: "all",
+                    bootstrap: 1000,
+                    seed: 12345,
+                    model: "GTR+G4",
+                    periodBin: "month",
+                    width: 12,
+                    height: 10,
+                    dpi: 300,
+                    phyloSegmentOrder: "PB2,PB1,PA,HA,NP,NA,MP,NS",
+                    segments: ["PB2","PB1","PA","HA","NP","NA","MP","NS"],
+                    labMap: null,
+                    aaPositions: null,
+                    aaGene: "HA1",
+                    phyloSubtypeConfig: [
+                        H1N1pdm09: [
+                            reference: "A/Wisconsin/67/2022",
+                            referenceFallback: "A/Wisconsin/67/2022",
+                            rootStrains: "A/Victoria/2570/2019,A/Sydney/5/2021,A/Wisconsin/67/2022",
+                            outgroup: "A/Nonexistent/1/2020"
+                        ]
+                    ]
+                ]
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result.any { it.contains("H1N1pdm09") && it.contains("outgroup") && it.contains("A/Nonexistent/1/2020") }
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // phyloRefId
+    // ---------------------------------------------------------------------------------------
+
+    test("phyloRefId: builds the tip identifier used in the alignment and tree") {
+        function "phyloRefId"
+        when {
+            function {
+                """
+                input[0] = "A/Darwin/6/2021"
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == "REF_A_Darwin_6_2021"
+        }
+    }
+
+    test("phyloRefId: strips characters outside [A-Za-z0-9.-]") {
+        function "phyloRefId"
+        when {
+            function {
+                """
+                input[0] = "A/Croatia/10136RV/2023"
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == "REF_A_Croatia_10136RV_2023"
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // parseAaPositionsFile
+    // ---------------------------------------------------------------------------------------
+
+    test("parseAaPositionsFile: null/empty/value-less flag means no override") {
+        function "parseAaPositionsFile"
+        when {
+            function {
+                """
+                input[0] = null
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == [:]
+        }
+    }
+
+    test("parseAaPositionsFile: subtype-tagged rows apply to H3N2 only, blank-subtype row applies to every subtype") {
+        function "parseAaPositionsFile"
+        when {
+            function {
+                """
+                input[0] = "${projectDir}/tests/data/phylo/aa_positions_example.csv"
+                """
+            }
+        }
+        then {
+            assert function.success
+            // aa_positions_example.csv: HA1:62,145,239 tagged H3N2; NA:247 with a blank subtype cell -> both subtypes
+            assert function.result["H3N2"] == [
+                [gene: "HA1", pos: 62, label: "HA1:62"],
+                [gene: "HA1", pos: 145, label: "HA1:145"],
+                [gene: "HA1", pos: 239, label: "HA1:239"],
+                [gene: "NA", pos: 247, label: "NA:247"]
+            ]
+            assert function.result["H1N1pdm09"] == [
+                [gene: "NA", pos: 247, label: "NA:247"]
+            ]
+        }
+    }
+
+    test("parseAaPositionsFile: a subtype the file never mentions is absent from the result") {
+        function "parseAaPositionsFile"
+        when {
+            function {
+                """
+                input[0] = "${projectDir}/tests/data/phylo/aa_positions_h3n2_only.csv"
+                """
+            }
+        }
+        then {
+            assert function.success
+            // aa_positions_h3n2_only.csv has a single HA1:62 row tagged H3N2 only: H1N1pdm09 is never mentioned
+            // (no blank-subtype row either), so it is absent from the result rather than mapped to an empty list
+            assert function.result == ["H3N2": [[gene: "HA1", pos: 62, label: "HA1:62"]]]
+            assert !function.result.containsKey("H1N1pdm09")
+        }
+    }
+
+    test("parseAaPositionsFile: missing 'protein'/'position' header columns fails naming the header") {
+        function "parseAaPositionsFile"
+        when {
+            function {
+                """
+                input[0] = "${projectDir}/tests/data/phylo/aa_positions_bad_header.csv"
+                """
+            }
+        }
+        then {
+            assert !function.success
+            assert function.failed
+            assert function.stdout.join("\n").contains("'protein' and 'position' columns")
+        }
+    }
+
+    test("parseAaPositionsFile: non-integer position fails naming the row") {
+        function "parseAaPositionsFile"
+        when {
+            function {
+                """
+                input[0] = "${projectDir}/tests/data/phylo/aa_positions_bad_position.csv"
+                """
+            }
+        }
+        then {
+            assert !function.success
+            assert function.failed
+            assert function.stdout.join("\n").contains("sixty-two")
+            assert function.stdout.join("\n").contains("positive integer")
+        }
+    }
+
+    test("parseAaPositionsFile: unknown subtype fails naming the row and the supported subtypes") {
+        function "parseAaPositionsFile"
+        when {
+            function {
+                """
+                input[0] = "${projectDir}/tests/data/phylo/aa_positions_bad_subtype.csv"
+                """
+            }
+        }
+        then {
+            assert !function.success
+            assert function.failed
+            assert function.stdout.join("\n").contains("H5N1")
+            assert function.stdout.join("\n").contains("unknown subtype")
+        }
+    }
+
+    test("parseAaPositionsFile: file not found fails naming the path") {
+        function "parseAaPositionsFile"
+        when {
+            function {
+                """
+                input[0] = "${projectDir}/tests/data/phylo/does_not_exist.csv"
+                """
+            }
+        }
+        then {
+            assert !function.success
+            assert function.failed
+            assert function.stdout.join("\n").contains("file not found")
+        }
+    }
+
+}

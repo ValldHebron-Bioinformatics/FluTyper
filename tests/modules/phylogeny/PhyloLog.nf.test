@@ -1,0 +1,119 @@
+nextflow_process {
+
+    name "Test Process PhyloLog"
+    script "nf_pipeline/modules/phylogeny/PhyloLog.nf"
+    process "PhyloLog"
+
+    test("Should assemble a segment tree's phylo.log in order (preflight, coverage QC, subclades, steps) and publish the treefile as tree.nwk") {
+
+        when {
+            process {
+                """
+                input[0] = tuple(
+                    "H3N2_HA", "HA",
+                    [
+                        file("${projectDir}/tests/data/phylo/log_parts/alignment.log", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/log_parts/iqtree.log", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/log_parts/phylo.treefile", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/log_parts/posttree.log", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/log_parts/report.log", checkIfExists: true)
+                    ]
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/log_parts/preflight.log", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/log_parts/subclades.log", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
+                input[4] = "PB2,PB1,PA,HA,NP,NA,MP,NS"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def log = path(process.out.log.get(0)[1]).text
+            assert log.startsWith("# phylo.log: H3N2_HA (HA segment tree)")
+
+            // preflight: the general note is kept; the PA and PB2/PB1 notes belong to other trees
+            assert log.contains("PhyloPreflight: all phylogenetics tools found.")
+            assert !log.contains("has no PA segment") : log
+            assert !log.contains("has no PB2,PB1 segment") : log
+
+            // coverage QC for HA only: all 6 candidates pass HA (their PB2/PB1/NP failures do not matter here)
+            assert log.contains("PhyloCoverageQC: 6 of 6 candidate samples enter this tree; 0 dropped.") : log
+
+            // every step's messages are there, in pipeline order
+            def order = ["## Preflight", "## Coverage QC", "## Subclades", "## Alignment", "## IQ-TREE", "## TreeTime and clusters", "## Report"].collect { log.indexOf(it) }
+            assert order.every { it >= 0 } && order == order.sort(false) : "sections missing or out of order: ${order}"
+            assert log.contains("PhyloSegmentAlignment: HA alignment of 9 sequences")
+            assert log.contains("IQ-TREE WARNING: Number of threads")
+            assert log.contains("PhyloPostTree: 1 clusters")
+            assert log.contains("INFO panel 'source' omitted")
+
+            def tree = path(process.out.tree.get(0)[1]).text
+            assert tree == path("${projectDir}/tests/data/phylo/log_parts/phylo.treefile").text
+            assert path(process.out.tree.get(0)[1]).toString().endsWith("HA/tree.nwk")
+
+            // the task's stdout is only the number of samples in the tree (for the subtype summary line); nothing is
+            // echoed to the terminal (the process has no `debug true`)
+            assert process.out.summary.get(0)[2].toString().trim() == "6"
+            assert !process.stdout.join("\n").contains("PhyloCoverageQC")
+        }
+    }
+
+    test("Should summarise the whole-genome QC (a sample must pass every segment) with the reasons and the dropped sample IDs") {
+
+        when {
+            process {
+                """
+                input[0] = tuple(
+                    "H3N2", "whole_genome",
+                    [
+                        file("${projectDir}/tests/data/phylo/log_parts/alignment.log", checkIfExists: true),
+                        file("${projectDir}/tests/data/phylo/log_parts/phylo.treefile", checkIfExists: true)
+                    ]
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/log_parts/preflight.log", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/log_parts/subclades.log", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
+                input[4] = "PB2,PB1,PA,HA,NP,NA,MP,NS"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def log = path(process.out.log.get(0)[1]).text
+            assert log.startsWith("# phylo.log: H3N2 (whole-genome tree)")
+            // the whole-genome tree keeps every preflight note
+            assert log.contains("has no PA segment") && log.contains("has no PB2,PB1 segment")
+            assert log.contains("PhyloCoverageQC: 3 of 6 candidate samples enter this tree; 3 dropped.") : log
+            assert log.contains("1 dropped (PB2 coverage below 95.00%): 01816747") : log
+            assert log.contains("PB2 segment missing") && log.contains("01821259") : log
+            assert process.out.summary.get(0)[2].toString().trim() == "3"
+        }
+    }
+
+    test("Should still write phylo.log, with a note for each step that did not finish, when a later step failed (no treefile, no report)") {
+
+        when {
+            process {
+                """
+                input[0] = tuple("H3N2_HA", "HA", [file("${projectDir}/tests/data/phylo/log_parts/alignment.log", checkIfExists: true)])
+                input[1] = file("${projectDir}/tests/data/phylo/log_parts/preflight.log", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/log_parts/subclades.log", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/phylo_coverage_qc.tsv", checkIfExists: true)
+                input[4] = "PB2,PB1,PA,HA,NP,NA,MP,NS"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def log = path(process.out.log.get(0)[1]).text
+            assert log.contains("PhyloSegmentAlignment: HA alignment of 9 sequences")
+            assert log.contains("(step did not finish: no iqtree.log was produced)") : log
+            assert log.contains("(step did not finish: no report.log was produced)") : log
+            assert process.out.tree.size() == 0 : "no treefile, so no tree.nwk"
+        }
+    }
+
+}

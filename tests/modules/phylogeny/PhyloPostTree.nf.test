@@ -1,0 +1,156 @@
+nextflow_process {
+
+    name "Test Process PhyloPostTree"
+    script "nf_pipeline/modules/phylogeny/PhyloPostTree.nf"
+    process "PhyloPostTree"
+
+    test("Should reconstruct ancestral states for tips and internal nodes, with 329aa HA1 proteins, and cluster K samples at threshold 0.005") {
+
+        when {
+            process {
+                """
+                input[0] = tuple(
+                    "H3N2",
+                    "whole_genome",
+                    file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/gene_map.tsv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
+                input[3] = 0.005
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            // Step messages go to posttree.log (part of the tree's phylo.log), not to the terminal
+            assert path(process.out.step_log.get(0)[1]).text.contains("PhyloPostTree: ") : "posttree.log should hold the cluster summary"
+            assert !process.stdout.join("\\n").contains("PhyloPostTree:")
+
+            // ---- Ancestral reconstruction ----
+            // ancestral_aa/HA1.fasta sequences are all 329 amino acids long
+            def ha1Fasta = path("${process.out.proteins.get(0)[1]}/HA1.fasta").text
+            def ha1Records = [:]
+            String currentId = null
+            StringBuilder seq = new StringBuilder()
+            ha1Fasta.readLines().each { line ->
+                if (line.startsWith(">")) {
+                    if (currentId != null) ha1Records[currentId] = seq.toString()
+                    currentId = line.substring(1)
+                    seq = new StringBuilder()
+                } else {
+                    seq.append(line)
+                }
+            }
+            if (currentId != null) ha1Records[currentId] = seq.toString()
+            assert ha1Records.size() > 0 : "ancestral_aa/HA1.fasta has no records"
+            ha1Records.each { id, s -> assert s.length() == 329 : "${id} HA1 protein length is ${s.length()}, expected 329" }
+
+            // HA1:145 tip state for REF_A_Croatia_10136RV_2023 is N
+            assert ha1Records["REF_A_Croatia_10136RV_2023"][144] == "N" : "expected HA1 position 145 of Croatia to be N"
+
+            // Darwin's PA protein is entirely missing data ('-'), never imputed, because Darwin has no PA segment
+            def paFasta = path("${process.out.proteins.get(0)[1]}/PA.fasta").text
+            def darwinPa = null
+            currentId = null
+            seq = new StringBuilder()
+            paFasta.readLines().each { line ->
+                if (line.startsWith(">")) {
+                    if (currentId == "REF_A_Darwin_6_2021") darwinPa = seq.toString()
+                    currentId = line.substring(1)
+                    seq = new StringBuilder()
+                } else {
+                    seq.append(line)
+                }
+            }
+            if (currentId == "REF_A_Darwin_6_2021") darwinPa = seq.toString()
+            assert darwinPa != null : "REF_A_Darwin_6_2021 not found in ancestral_aa/PA.fasta"
+            assert darwinPa.length() > 0
+            assert darwinPa.chars().allMatch { (char) it == '-' as char } : "Darwin's PA protein should be all gaps (missing), got: ${darwinPa}"
+
+            // ---- Clusters ----
+            def clusterLines = path(process.out.clusters.get(0)[1]).text.readLines()
+            assert clusterLines[0] == "tip\tsubclade\tcluster\tcluster_size"
+            def rows = clusterLines.drop(1).collectEntries { line -> def f = line.split("\t", -1); [(f[0]): f] }
+
+            // The 3 K-subclade samples in the tree cluster together as K_C1
+            ["01816372", "01818936", "198353883"].each { tip ->
+                assert rows[tip][2] == "K_C1" : "${tip} should be in cluster K_C1, got ${rows[tip][2]}"
+                assert rows[tip][3] == "3" : "${tip} cluster_size should be 3, got ${rows[tip][3]}"
+            }
+
+            // Root strains are never clustered (NA), regardless of their subclade
+            [
+                "REF_A_Darwin_6_2021", "REF_A_Massachusetts_18_2022", "REF_A_Croatia_10136RV_2023",
+                "REF_A_Singapore_GP20238_2024", "REF_A_Sydney_1359_2024"
+            ].each { tip ->
+                assert rows[tip][2] == "NA" : "root strain ${tip} should never be clustered, got ${rows[tip][2]}"
+            }
+        }
+    }
+
+    test("Should leave every sample unclustered when the threshold is far smaller than any patristic distance") {
+
+        when {
+            process {
+                """
+                input[0] = tuple(
+                    "H3N2",
+                    "whole_genome",
+                    file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/gene_map.tsv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
+                input[3] = 0.00001
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def clusterLines = path(process.out.clusters.get(0)[1]).text.readLines()
+            def rows = clusterLines.drop(1).collect { line -> line.split("\t", -1) }
+            def sampleRows = rows.findAll { it[0] in ["01816372", "01818936", "198353883"] }
+            assert sampleRows.size() == 3
+            sampleRows.each { r -> assert r[2] == "unclustered" : "${r[0]} should be unclustered at threshold 0.00001, got ${r[2]}" }
+        }
+    }
+
+    test("Should nest a segment tree's files under its own tree_folder (e.g. 'HA') and carry it through for_report") {
+
+        when {
+            process {
+                """
+                input[0] = tuple(
+                    "H3N2_HA",
+                    "HA",
+                    file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_segments.tsv", checkIfExists: true)
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/gene_map.tsv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
+                input[3] = 0.005
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def clustersPath = path(process.out.clusters.get(0)[1])
+            assert clustersPath.toString().contains("/HA/") : "expected clusters.tsv nested under an 'HA' folder, got ${clustersPath}"
+            def forReport = process.out.for_report.get(0)
+            assert forReport[0] == "H3N2_HA"
+            assert forReport[1] == "HA"
+        }
+    }
+
+}

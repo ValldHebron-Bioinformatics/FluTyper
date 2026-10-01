@@ -445,7 +445,18 @@ process MutationsGraphicReport {
         subtitle_text = "Markers are filtered by the selected frequency threshold."
         js_marker_bypass = "false"
 
-    season_options = "".join([f'<option value="{s}">{s}</option>' for s in sorted_seasons])
+    # Season range selectors. FROM: 'All Time', then every dated season in chronological
+    # order, plus 'Unknown Season' (single-season view only) when undated samples exist.
+    # TO: every dated season in chronological order. Both start on the default season so the
+    # initial view is the same single-season view as before.
+    range_seasons = sorted(valid_seasons)
+    from_seasons = ['All Time'] + range_seasons
+    if 'Unknown Season' in available_seasons:
+        from_seasons.append('Unknown Season')
+    default_to = default_season if default_season in range_seasons else (range_seasons[-1] if range_seasons else '')
+    season_from_options = "".join([f'<option value="{s}"{" selected" if s == default_season else ""}>{s}</option>' for s in from_seasons])
+    season_to_options   = "".join([f'<option value="{s}"{" selected" if s == default_to else ""}>{s}</option>' for s in range_seasons])
+    season_to_disabled  = "" if default_season in range_seasons else " disabled"
     age_options    = "".join([f'<option value="{a}">{a}</option>' for a in age_groups])
     sex_options = "".join([f'<option value="{g}">{g}</option>' for g in sexs])
 
@@ -485,9 +496,16 @@ process MutationsGraphicReport {
 
             <div class="controls-container">
                 <div class="control-group">
-                    <label>SEASON</label>
-                    <select id="seasonSel" onchange="applyFilters()" style="min-width:160px;">
-                        {season_options}
+                    <label>SEASON FROM</label>
+                    <select id="seasonSel" onchange="onSeasonFromChange()" style="min-width:160px;">
+                        {season_from_options}
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label>SEASON TO</label>
+                    <select id="seasonToSel" onchange="onSeasonToChange()" style="min-width:160px;"{season_to_disabled}>
+                        {season_to_options}
                     </select>
                 </div>
 
@@ -510,7 +528,7 @@ process MutationsGraphicReport {
                     <input type="range" id="freqSlider" min="0" max="100" value="{default_val}"
                            oninput="applyFilters()" style="width: 100%; margin-top: 8px;">
                     <p style="color: gray; font-size: 11px; margin-top: 4px; margin-bottom: 0;">
-                        Percentage relative to sequences in the active season
+                        Percentage relative to sequences in the selected season(s)
                     </p>
                 </div>
             </div>
@@ -539,7 +557,8 @@ process MutationsGraphicReport {
                         var yArr = graphContainer.data[si].y;
                         graphContainer.originalYValues.push(yArr ? Array.from(yArr) : null);
                     }}
-                    
+
+                    buildSeasonIndex(graphContainer);
                     applyFilters();
 
                     // Marker click -> ask the parent dashboard (index.html) to open the matching
@@ -560,20 +579,175 @@ process MutationsGraphicReport {
                 }}
             }}, 200);
 
+            // ---- Season range (SEASON FROM / SEASON TO) ----
+            // Single-season and All Time views reuse the pre-built per-season traces unchanged.
+            // A multi-season range reuses the 'All Time' traces as templates (they hold every
+            // mutation point) and recomputes each point from the per-season traces:
+            //   frequency = sum(per-season sample counts) / sum(per-season protein totals).
+            // Seasons are disjoint sample sets, so summing per-season unique counts is exact.
+            var EFFECT_JOIN = '<br>                 ';
+
+            // Index of a season inside the chronological SEASON TO list (-1 for All Time / Unknown Season).
+            function rangeIndexOf(season) {{
+                var opts = document.getElementById('seasonToSel').options;
+                for (var i = 0; i < opts.length; i++) {{
+                    if (opts[i].value === season) return i;
+                }}
+                return -1;
+            }}
+
+            function onSeasonFromChange() {{
+                var toSel   = document.getElementById('seasonToSel');
+                var fromIdx = rangeIndexOf(document.getElementById('seasonSel').value);
+                if (fromIdx < 0) {{
+                    toSel.disabled = true;
+                }} else {{
+                    toSel.disabled = false;
+                    if (toSel.selectedIndex < fromIdx) toSel.selectedIndex = fromIdx;
+                }}
+                applyFilters();
+            }}
+
+            function onSeasonToChange() {{
+                var toSel   = document.getElementById('seasonToSel');
+                var fromIdx = rangeIndexOf(document.getElementById('seasonSel').value);
+                if (fromIdx >= 0 && toSel.selectedIndex < fromIdx) toSel.selectedIndex = fromIdx;
+                applyFilters();
+            }}
+
+            // Chronological list of seasons when a multi-season range is active, otherwise null.
+            function activeSeasonRange() {{
+                var toSel   = document.getElementById('seasonToSel');
+                var fromIdx = rangeIndexOf(document.getElementById('seasonSel').value);
+                if (fromIdx < 0 || toSel.disabled || toSel.selectedIndex <= fromIdx) return null;
+                var seasons = [];
+                for (var i = fromIdx; i <= toSel.selectedIndex; i++) seasons.push(toSel.options[i].value);
+                return seasons;
+            }}
+
+            function totalsKey(ds, meta, season) {{
+                return [ds.xaxis || 'x', meta.age, meta.sex, season].join('||');
+            }}
+
+            function pointKey(ds, meta, pi) {{
+                var cd = ds.customdata[pi];
+                return [ds.xaxis || 'x', meta.age, meta.sex, ds.name, ds.x[pi], cd[2], cd[7], cd[9]].join('||');
+            }}
+
+            // One-time index of the per-season traces: protein totals and per-point rows.
+            function buildSeasonIndex(gd) {{
+                gd.originalCustom = [];
+                gd.seasonTotals   = {{}};
+                gd.seasonPoints   = {{}};
+                gd.templateIdx    = [];
+                gd.rangeCache     = {{}};
+                gd.appliedCdKey   = 'original';
+                for (var si = 0; si < gd.data.length; si++) {{
+                    var ds   = gd.data[si];
+                    var meta = gd.parsedMeta[si];
+                    gd.originalCustom.push(ds.customdata ? ds.customdata.map(function(r) {{ return Array.from(r); }}) : null);
+                    if (!meta || typeof meta !== 'object' || !ds.customdata || !ds.x) continue;
+                    if (meta.season === 'All Time') {{
+                        gd.templateIdx.push(si);
+                        continue;
+                    }}
+                    for (var pi = 0; pi < ds.customdata.length; pi++) {{
+                        var row = ds.customdata[pi];
+                        gd.seasonTotals[totalsKey(ds, meta, meta.season)] = Number(row[8]);
+                        var pk = pointKey(ds, meta, pi);
+                        if (!gd.seasonPoints[pk]) gd.seasonPoints[pk] = {{}};
+                        gd.seasonPoints[pk][meta.season] = row;
+                    }}
+                }}
+            }}
+
+            // Same rounding as pandas .round(2) (numpy: scale by 100, round half to even).
+            function roundHalfEven2(value) {{
+                var scaled  = value * 100;
+                var rounded = Math.round(scaled);
+                if (Math.abs(scaled % 1) === 0.5 && rounded % 2 !== 0) rounded -= 1;
+                return rounded / 100;
+            }}
+
+            function addUnique(list, text, sep) {{
+                if (text === null || text === undefined) return;
+                String(text).split(sep).forEach(function(item) {{
+                    var clean = item.trim();
+                    if (clean !== '' && list.indexOf(clean) < 0) list.push(clean);
+                }});
+            }}
+
+            // Aggregated rows ({{pct, cd}} or null per point) for every template trace of a range.
+            function getRangeRows(gd, seasons) {{
+                var cacheKey = seasons.join(',');
+                if (gd.rangeCache[cacheKey]) return gd.rangeCache[cacheKey];
+                var result = {{}};
+                gd.templateIdx.forEach(function(si) {{
+                    var ds   = gd.data[si];
+                    var meta = gd.parsedMeta[si];
+                    var orig = gd.originalCustom[si];
+                    var rows = [];
+                    var cds  = [];
+                    var total = 0;
+                    seasons.forEach(function(s) {{ total += gd.seasonTotals[totalsKey(ds, meta, s)] || 0; }});
+                    for (var pi = 0; pi < orig.length; pi++) {{
+                        var perSeason = gd.seasonPoints[pointKey(ds, meta, pi)] || {{}};
+                        var count = 0, ids = [], subtypes = [], effects = [], foundIn = [];
+                        seasons.forEach(function(s) {{
+                            var r = perSeason[s];
+                            if (!r) return;
+                            count += Number(r[4]);
+                            addUnique(ids, r[0], ',');
+                            addUnique(subtypes, r[1], ',');
+                            addUnique(effects, r[3], '<br>');
+                            addUnique(foundIn, r[6], ',');
+                        }});
+                        if (count === 0 || total === 0) {{
+                            rows.push(null);
+                            cds.push(orig[pi]);
+                            continue;
+                        }}
+                        var pct = roundHalfEven2(count / total * 100);
+                        rows.push(pct);
+                        cds.push([ids.join(', '), subtypes.join(', '), orig[pi][2], effects.join(EFFECT_JOIN),
+                                  count, pct, foundIn.join(', '), orig[pi][7], total, orig[pi][9]]);
+                    }}
+                    result[si] = {{ pct: rows, cd: cds }};
+                }});
+                gd.rangeCache[cacheKey] = result;
+                return result;
+            }}
+
             function applyFilters() {{
                 var minimumFrequency = parseFloat(document.getElementById('freqSlider').value);
-                var activeSeason     = document.getElementById('seasonSel').value;
+                var seasonRange      = activeSeasonRange();
+                // A range is drawn on the 'All Time' template traces with recomputed values.
+                var activeSeason     = seasonRange ? 'All Time' : document.getElementById('seasonSel').value;
                 var activeAge        = document.getElementById('ageSel').value;
                 var activeSex     = document.getElementById('sexSel').value;
 
                 document.getElementById('sliderValue').innerText = minimumFrequency + '%';
 
-                var titleLabel = activeSeason === 'All Time' ? 'All Time' : 'Season ' + activeSeason;
+                var titleLabel = seasonRange
+                    ? 'Seasons ' + seasonRange[0] + ' to ' + seasonRange[seasonRange.length - 1]
+                    : (activeSeason === 'All Time' ? 'All Time' : 'Season ' + activeSeason);
                 document.getElementById('report-title').innerText =
                     'Mutation Summary per Protein - ' + titleLabel;
 
                 var graphContainer = document.getElementById('plotly-graphs');
                 if (!graphContainer || !graphContainer.originalYValues) return;
+
+                var rangeRows = seasonRange ? getRangeRows(graphContainer, seasonRange) : null;
+
+                // Swap hover data of the template traces between original and range values.
+                var cdKey = seasonRange ? seasonRange.join(',') : 'original';
+                if (cdKey !== graphContainer.appliedCdKey && graphContainer.templateIdx.length > 0) {{
+                    var cdValues = graphContainer.templateIdx.map(function(si) {{
+                        return rangeRows ? rangeRows[si].cd : graphContainer.originalCustom[si];
+                    }});
+                    Plotly.restyle(graphContainer, {{ customdata: cdValues }}, graphContainer.templateIdx);
+                    graphContainer.appliedCdKey = cdKey;
+                }}
 
                 var newY          = [];
                 var newVisibility = [];
@@ -607,7 +781,14 @@ process MutationsGraphicReport {
 
                     newVisibility.push(true);
 
-                    if ({js_marker_bypass}) {{
+                    if (rangeRows && rangeRows[si]) {{
+                        var rangePct = rangeRows[si].pct;
+                        var bypass   = {js_marker_bypass};
+                        newY.push(rangePct.map(function(p) {{
+                            if (p === null) return null;
+                            return (bypass || p >= minimumFrequency) ? p : null;
+                        }}));
+                    }} else if ({js_marker_bypass}) {{
                         newY.push(baselineY);
                     }} else {{
                         var filteredY = [];

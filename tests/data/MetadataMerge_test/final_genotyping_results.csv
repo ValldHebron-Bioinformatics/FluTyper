@@ -1,0 +1,4 @@
+SampleID,Subtype,Dataset,Dataset Version,Clade,Genin Version,Genotype,Sub-genotype,Notes
+S001,H5N1(HPAI),nextclade_H5_dataset,2024-01-01T00:00:00Z,2.3.4.4b,2.1.6,EA-2020-C,,
+S002,A(H3N2),nextclade_H3_dataset,2024-01-01T00:00:00Z,G.1,-,-,-,-
+S003,H9N2(LPAI),nextclade_H9_dataset,-,-,-,-,-,-

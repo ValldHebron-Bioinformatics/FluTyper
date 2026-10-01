@@ -1,0 +1,399 @@
+import groovy.json.JsonSlurper
+
+nextflow_pipeline {
+
+    name "Test Pipeline Phylogenetics"
+    script "nf_pipeline/main.nf"
+
+    test("Should skip the source panel (no ORIGINATING_LAB in humanmetadata.csv) and report 6 QC candidates / 3 passed") {
+
+        when {
+            params {
+                protocol = "HUMAN"
+                protocols = [
+                    HUMAN: [
+                        directory: "${projectDir}/protocols/HUMAN",
+                        resources: "${projectDir}/protocols/HUMAN/v2"
+                    ]
+                ]
+                inputFasta = "${projectDir}/tests/data/HUMAN.fasta"
+                outDir = "tests/results/phylo_test_1"
+                metadata = "${projectDir}/tests/data/humanmetadata.csv"
+                phylogenetics = true
+                phyloSubtype = "H3N2"
+                phyloWholeGenome = true
+                phyloSegmentTrees = "none"
+                aaPositions = "HA1:62,HA1:145,HA1:239"
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def outputDir = path("$baseDir/tests/results/phylo_test_1")
+            def manifestFile = PhyloTestHelpers.workFile("${launchDir}/work", "whole_genome", "run_manifest.json")
+            assert !outputDir.resolve("phylogeny/H3N2/whole_genome/run_manifest.json").exists() : "run_manifest.json must stay in work/, not be published"
+
+            def manifest = new JsonSlurper().parse(manifestFile)
+            assert manifest.qc.candidates == 6 : "expected 6 QC candidates, got ${manifest.qc.candidates}"
+            assert manifest.qc.passed == 3 : "expected 3 passed, got ${manifest.qc.passed}"
+
+            def skippedPanels = manifest.panels.skipped.collect { it.panel }
+            assert skippedPanels.contains("source") : "source panel should be skipped (humanmetadata.csv has no ORIGINATING_LAB column): ${manifest.panels}"
+
+            def phyloLog = PhyloTestHelpers.checkTreeFolder(outputDir.resolve("phylogeny/H3N2/whole_genome"), "H3N2")
+            // phylo.log: preflight note, the coverage QC summary (samples in / dropped) and the step messages, in order
+            assert phyloLog.contains("PhyloPreflight: all phylogenetics tools found.")
+            assert phyloLog.contains("PhyloCoverageQC: 3 of 6 candidate samples enter this tree; 3 dropped.") : phyloLog
+            assert phyloLog.contains("PhyloAlignment: whole-genome alignment of")
+            assert phyloLog.contains("PhyloPostTree: ")
+            assert phyloLog.contains("PhyloReport: INFO panel 'source' omitted")
+            assert phyloLog.indexOf("## Preflight") < phyloLog.indexOf("## Coverage QC") && phyloLog.indexOf("## Coverage QC") < phyloLog.indexOf("## Alignment") &&
+                   phyloLog.indexOf("## Alignment") < phyloLog.indexOf("## IQ-TREE") && phyloLog.indexOf("## IQ-TREE") < phyloLog.indexOf("## Report")
+            // no other phylogenetics file is published, neither per tree nor for the subtype
+            assert outputDir.resolve("phylogeny/H3N2").toFile().list().toList() == ["whole_genome"] : outputDir.resolve("phylogeny/H3N2").toFile().list().toList()
+
+            PhyloTestHelpers.checkQuietTerminal(workflow.stdout)
+            assert PhyloTestHelpers.countLines(workflow.stdout, "PHYLOGENETICS(H3N2): whole-genome tree built (3 samples) -> phylogeny/H3N2/") == 1
+
+            def dashboard = outputDir.resolve("index.html")
+            assert dashboard.exists() : "index.html was not published"
+            assert dashboard.text.contains('"title": "Phylogenetic Tree H3N2 Whole genome"') : "index.html's catalog does not list the H3N2 whole-genome Phylogenetic Tree report"
+        }
+    }
+
+    test("Should render the source panel and group labs with --labMap; season/age/sex come from humanmetadata_labs.csv") {
+
+        when {
+            params {
+                protocol = "HUMAN"
+                protocols = [
+                    HUMAN: [
+                        directory: "${projectDir}/protocols/HUMAN",
+                        resources: "${projectDir}/protocols/HUMAN/v2"
+                    ]
+                ]
+                inputFasta = "${projectDir}/tests/data/HUMAN.fasta"
+                outDir = "tests/results/phylo_test_2"
+                metadata = "${projectDir}/tests/data/humanmetadata_labs.csv"
+                labMap = "${projectDir}/tests/data/lab_map_cat.tsv"
+                phylogenetics = true
+                phyloSubtype = "H3N2"
+                phyloWholeGenome = true
+                phyloSegmentTrees = "none"
+                aaPositions = "HA1:62,HA1:145,HA1:239"
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def outputDir = path("$baseDir/tests/results/phylo_test_2")
+            def manifestFile = PhyloTestHelpers.workFile("${launchDir}/work", "whole_genome", "run_manifest.json")
+            def manifest = new JsonSlurper().parse(manifestFile)
+            def renderedPanels = manifest.panels.rendered
+            assert renderedPanels.contains("source") : "source panel should be rendered with --labMap: ${manifest.panels}"
+
+            def annotationsFile = PhyloTestHelpers.workFile("${launchDir}/work", "whole_genome", "annotations.tsv")
+            def lines = annotationsFile.text.readLines()
+            def header = lines[0].split("\t", -1)
+            def byId = lines.drop(1).collectEntries { line -> def f = line.split("\t", -1); [(f[0]): f] }
+            def col = { String name -> header.toList().indexOf(name) }
+            def sourceIdx = col("source_group")
+            def seasonIdx = col("season")
+            def ageIdx = col("age_group")
+            def sexIdx = col("sex")
+
+            // lab_map_cat.tsv: CAP El Carmel -> Community, Hospital Universitari Vall d'Hebron -> Hospital,
+            // Hospital Universitari Germans Trias i Pujol -> Hospital
+            assert byId["01816372"][sourceIdx] == "Community" : "01816372 should be grouped as Community: ${byId['01816372']}"
+            assert byId["01818936"][sourceIdx] == "Hospital" : "01818936 should be grouped as Hospital: ${byId['01818936']}"
+            assert byId["198353883"][sourceIdx] == "Hospital" : "198353883 should be grouped as Hospital: ${byId['198353883']}"
+
+            // humanmetadata_labs.csv DATEs: 01816372=2024-11-08 and 198353883=2024-11-23 (season 2024-2025);
+            // 01818936=2024-08-23 (season 2023-2024)
+            assert byId["01818936"][seasonIdx] == "2023-2024" : "01818936 should be season 2023-2024: ${byId['01818936']}"
+            assert byId["01816372"][seasonIdx] == "2024-2025" : "01816372 should be season 2024-2025: ${byId['01816372']}"
+            assert byId["198353883"][seasonIdx] == "2024-2025" : "198353883 should be season 2024-2025: ${byId['198353883']}"
+
+            assert byId["01816372"][ageIdx] == "15-65" && byId["01816372"][sexIdx] == "F"
+            assert byId["01818936"][ageIdx] == "65+" && byId["01818936"][sexIdx] == "M"
+            assert byId["198353883"][ageIdx] == "65+" && byId["198353883"][sexIdx] == "M"
+
+            PhyloTestHelpers.checkTreeFolder(outputDir.resolve("phylogeny/H3N2/whole_genome"), "H3N2")
+
+            def dashboard = outputDir.resolve("index.html")
+            assert dashboard.exists()
+            assert dashboard.text.contains('"title": "Phylogenetic Tree H3N2 Whole genome"') : "index.html's catalog does not list the H3N2 whole-genome Phylogenetic Tree report"
+        }
+    }
+
+    test("Should fail when an amino acid position is out of range (HA1:400)") {
+
+        when {
+            params {
+                protocol = "HUMAN"
+                protocols = [
+                    HUMAN: [
+                        directory: "${projectDir}/protocols/HUMAN",
+                        resources: "${projectDir}/protocols/HUMAN/v2"
+                    ]
+                ]
+                inputFasta = "${projectDir}/tests/data/HUMAN.fasta"
+                outDir = "tests/results/phylo_test_3"
+                metadata = "${projectDir}/tests/data/humanmetadata.csv"
+                phylogenetics = true
+                phyloSubtype = "H3N2"
+                phyloWholeGenome = true
+                phyloSegmentTrees = "none"
+                aaPositions = "HA1:400"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            assert workflow.stdout.join("\n").contains("valid positions for HA1 are 1-329")
+        }
+    }
+
+    test("Should fail fast, before any process runs, when --periodBin is 'year'") {
+
+        when {
+            params {
+                protocol = "HUMAN"
+                protocols = [
+                    HUMAN: [
+                        directory: "${projectDir}/protocols/HUMAN",
+                        resources: "${projectDir}/protocols/HUMAN/v2"
+                    ]
+                ]
+                inputFasta = "${projectDir}/tests/data/HUMAN.fasta"
+                outDir = "tests/results/phylo_test_4"
+                metadata = "${projectDir}/tests/data/humanmetadata.csv"
+                phylogenetics = true
+                aaPositions = "HA1:62,HA1:145,HA1:239"
+                periodBin = "year"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            assert workflow.stdout.join("\n").contains("--periodBin must be one of month, week or none")
+            // Parameter validation happens before the input FASTA is even parsed: no process should have run
+            assert workflow.trace.succeeded().size() == 0
+        }
+    }
+
+    test("Should build only segment trees by default (--phyloWholeGenome false, --phyloSegmentTrees all): no whole-genome tree, several segment trees exist, and the dashboard has both the subtype and tree selectors") {
+
+        when {
+            params {
+                protocol = "HUMAN"
+                protocols = [
+                    HUMAN: [
+                        directory: "${projectDir}/protocols/HUMAN",
+                        resources: "${projectDir}/protocols/HUMAN/v2"
+                    ]
+                ]
+                inputFasta = "${projectDir}/tests/data/HUMAN.fasta"
+                outDir = "tests/results/phylo_test_5"
+                metadata = "${projectDir}/tests/data/humanmetadata.csv"
+                phylogenetics = true
+                phyloSubtype = "H3N2"
+                bootstrap = 0
+                // phyloWholeGenome / phyloSegmentTrees left at their defaults: false / "all"
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def outputDir = path("$baseDir/tests/results/phylo_test_5")
+            assert !outputDir.resolve("phylogeny/H3N2/whole_genome").exists() :
+                "no whole-genome tree should be built by default (--phyloWholeGenome default is false)"
+
+            // HA and PA are both expected to have >= 3 samples passing their own coverage QC (same fixture as
+            // phylo_test_1/2): with --phyloSegmentTrees "all" (the default), every segment with enough samples
+            // should build its own tree, not just HA.
+            def haLog = PhyloTestHelpers.checkTreeFolder(outputDir.resolve("phylogeny/H3N2/HA"), "H3N2_HA")
+            def paLog = PhyloTestHelpers.checkTreeFolder(outputDir.resolve("phylogeny/H3N2/PA"), "H3N2_PA")
+            assert haLog.contains("PhyloSegmentAlignment: HA alignment of") && haLog.contains("PhyloCoverageQC:") : haLog
+            // PA: the configured outgroup A/Darwin/6/2021 has no PA segment; both the preflight note and the
+            // outgroup fallback of this tree end up in its own phylo.log (and not in the HA one)
+            assert paLog.contains("PhyloPreflight: A/Darwin/6/2021 has no PA segment in the protocol references") : paLog
+            assert paLog.contains("rooting the PA tree on A/Massachusetts/18/2022 instead") : paLog
+            assert !haLog.contains("has no PA segment") : "PA-only preflight notes must not appear in the HA tree's phylo.log"
+            // the shared subtype-level files are not published, only the tree folders
+            assert outputDir.resolve("phylogeny/H3N2").toFile().list().toList().every { it in ["PB2", "PB1", "PA", "HA", "NP", "NA", "MP", "NS"] }
+            PhyloTestHelpers.checkQuietTerminal(workflow.stdout)
+            // exactly one summary line for the subtype, listing every built segment tree
+            assert workflow.stdout.count { it.startsWith("PHYLOGENETICS(H3N2): ") && it.contains("segment trees built (") && it.contains("HA ") && it.contains("PA ") } == 1
+
+            def dashboard = outputDir.resolve("index.html")
+            assert dashboard.exists()
+            assert dashboard.text.contains("Subtype") : "index.html's Phylogenetics section is missing the Subtype selector"
+            assert dashboard.text.contains("treeLabel.textContent = 'Tree'") : "index.html's Phylogenetics section is missing the Tree selector"
+
+            // Parse the actual catalog JSON payload (not a static JS string search) to confirm the dashboard groups
+            // reports by the real per-tree data MergeReports emitted, for both HA and PA, and never a whole-genome
+            // entry.
+            def catalogMatch = (dashboard.text =~ /const catalog = (\[.*?\]);/)
+            assert catalogMatch.find() : "index.html has no embedded catalog JSON"
+            def catalog = new JsonSlurper().parseText(catalogMatch.group(1))
+            def phyloEntries = catalog.findAll { it.category == "Phylogenetics" && it.subtype == "H3N2" }
+            def treesListed = phyloEntries.collect { it.tree }
+            assert "HA" in treesListed : "index.html's catalog does not list the HA tree: ${treesListed}"
+            assert "PA" in treesListed : "index.html's catalog does not list the PA tree: ${treesListed}"
+            assert !("Whole genome" in treesListed) : "index.html's catalog should not list a whole-genome tree: ${treesListed}"
+        }
+    }
+
+    test("Should skip segment trees with 0 and with < 3 passing samples (warning each), while a well-covered segment still builds") {
+
+        when {
+            params {
+                protocol = "HUMAN"
+                protocols = [
+                    HUMAN: [
+                        directory: "${projectDir}/protocols/HUMAN",
+                        resources: "${projectDir}/protocols/HUMAN/v2"
+                    ]
+                ]
+                inputFasta = "${projectDir}/tests/data/phylo/gate_test.fasta"
+                outDir = "tests/results/phylo_test_6"
+                phylogenetics = true
+                phyloSubtype = "H3N2"
+                phyloWholeGenome = false
+                phyloSegmentTrees = "HA,MP,NS"
+                bootstrap = 0
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            // gate_test.fasta: HA has 3 samples (builds), MP has 1 (<3, skipped), NS has 0 (skipped)
+            assert workflow.stdout.join("\n").contains("segment tree MP skipped: only 1 sample(s) passed coverage QC for MP")
+            assert workflow.stdout.join("\n").contains("segment tree NS skipped: 0 samples passed coverage QC for NS")
+            // each warning appears once on the terminal (println only, no extra log.warn copy) ...
+            assert PhyloTestHelpers.countLines(workflow.stdout, "segment tree MP skipped") == 1
+            assert PhyloTestHelpers.countLines(workflow.stdout, "segment tree NS skipped") == 1
+            // ... and the subtype summary names what was skipped
+            assert workflow.stdout.count { it.startsWith("PHYLOGENETICS(H3N2): 1 segment tree built (HA 3) -> phylogeny/H3N2/ (skipped: MP, NS)") } == 1
+
+            def outputDir = path("$baseDir/tests/results/phylo_test_6")
+            PhyloTestHelpers.checkTreeFolder(outputDir.resolve("phylogeny/H3N2/HA"), "H3N2_HA")
+            assert !outputDir.resolve("phylogeny/H3N2/MP").exists() : "MP (1 sample) should be skipped"
+            assert !outputDir.resolve("phylogeny/H3N2/NS").exists() : "NS (0 samples) should be skipped"
+        }
+    }
+
+    test("Should run with the real default --phyloSubtype (H3N2,H1N1pdm09) on H3N2-only fixtures: H1N1pdm09 warns 'no samples', H3N2 trees exist, dashboard builds") {
+
+        when {
+            params {
+                protocol = "HUMAN"
+                protocols = [
+                    HUMAN: [
+                        directory: "${projectDir}/protocols/HUMAN",
+                        resources: "${projectDir}/protocols/HUMAN/v2"
+                    ]
+                ]
+                // gate_test.fasta only has H3N2 samples (01816372, 01818936, 198353883): H1N1pdm09 should find none
+                inputFasta = "${projectDir}/tests/data/phylo/gate_test.fasta"
+                outDir = "tests/results/phylo_test_7"
+                phylogenetics = true
+                // phyloSubtype left at its real default: "H3N2,H1N1pdm09"
+                phyloSegmentTrees = "HA"
+                bootstrap = 0
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert workflow.stdout.join("\n").contains("PHYLOGENETICS(H1N1pdm09): no H1N1 samples were found, so no phylogeny is built.")
+
+            def outputDir = path("$baseDir/tests/results/phylo_test_7")
+            PhyloTestHelpers.checkTreeFolder(outputDir.resolve("phylogeny/H3N2/HA"), "H3N2_HA")
+            // No shared subtype-level file is published any more, and with 0 candidates H1N1pdm09 publishes nothing
+            assert !outputDir.resolve("phylogeny/H1N1pdm09").exists() : "H1N1pdm09 has no candidates, so it publishes nothing"
+            assert PhyloTestHelpers.countLines(workflow.stdout, "no H1N1 samples were found") == 1 : "the 'no samples' warning must appear exactly once"
+            assert PhyloTestHelpers.countLines(workflow.stdout, "PHYLOGENETICS(H1N1pdm09): ") == 1 : "only the 'no samples' line is expected for H1N1pdm09"
+
+            def dashboard = outputDir.resolve("index.html")
+            assert dashboard.exists() : "index.html was not published"
+            assert dashboard.text.contains('"tree": "HA"')
+        }
+    }
+
+    test("Should build the H1N1pdm09 tree from --append historical samples alone (finding 1): a new H3N2-only FASTA plus an --append dir of H1N1pdm09 history still builds the H1N1pdm09 tree, reusing one historical sample's persisted Nextclade CSV and rerunning Nextclade for another") {
+
+        when {
+            params {
+                protocol = "HUMAN"
+                protocols = [
+                    HUMAN: [
+                        directory: "${projectDir}/protocols/HUMAN",
+                        resources: "${projectDir}/protocols/HUMAN/v2"
+                    ]
+                ]
+                // The new run's own FASTA is H3N2-only (same 3 samples as gate_test.fasta); every H1N1pdm09 sample
+                // (H1S001-004) comes exclusively from --append history.
+                inputFasta = "${projectDir}/tests/data/phylo/gate_test.fasta"
+                outDir = "tests/results/phylo_test_append"
+                append = "${projectDir}/tests/data/phylo/append_source"
+                phylogenetics = true
+                // phyloSubtype left at its real default: "H3N2,H1N1pdm09"
+                phyloSegmentTrees = "HA"
+                bootstrap = 0
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def outputDir = path("$baseDir/tests/results/phylo_test_append")
+
+            // The new run's own H3N2 tree still builds from gate_test.fasta's 3 samples
+            PhyloTestHelpers.checkTreeFolder(outputDir.resolve("phylogeny/H3N2/HA"), "H3N2_HA")
+
+            // Finding 1: GetDatasets must fetch the H1 Nextclade dataset from the merged (--append) inferred_subtypes.csv
+            // even though the new run's own FASTA has no H1N1 samples at all - otherwise this tree silently vanishes.
+            def h1n1Log = PhyloTestHelpers.checkTreeFolder(outputDir.resolve("phylogeny/H1N1pdm09/HA"), "H1N1pdm09_HA")
+            def h1n1Report = outputDir.resolve("phylogeny/H1N1pdm09/HA/PhylogeneticTreeReport_H1N1pdm09_HA.html")
+            assert h1n1Log.contains("PhyloCoverageQC: 4 of 4 candidate samples enter this tree") : h1n1Log
+            assert h1n1Report.text.contains("<title>Phylogenetic Tree - H1N1pdm09 - HA segment phylogeny</title>")
+
+            // The alignment/tree carries all 4 historical sample IDs plus the subtype's root strains
+            def alignmentText = PhyloTestHelpers.workFile("${launchDir}/work", "HA", "HA_alignment.fasta", "H1S001").text
+            ["H1S001", "H1S002", "H1S003", "H1S004"].each { id ->
+                assert alignmentText.contains(id) : "historical sample ${id} is missing from the H1N1pdm09 HA alignment"
+            }
+            ["REF_A_Victoria_2570_2019", "REF_A_Sydney_5_2021", "REF_A_Wisconsin_67_2022"].each { tip ->
+                assert alignmentText.contains(tip) : "root strain tip ${tip} is missing from the H1N1pdm09 HA alignment"
+            }
+
+            // annotations.tsv: H1S001 has a persisted nextclade_results.csv in --append history (reuse path) and
+            // must carry that CSV's own subclade (D.2); H1S002 has none (PhyloHistoricalNextclade rerun path,
+            // finding 7) and must still get a real (non-NA) subclade rather than silently losing its output.
+            def annotations = PhyloTestHelpers.workFile("${launchDir}/work", "HA", "annotations.tsv", "H1S001").text
+            def rows = annotations.readLines().drop(1).collect { it.split('\t') }
+            def h1s001 = rows.find { it[0] == "H1S001" }
+            def h1s002 = rows.find { it[0] == "H1S002" }
+            assert h1s001 != null : "H1S001 is not a tip in annotations.tsv"
+            assert h1s001[2] == "D.2" : "H1S001 (reused persisted CSV) should keep its own subclade D.2, got ${h1s001[2]}"
+            assert h1s002 != null : "H1S002 is not a tip in annotations.tsv"
+            assert h1s002[2] != "NA" : "H1S002 (PhyloHistoricalNextclade rerun path) should have a real subclade, not NA"
+
+            def dashboard = outputDir.resolve("index.html")
+            assert dashboard.exists()
+            def catalogMatch = (dashboard.text =~ /const catalog = (\[.*?\]);/)
+            assert catalogMatch.find()
+            def catalog = new JsonSlurper().parseText(catalogMatch.group(1))
+            def subtypesListed = catalog.findAll { it.category == "Phylogenetics" }.collect { it.subtype }
+            assert "H3N2" in subtypesListed : "index.html's catalog is missing the H3N2 entry"
+            assert "H1N1pdm09" in subtypesListed : "index.html's catalog is missing the H1N1pdm09 entry"
+        }
+    }
+
+}

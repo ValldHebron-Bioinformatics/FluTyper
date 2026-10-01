@@ -1,0 +1,206 @@
+import groovy.json.JsonSlurper
+
+nextflow_process {
+
+    name "Test Process PhyloPreflight"
+    script "nf_pipeline/modules/phylogeny/PhyloPreflight.nf"
+    process "PhyloPreflight"
+
+    test("Should succeed, mapping HA1 62/145/239 to the expected reference amino acids and building the coordinate/root/gene maps") {
+
+        when {
+            process {
+                """
+                input[0] = groovy.json.JsonOutput.toJson([
+                    "mafft": "7.525", "iqtree2": "2.3.6", "treetime": "0.11.4", "TreeCluster.py": "1.0.4",
+                    "nextclade": "3.18.0", "Rscript": "4.5.3", "ggtree": "4.0.5", "ape": "5.8.1",
+                    "ggplot2": "4.0.3", "ggnewscale": "0.5.2", "svglite": "2.2.2"
+                ]).bytes.encodeBase64().toString()
+                input[1] = file("${projectDir}/protocols/HUMAN/v2/HUMAN_references.fasta", checkIfExists: true)
+                input[2] = file("${projectDir}/protocols/HUMAN/v2/CDS_references.fasta", checkIfExists: true)
+                input[3] = "H3N2"
+                input[4] = "A/Darwin/6/2021"
+                input[5] = "A/Massachusetts/18/2022"
+                input[6] = "A/Darwin/6/2021,A/Massachusetts/18/2022,A/Croatia/10136RV/2023,A/Singapore/GP20238/2024,A/Sydney/1359/2024"
+                input[7] = "PB2,PB1,PA,HA,NP,NA,MP,NS"
+                input[8] = "HA1:62,HA1:145,HA1:239"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            // Notes go to preflight.log ("<segments>\t<message>", read by PhyloLog), not to the terminal
+            def notes = path(process.out.log.get(0)).text.readLines()
+            assert notes.contains("\tall phylogenetics tools found.")
+            assert notes.any { it.startsWith("PA\t") && it.contains("A/Darwin/6/2021 has no PA segment in the protocol references") } : notes
+            assert notes.any { it.startsWith("PA\t") && it.contains("root strain A/Darwin/6/2021 has no PA segment(s)") } : notes
+            assert !process.stdout.join("\\n").contains("PhyloPreflight:") : "PhyloPreflight no longer prints its notes to the terminal"
+
+            // Tool versions: every tool matches the expected version
+            def report = new JsonSlurper().parse(path(process.out.versions.get(0)).toFile())
+            assert report.mafft.status == "ok"
+            assert report.mafft.expected == "7.525"
+            assert report.mafft.found == "7.525"
+
+            def positionsText = path(process.out.positions.get(0)).text
+            assert positionsText.contains("1\tHA1:62\tHA1\t62\tG")
+            assert positionsText.contains("2\tHA1:145\tHA1\t145\tS")
+            assert positionsText.contains("3\tHA1:239\tHA1\t239\tP")
+
+            // PA has no segment for the alignment reference (Darwin) in the protocol references,
+            // so its coordinate reference falls back to Massachusetts
+            def coordTable = path(process.out.coordinate_table.get(0)).text
+            assert coordTable.contains("PA\tA/Massachusetts/18/2022")
+            // The other segments keep the alignment reference
+            assert coordTable.contains("HA\tA/Darwin/6/2021")
+
+            // Darwin (the alignment reference and a root strain) lists PA as missing
+            def rootTable = path(process.out.root_table.get(0)).text
+            def darwinLine = rootTable.readLines().find { it.startsWith("A/Darwin/6/2021\t") }
+            assert darwinLine != null : "A/Darwin/6/2021 row missing from root_strains.tsv"
+            assert darwinLine.endsWith("\tPA") : "PA should be in the segments_missing column: ${darwinLine}"
+
+            // HA1 has 329 codons (the last row of gene_map.tsv for HA1)
+            def geneMapLines = path(process.out.gene_map.get(0)).text.readLines()
+            def ha1Lines = geneMapLines.findAll { it.startsWith("HA1\t") }
+            assert ha1Lines.size() == 329 : "HA1 should have 329 codons, found ${ha1Lines.size()}"
+            def maxPos = ha1Lines.collect { it.split("\t")[1].toInteger() }.max()
+            assert maxPos == 329
+        }
+    }
+
+    test("Should fail with the valid range when a requested HA1 position is out of range ('HA1:400')") {
+
+        when {
+            process {
+                """
+                input[0] = groovy.json.JsonOutput.toJson(["mafft": "7.525"]).bytes.encodeBase64().toString()
+                input[1] = file("${projectDir}/protocols/HUMAN/v2/HUMAN_references.fasta", checkIfExists: true)
+                input[2] = file("${projectDir}/protocols/HUMAN/v2/CDS_references.fasta", checkIfExists: true)
+                input[3] = "H3N2"
+                input[4] = "A/Darwin/6/2021"
+                input[5] = "A/Massachusetts/18/2022"
+                input[6] = "A/Darwin/6/2021,A/Massachusetts/18/2022,A/Croatia/10136RV/2023,A/Singapore/GP20238/2024,A/Sydney/1359/2024"
+                input[7] = "PB2,PB1,PA,HA,NP,NA,MP,NS"
+                input[8] = "HA1:400"
+                """
+            }
+        }
+
+        then {
+            assert process.failed
+            assert process.stdout.join("\\n").contains("valid positions for HA1 are 1-329")
+        }
+    }
+
+    test("Should fail listing the available genes when an unknown gene is requested") {
+
+        when {
+            process {
+                """
+                input[0] = groovy.json.JsonOutput.toJson(["mafft": "7.525"]).bytes.encodeBase64().toString()
+                input[1] = file("${projectDir}/protocols/HUMAN/v2/HUMAN_references.fasta", checkIfExists: true)
+                input[2] = file("${projectDir}/protocols/HUMAN/v2/CDS_references.fasta", checkIfExists: true)
+                input[3] = "H3N2"
+                input[4] = "A/Darwin/6/2021"
+                input[5] = "A/Massachusetts/18/2022"
+                input[6] = "A/Darwin/6/2021,A/Massachusetts/18/2022,A/Croatia/10136RV/2023,A/Singapore/GP20238/2024,A/Sydney/1359/2024"
+                input[7] = "PB2,PB1,PA,HA,NP,NA,MP,NS"
+                input[8] = "NOTAGENE:1"
+                """
+            }
+        }
+
+        then {
+            assert process.failed
+            def out = process.stdout.join("\\n")
+            assert out.contains("gene NOTAGENE is not in the H3N2 reference")
+            assert out.contains("Available genes:")
+            assert out.contains("HA1")
+            assert out.contains("PB2")
+        }
+    }
+
+    test("Should fail naming the missing tool and its expected version when a tool is not installed") {
+
+        when {
+            process {
+                """
+                input[0] = groovy.json.JsonOutput.toJson(["notatool_xyz": "1.0"]).bytes.encodeBase64().toString()
+                input[1] = file("${projectDir}/protocols/HUMAN/v2/HUMAN_references.fasta", checkIfExists: true)
+                input[2] = file("${projectDir}/protocols/HUMAN/v2/CDS_references.fasta", checkIfExists: true)
+                input[3] = "H3N2"
+                input[4] = "A/Darwin/6/2021"
+                input[5] = "A/Massachusetts/18/2022"
+                input[6] = "A/Darwin/6/2021,A/Massachusetts/18/2022,A/Croatia/10136RV/2023,A/Singapore/GP20238/2024,A/Sydney/1359/2024"
+                input[7] = "PB2,PB1,PA,HA,NP,NA,MP,NS"
+                input[8] = ""
+                """
+            }
+        }
+
+        then {
+            assert process.failed
+            // errorStrategy 'terminate' means nf-test captures the process failure (with the
+            // command's stderr) in the Nextflow console log rather than in process.stderr.
+            assert process.stdout.join("\\n").contains("notatool_xyz")
+            assert process.stdout.join("\\n").contains("expected version 1.0")
+        }
+    }
+
+    test("Should succeed with status version_mismatch when a tool is found but at a different version") {
+
+        when {
+            process {
+                """
+                input[0] = groovy.json.JsonOutput.toJson(["mafft": "99.99"]).bytes.encodeBase64().toString()
+                input[1] = file("${projectDir}/protocols/HUMAN/v2/HUMAN_references.fasta", checkIfExists: true)
+                input[2] = file("${projectDir}/protocols/HUMAN/v2/CDS_references.fasta", checkIfExists: true)
+                input[3] = "H3N2"
+                input[4] = "A/Darwin/6/2021"
+                input[5] = "A/Massachusetts/18/2022"
+                input[6] = "A/Darwin/6/2021,A/Massachusetts/18/2022,A/Croatia/10136RV/2023,A/Singapore/GP20238/2024,A/Sydney/1359/2024"
+                input[7] = "PB2,PB1,PA,HA,NP,NA,MP,NS"
+                input[8] = ""
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def report = new JsonSlurper().parse(path(process.out.versions.get(0)).toFile())
+            assert report.mafft.status == "version_mismatch"
+            assert report.mafft.expected == "99.99"
+            assert report.mafft.found != "99.99"
+        }
+    }
+
+    test("Should write only the header of aa_positions.tsv when no positions are requested") {
+
+        when {
+            process {
+                """
+                input[0] = groovy.json.JsonOutput.toJson(["mafft": "7.525"]).bytes.encodeBase64().toString()
+                input[1] = file("${projectDir}/protocols/HUMAN/v2/HUMAN_references.fasta", checkIfExists: true)
+                input[2] = file("${projectDir}/protocols/HUMAN/v2/CDS_references.fasta", checkIfExists: true)
+                input[3] = "H3N2"
+                input[4] = "A/Darwin/6/2021"
+                input[5] = "A/Massachusetts/18/2022"
+                input[6] = "A/Darwin/6/2021,A/Massachusetts/18/2022,A/Croatia/10136RV/2023,A/Singapore/GP20238/2024,A/Sydney/1359/2024"
+                input[7] = "PB2,PB1,PA,HA,NP,NA,MP,NS"
+                input[8] = ""
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def positionsLines = path(process.out.positions.get(0)).text.readLines()
+            assert positionsLines.size() == 1 : "aa_positions.tsv should only contain the header when no positions are requested"
+            assert positionsLines[0] == "order\tlabel\tgene\tposition\tref_aa"
+        }
+    }
+
+}

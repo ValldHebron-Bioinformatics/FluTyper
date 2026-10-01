@@ -226,18 +226,42 @@ process CladeGraphicReport {
         genotype_map["No dataset available"] = '#d3d3d3'
         global_color_map['genotypes'] = genotype_map
 
-    season_options_evo = "".join([f'<option value="{s}">{s}</option>' for s in seasons_evo])
-    season_options_pie = "".join([f'<option value="{s}">{s}</option>' for s in seasons_pie])
+    # Season range selector: SEASON FROM ("All Time" + seasons) and SEASON TO (seasons), in chronological order.
+    # The initial selection is the same view as before: the most recent season (or All Time when there is none).
+    seasons_chrono = sorted(seasons_pie)
+    default_season = seasons_pie[0] if seasons_pie else "All Time"
+    season_from_options = "".join([f'<option value="{s}"{" selected" if s == default_season else ""}>{s}</option>' for s in ["All Time"] + seasons_chrono])
+    season_to_options = "".join([f'<option value="{s}"{" selected" if s == default_season else ""}>{s}</option>' for s in seasons_chrono])
     age_options = "".join([f'<option value="{a}">{a}</option>' for a in age_groups])
     sex_options = "".join([f'<option value="{g}">{g}</option>' for g in sexs])
 
+    # Shared JS: keeps SEASON TO consistent with SEASON FROM and describes the selected range
+    season_range_js = '''
+        function syncSeasonRange(rt) {
+            var f = document.getElementById('sel_season_from_' + rt), t = document.getElementById('sel_season_to_' + rt);
+            var allTime = f.value === 'All Time';
+            var fromIdx = f.selectedIndex - 1;
+            t.disabled = allTime;
+            if (!allTime && t.selectedIndex < fromIdx) t.selectedIndex = fromIdx;
+            return { allTime: allTime, from: f.value, to: t.value, fromIdx: fromIdx, toIdx: t.selectedIndex };
+        }
+        function seasonRangeLabel(r) {
+            if (r.allTime) return 'All Time';
+            return r.from === r.to ? 'Season ' + r.from : 'Seasons ' + r.from + ' to ' + r.to;
+        }
+    '''
+
     def generate_ui_html(report_type):
-        opts = season_options_evo if report_type == 'evo' else season_options_pie
+        to_disabled = " disabled" if default_season == "All Time" else ""
         return f'''
         <div style="display:flex; gap:15px; justify-content:center; margin-top:20px; font-family:Arial; background:#f9f9f9; padding:15px; border-radius:8px; border:1px solid #ddd; width:fit-content; margin-left:auto; margin-right:auto; box-shadow:0 4px 10px rgba(0,0,0,0.05);">
             <div style="min-width:150px;">
-                <label style="font-size:10px; font-weight:bold; color:#666;">SEASON</label><br>
-                <select id="sel_season_{report_type}" style="padding:6px; border-radius:4px; width:100%; border:1px solid #ccc; background:white;">{opts}</select>
+                <label style="font-size:10px; font-weight:bold; color:#666;">SEASON FROM</label><br>
+                <select id="sel_season_from_{report_type}" style="padding:6px; border-radius:4px; width:100%; border:1px solid #ccc; background:white;">{season_from_options}</select>
+            </div>
+            <div style="min-width:150px;">
+                <label style="font-size:10px; font-weight:bold; color:#666;">SEASON TO</label><br>
+                <select id="sel_season_to_{report_type}" style="padding:6px; border-radius:4px; width:100%; border:1px solid #ccc; background:white;"{to_disabled}>{season_to_options}</select>
             </div>
             <div style="min-width:120px;">
                 <label style="font-size:10px; font-weight:bold; color:#666;">AGE GROUP</label><br>
@@ -356,22 +380,25 @@ process CladeGraphicReport {
         <script>
             var seasonRanges = {json.dumps(season_ranges)};
             var totalCharts = {total_charts};
+            {season_range_js}
             function updateEvoPlot() {{
-                var s = document.getElementById('sel_season_evo').value;
+                var r = syncSeasonRange('evo');
                 var a = document.getElementById('sel_age_evo').value;
                 var g = document.getElementById('sel_sex_evo').value;
                 var plotDivs = document.getElementsByClassName('plotly-graph-div');
                 if (plotDivs.length === 0) return;
                 var plotDiv = plotDivs[0];
                 var update = {{ visible: [] }};
-                
+                // Weeks spanning the selected seasons: start of SEASON FROM to end of SEASON TO
+                var range = (!r.allTime && seasonRanges[r.from] && seasonRanges[r.to]) ? [seasonRanges[r.from][0], seasonRanges[r.to][1]] : null;
+
                 for (var i = 0; i < plotDiv.data.length; i++) {{
                     var meta = plotDiv.data[i].meta;
                     if (meta && meta.age === a && meta.sex === g) {{
                         var hasData = false;
-                        if (s === 'All Time') {{ hasData = plotDiv.data[i].x && plotDiv.data[i].x.length > 0; }}
-                        else if (seasonRanges[s]) {{
-                            var sStart = new Date(seasonRanges[s][0]), sEnd = new Date(seasonRanges[s][1]);
+                        if (r.allTime) {{ hasData = plotDiv.data[i].x && plotDiv.data[i].x.length > 0; }}
+                        else if (range) {{
+                            var sStart = new Date(range[0]), sEnd = new Date(range[1]);
                             if (plotDiv.data[i].x) {{
                                 for (var j = 0; j < plotDiv.data[i].x.length; j++) {{
                                     var xDate = new Date(plotDiv.data[i].x[j]);
@@ -385,11 +412,11 @@ process CladeGraphicReport {
                 Plotly.restyle(plotDiv, update);
                 
                 var layoutUpdate = {{}};
-                layoutUpdate['title.text'] = '<b>Evolution of Subtypes and Clades - ' + (s === 'All Time' ? s : 'Season ' + s) + '</b>';
+                layoutUpdate['title.text'] = '<b>Evolution of Subtypes and Clades - ' + seasonRangeLabel(r) + '</b>';
                 for (var i = 0; i < totalCharts; i++) {{
                     var ax = i === 0 ? 'xaxis' : 'xaxis' + (i + 1);
-                    if (s !== 'All Time' && seasonRanges[s]) {{
-                        layoutUpdate[ax + '.range'] = seasonRanges[s];
+                    if (range) {{
+                        layoutUpdate[ax + '.range'] = range;
                         layoutUpdate[ax + '.autorange'] = false;
                         layoutUpdate[ax + '.fixedrange'] = true;
                     }} else {{
@@ -399,7 +426,8 @@ process CladeGraphicReport {
                 }}
                 Plotly.relayout(plotDiv, layoutUpdate);
             }}
-            document.getElementById('sel_season_evo').addEventListener('change', updateEvoPlot);
+            document.getElementById('sel_season_from_evo').addEventListener('change', updateEvoPlot);
+            document.getElementById('sel_season_to_evo').addEventListener('change', updateEvoPlot);
             document.getElementById('sel_age_evo').addEventListener('change', updateEvoPlot);
             document.getElementById('sel_sex_evo').addEventListener('change', updateEvoPlot);
             window.addEventListener('load', updateEvoPlot);
@@ -417,86 +445,181 @@ process CladeGraphicReport {
     if include_genotype_chart: subplot_titles.append("<b>Genotype Distribution (Clade 2.3.4.4b)</b>")
     fig = make_subplots(rows=rows, cols=cols, specs=[[{"type": "domain"} for _ in range(cols)]], subplot_titles=subplot_titles, horizontal_spacing=0.05)
 
-    for season in seasons_pie:
+    # The pie slices are computed in the browser from per-group sample counts, so that a season range
+    # (SEASON FROM..SEASON TO) sums the counts of its seasons and every fraction is recomputed from the summed totals.
+    # Python adds one styled (empty) template trace per chart; the page fills labels, values, text and colors.
+    pie_texttemplate = '<b>%{label}</b><br><b>%{text}</b><br><b>%{percent}</b>'
+    pie_line = dict(color='#ffffff', width=2)
+    pie_charts = [{'kind': 'h', 'colorKey': 'h_subtypes', 'noDataName': 'H Subtypes'}]
+    fig.add_trace(go.Pie(
+        name="H Subtypes", texttemplate=pie_texttemplate, textposition='outside', insidetextorientation='horizontal', rotation=270, automargin=True, hole=0.35, marker=dict(line=pie_line),
+        hoverlabel=dict(font_size=14), hovertemplate='<b>H Subtype:</b> %{label}<br><b>Count:</b> %{text}<br><b>Percentage:</b> %{percent}<extra></extra>', visible=False
+    ), row=1, col=1)
+    for i, h in enumerate(valid_h_subtypes):
+        pie_charts.append({'kind': 'clade', 'h': str(h), 'colorKey': f'clades_{h}', 'noDataName': str(h)})
+        fig.add_trace(go.Pie(
+            name=str(h), texttemplate=pie_texttemplate, textposition='outside', rotation=270, automargin=True, insidetextorientation='horizontal', hole=0.35, marker=dict(line=pie_line),
+            hoverlabel=dict(font_size=14, align='left'), hovertemplate='<b>Group:</b> %{label}<br><b>Total Count:</b> %{text}<br><b>Group Percentage:</b> %{percent}%{customdata}<extra></extra>', visible=False
+        ), row=1, col=i + 2)
+    if include_genotype_chart:
+        pie_charts.append({'kind': 'genotype', 'colorKey': 'genotypes', 'noDataName': 'Genotypes'})
+        fig.add_trace(go.Pie(
+            name="Genotypes 2.3.4.4b", texttemplate=pie_texttemplate, textposition='outside', rotation=270, automargin=True, insidetextorientation='horizontal', hole=0.35, marker=dict(line=pie_line),
+            hoverlabel=dict(font_size=14, align='left'), hovertemplate='<b>Genotype:</b> %{label}<br><b>Total Count:</b> %{text}<br><b>Percentage:</b> %{percent}%{customdata}<extra></extra>', visible=False
+        ), row=1, col=total_charts)
+
+    # Sample counts per (season, age group, sex, H subtype, clade, root clade, genotype, sub-genotype), plus the first
+    # row index of each group (keeps pandas' first-appearance order for ties in the subtype counts)
+    pie_cols = ['Season', 'Age_Group', 'Sex', 'H_Subtype', 'Clade', 'Root_Clade', 'Genotype', 'Sub-genotype']
+    pie_groups = {}
+    for row_idx, row in enumerate(genotyping_df[pie_cols].itertuples(index=False, name=None)):
+        key = tuple(None if pd.isna(v) else str(v) for v in row)
+        if key in pie_groups: pie_groups[key][0] += 1
+        else: pie_groups[key] = [1, row_idx]
+    pie_records = [list(k) + v for k, v in pie_groups.items()]
+
+    # Slice order of the subtype pie for each single season (and All Time) x age x sex view, exactly as pandas
+    # value_counts() gives it: its order for tied counts depends on numpy's sort (CPU dependent), so it cannot be
+    # reproduced in the browser. Multi-season ranges use count descending, ties in order of first appearance.
+    pie_subtype_order = {}
+    for season in ["All Time"] + seasons_pie:
+        df_season = genotyping_df if season == "All Time" else genotyping_df[genotyping_df['Season'] == season]
         for age in age_groups:
             for sex in sexs:
-                meta_dict = {'season': season, 'age': age, 'sex': sex}
-                df_view = genotyping_df[genotyping_df['Season'] == season].copy()
+                df_view = df_season
                 if age != 'All': df_view = df_view[df_view['Age_Group'] == age]
                 if sex != 'All': df_view = df_view[df_view['Sex'] == sex]
+                pie_subtype_order[f"{season}|{age}|{sex}"] = [str(v) for v in df_view['H_Subtype'].value_counts().index]
 
-                h_counts = df_view['H_Subtype'].value_counts().reset_index()
-                h_counts.columns = ['Label', 'Count']
-                if h_counts.empty: fig.add_trace(go.Pie(labels=["No Data"], values=[1], name="H Subtypes", textinfo='none', hoverinfo='none', marker=dict(colors=['#f0f0f0']), visible=False, meta=meta_dict), row=1, col=1)
-                else:
-                    h_counts['Text'] = h_counts['Count'].astype(str) + '/' + str(h_counts['Count'].sum())
-                    
-                    fig.add_trace(go.Pie(
-                        labels=h_counts['Label'], values=h_counts['Count'], name="H Subtypes", text=h_counts['Text'], texttemplate='<b>%{label}</b><br><b>%{text}</b><br><b>%{percent}</b>',
-                        textposition='outside', insidetextorientation='horizontal', rotation=270, automargin=True, hole=0.35, marker=dict(colors=[global_color_map['h_subtypes'].get(str(lbl), '#d3d3d3' if 'unassigned' in str(lbl).strip().lower() or str(lbl) in ['No dataset available'] else '#888888') for lbl in h_counts['Label']], line=dict(color='#ffffff', width=2)),
-                        hoverlabel=dict(font_size=14), hovertemplate='<b>H Subtype:</b> %{label}<br><b>Count:</b> %{text}<br><b>Percentage:</b> %{percent}<extra></extra>', visible=False, meta=meta_dict
-                    ), row=1, col=1)
-
-                for i, h in enumerate(valid_h_subtypes):
-                    c_col = i + 2
-                    sub_df = df_view[df_view['H_Subtype'] == h]
-                    if len(sub_df) == 0: fig.add_trace(go.Pie(labels=["No Data"], values=[1], name=str(h), textinfo='none', hoverinfo='none', marker=dict(colors=['#f0f0f0']), visible=False, meta=meta_dict), row=1, col=c_col); continue
-                    
-                    orig_counts = sub_df.groupby(['Clade', 'Root_Clade']).size().reset_index(name='Count')
-                    orig_counts['Hover_Detail'] = orig_counts.apply(lambda x: f"- {x['Clade']}: {x['Count']}/{len(sub_df)} ({x['Count']/len(sub_df):.1%})" if x['Count'] > 0 else "", axis=1)
-                    root_grouped = orig_counts.groupby('Root_Clade').agg(Root_Count=('Count', 'sum'), Root_Hover_Details=('Hover_Detail', lambda x: "<br>".join([d for d in x if d]))).reset_index()
-                    root_grouped['Final_Label'] = root_grouped.apply(lambda x: "Others" if x['Root_Count']/len(sub_df) < 0.01 and "unassigned" not in str(x['Root_Clade']).lower() else x['Root_Clade'], axis=1)
-                    final_grouped = root_grouped.groupby('Final_Label').agg(Final_Count=('Root_Count', 'sum'), Final_Hover_Details=('Root_Hover_Details', lambda x: "<br>".join([d for d in x if d]))).reset_index()
-                    final_grouped['Hover_Extra'] = final_grouped.apply(lambda x: "<br><br><b>Clade Breakdown:</b><br>" + x['Final_Hover_Details'] if str(x['Final_Label']).endswith("-like") or str(x['Final_Label']) == "Others" else "", axis=1)
-                    final_grouped['Text'] = final_grouped['Final_Count'].astype(str) + '/' + str(len(sub_df))
-                    
-                    # Force light grey for any label containing "unassigned"
-                    fig.add_trace(go.Pie(
-                        labels=final_grouped['Final_Label'], values=final_grouped['Final_Count'], name=str(h), text=final_grouped['Text'], texttemplate='<b>%{label}</b><br><b>%{text}</b><br><b>%{percent}</b>',
-                        textposition='outside', rotation=270, automargin=True, insidetextorientation='horizontal', hole=0.35, marker=dict(colors=[global_color_map[f'clades_{h}'].get(str(lbl), '#d3d3d3' if 'unassigned' in str(lbl).strip().lower() or str(lbl) in ['No dataset available'] else '#888888') for lbl in final_grouped['Final_Label']], line=dict(color='#ffffff', width=2)),
-                        hoverlabel=dict(font_size=14, align='left'), customdata=final_grouped['Hover_Extra'], hovertemplate='<b>Group:</b> %{label}<br><b>Total Count:</b> %{text}<br><b>Group Percentage:</b> %{percent}%{customdata}<extra></extra>', visible=False, meta=meta_dict
-                    ), row=1, col=c_col)
-
-                if include_genotype_chart:
-                    sub_df = df_view[(df_view['Clade'] == '2.3.4.4b') & (df_view['Genotype'] != 'Unassigned')]
-                    if len(sub_df) == 0: fig.add_trace(go.Pie(labels=["No Data"], values=[1], name="Genotypes", textinfo='none', hoverinfo='none', marker=dict(colors=['#f0f0f0']), visible=False, meta=meta_dict), row=1, col=total_charts)
-                    else:
-                        orig_counts = sub_df.groupby(['Genotype', 'Sub-genotype']).size().reset_index(name='Count')
-                        orig_counts['Hover_Detail'] = orig_counts.apply(lambda x: f"- {x['Sub-genotype']}: {x['Count']}/{len(sub_df)} ({x['Count']/len(sub_df):.1%})" if "unassigned" not in str(x['Sub-genotype']).lower() and str(x['Sub-genotype']) not in ["Unassigned", "None", "", "nan"] else "", axis=1)
-                        root_grouped = orig_counts.groupby('Genotype').agg(Final_Count=('Count', 'sum'), Hover_Details=('Hover_Detail', lambda x: "<br>".join([d for d in x if d]))).reset_index()
-                        root_grouped['Hover_Extra'] = root_grouped.apply(lambda x: "<br><br><b>Sub-genotypes Breakdown:</b><br>" + x['Hover_Details'] if x['Hover_Details'] else "", axis=1)
-                        root_grouped['Text'] = root_grouped['Final_Count'].astype(str) + '/' + str(len(sub_df))
-
-                        # Force light grey for any label containing "unassigned"
-                        fig.add_trace(go.Pie(
-                            labels=root_grouped['Genotype'], values=root_grouped['Final_Count'], name="Genotypes 2.3.4.4b", text=root_grouped['Text'], texttemplate='<b>%{label}</b><br><b>%{text}</b><br><b>%{percent}</b>',
-                            textposition='outside', rotation=270, automargin=True, insidetextorientation='horizontal', hole=0.35, marker=dict(colors=[global_color_map['genotypes'].get(str(lbl), '#d3d3d3' if 'unassigned' in str(lbl).strip().lower() or str(lbl) in ['No dataset available'] else '#888888') for lbl in root_grouped['Genotype']], line=dict(color='#ffffff', width=2)),
-                            hoverlabel=dict(font_size=14, align='left'), customdata=root_grouped['Hover_Extra'], hovertemplate='<b>Genotype:</b> %{label}<br><b>Total Count:</b> %{text}<br><b>Percentage:</b> %{percent}%{customdata}<extra></extra>', visible=False, meta=meta_dict
-                        ), row=1, col=total_charts)
+    def to_js_json(obj):
+        return json.dumps(obj).replace('</', '<' + chr(92) + '/')
 
     if 'annotations' in fig['layout']:
         for annotation in fig['layout']['annotations']: annotation['y'] += 0.1
-    
-    fig.update_layout(title=dict(text=f"<b>Subtype and Clade Report - Season {seasons_pie[0] if seasons_pie else 'No Data'}</b>", x=0.5, y=0.98, xanchor="center", yanchor="top", font=dict(size=24)), height=680, showlegend=False, hovermode="closest", margin=dict(t=180, b=80, l=40, r=40), uniformtext=dict(minsize=10, mode='show'))
+
+    initial_lbl_pie = f"Season {default_season}" if seasons_pie else "All Time"
+    fig.update_layout(title=dict(text=f"<b>Subtype and Clade Report - {initial_lbl_pie}</b>", x=0.5, y=0.98, xanchor="center", yanchor="top", font=dict(size=24)), height=680, showlegend=False, hovermode="closest", margin=dict(t=180, b=80, l=40, r=40), uniformtext=dict(minsize=10, mode='show'))
 
     js_pie = f'''
     <script>
+        {season_range_js}
+        var pieSeasons = {to_js_json(seasons_chrono)};
+        // [season, age group, sex, H subtype, clade, root clade, genotype, sub-genotype, sample count, first row]
+        var pieRecords = {to_js_json(pie_records)};
+        var pieCharts = {to_js_json(pie_charts)};
+        var pieColors = {to_js_json(global_color_map)};
+        var pieSubtypeOrder = {to_js_json(pie_subtype_order)};
+        var pieTemplates = null;
+
+        function pieCmp(x, y) {{ return x < y ? -1 : (x > y ? 1 : 0); }}
+        function pieColor(map, lbl) {{
+            if (map && Object.prototype.hasOwnProperty.call(map, lbl)) return map[lbl];
+            return (lbl.trim().toLowerCase().indexOf('unassigned') !== -1 || lbl === 'No dataset available') ? '#d3d3d3' : '#888888';
+        }}
+        // Same text as Python's format(num / den, '.1%'), including round-half-even on exact ties
+        function piePct(num, den) {{
+            var v = (num / den) * 100;
+            var q = v * 4;
+            if (Number.isInteger(q) && q % 4 === 1) return (Math.floor(v * 10) / 10).toFixed(1) + '%';
+            return v.toFixed(1) + '%';
+        }}
+        function pieTotal(recs) {{ return recs.reduce(function (s, r) {{ return s + r[8]; }}, 0); }}
+        // Sums sample counts by key; groups are returned sorted like a pandas groupby
+        function pieSum(items, keyFn, countFn, sortFn) {{
+            var m = new Map();
+            items.forEach(function (it) {{
+                var k = keyFn(it), e = m.get(k);
+                if (!e) {{ e = {{ item: it, n: 0, members: [] }}; m.set(k, e); }}
+                e.n += countFn(it); e.members.push(it);
+            }});
+            return Array.from(m.values()).sort(sortFn);
+        }}
+        function pieNoData(tpl, chart) {{
+            return {{ type: 'pie', labels: ['No Data'], values: [1], name: chart.noDataName, textinfo: 'none', hoverinfo: 'none', marker: {{ colors: ['#f0f0f0'] }}, domain: tpl.domain, visible: true }};
+        }}
+        function pieFill(tpl, chart, groups, labelFn, total, customdata) {{
+            var t = JSON.parse(JSON.stringify(tpl));
+            t.labels = groups.map(labelFn);
+            t.values = groups.map(function (e) {{ return e.n; }});
+            t.text = groups.map(function (e) {{ return e.n + '/' + total; }});
+            if (customdata) t.customdata = customdata;
+            t.marker = {{ colors: t.labels.map(function (l) {{ return pieColor(pieColors[chart.colorKey], l); }}), line: tpl.marker.line }};
+            t.visible = true;
+            return t;
+        }}
+        function pieSubtypeTrace(tpl, chart, recs, order) {{
+            var sub = recs.filter(function (r) {{ return r[3] !== null; }});
+            if (sub.length === 0) return pieNoData(tpl, chart);
+            var groups = pieSum(sub, function (r) {{ return r[3]; }}, function (r) {{ return r[8]; }}, function () {{ return 0; }});
+            groups.forEach(function (e) {{ e.first = Math.min.apply(null, e.members.map(function (r) {{ return r[9]; }})); }});
+            if (order) groups.sort(function (x, y) {{ return order.indexOf(x.item[3]) - order.indexOf(y.item[3]); }});
+            else groups.sort(function (x, y) {{ return (y.n - x.n) || (x.first - y.first); }});
+            return pieFill(tpl, chart, groups, function (e) {{ return e.item[3]; }}, pieTotal(sub), null);
+        }}
+        function pieCladeTrace(tpl, chart, recs) {{
+            var sub = recs.filter(function (r) {{ return r[3] === chart.h; }});
+            var total = pieTotal(sub);
+            if (total === 0) return pieNoData(tpl, chart);
+            var orig = pieSum(sub, function (r) {{ return JSON.stringify([r[4], r[5]]); }}, function (r) {{ return r[8]; }},
+                function (x, y) {{ return pieCmp(x.item[4], y.item[4]) || pieCmp(x.item[5], y.item[5]); }});
+            orig.forEach(function (e) {{ e.detail = '- ' + e.item[4] + ': ' + e.n + '/' + total + ' (' + piePct(e.n, total) + ')'; }});
+            var roots = pieSum(orig, function (e) {{ return e.item[5]; }}, function (e) {{ return e.n; }}, function (x, y) {{ return pieCmp(x.item.item[5], y.item.item[5]); }});
+            roots.forEach(function (g) {{
+                var root = g.item.item[5];
+                g.label = (g.n / total < 0.01 && root.toLowerCase().indexOf('unassigned') === -1) ? 'Others' : root;
+                g.details = g.members.map(function (e) {{ return e.detail; }}).filter(function (d) {{ return d; }}).join('<br>');
+            }});
+            var finals = pieSum(roots, function (g) {{ return g.label; }}, function (g) {{ return g.n; }}, function (x, y) {{ return pieCmp(x.item.label, y.item.label); }});
+            var customdata = finals.map(function (f) {{
+                var lbl = f.item.label;
+                var details = f.members.map(function (g) {{ return g.details; }}).filter(function (d) {{ return d; }}).join('<br>');
+                return (lbl.endsWith('-like') || lbl === 'Others') ? '<br><br><b>Clade Breakdown:</b><br>' + details : '';
+            }});
+            return pieFill(tpl, chart, finals, function (f) {{ return f.item.label; }}, total, customdata);
+        }}
+        function pieGenotypeTrace(tpl, chart, recs) {{
+            var sub = recs.filter(function (r) {{ return r[4] === '2.3.4.4b' && r[6] !== 'Unassigned'; }});
+            var total = pieTotal(sub);
+            if (total === 0) return pieNoData(tpl, chart);
+            var orig = pieSum(sub, function (r) {{ return JSON.stringify([r[6], r[7]]); }}, function (r) {{ return r[8]; }},
+                function (x, y) {{ return pieCmp(x.item[6], y.item[6]) || pieCmp(x.item[7], y.item[7]); }});
+            orig.forEach(function (e) {{
+                var sg = e.item[7];
+                var skip = sg.toLowerCase().indexOf('unassigned') !== -1 || ['Unassigned', 'None', '', 'nan'].indexOf(sg) !== -1;
+                e.detail = skip ? '' : '- ' + sg + ': ' + e.n + '/' + total + ' (' + piePct(e.n, total) + ')';
+            }});
+            var genos = pieSum(orig, function (e) {{ return e.item[6]; }}, function (e) {{ return e.n; }}, function (x, y) {{ return pieCmp(x.item.item[6], y.item.item[6]); }});
+            var customdata = genos.map(function (g) {{
+                var details = g.members.map(function (e) {{ return e.detail; }}).filter(function (d) {{ return d; }}).join('<br>');
+                return details ? '<br><br><b>Sub-genotypes Breakdown:</b><br>' + details : '';
+            }});
+            return pieFill(tpl, chart, genos, function (g) {{ return g.item.item[6]; }}, total, customdata);
+        }}
         function updatePiePlot() {{
-            var s = document.getElementById('sel_season_pie').value;
+            var r = syncSeasonRange('pie');
             var a = document.getElementById('sel_age_pie').value;
             var g = document.getElementById('sel_sex_pie').value;
             var plotDivs = document.getElementsByClassName('plotly-graph-div');
             if (plotDivs.length === 0) return;
             var plotDiv = plotDivs[0];
-            var update = {{ visible: [] }};
-            for (var i = 0; i < plotDiv.data.length; i++) {{
-                var meta = plotDiv.data[i].meta;
-                update.visible.push(meta && meta.season === s && meta.age === a && meta.sex === g);
-            }}
-            Plotly.restyle(plotDiv, update);
-            Plotly.relayout(plotDiv, {{ 'title.text': '<b>Subtype and Clade Report - Season ' + s + '</b>' }});
+            if (!pieTemplates) pieTemplates = JSON.parse(JSON.stringify(plotDiv.data));
+            // All Time keeps every sample (Unknown Season included); a range keeps the seasons From..To
+            var selected = new Set(r.allTime ? [] : pieSeasons.slice(r.fromIdx, r.toIdx + 1));
+            var recs = pieRecords.filter(function (rec) {{
+                return (r.allTime || selected.has(rec[0])) && (a === 'All' || rec[1] === a) && (g === 'All' || rec[2] === g);
+            }});
+            var orderKey = r.allTime ? 'All Time' : (r.from === r.to ? r.from : null);
+            var order = orderKey === null ? null : pieSubtypeOrder[orderKey + '|' + a + '|' + g] || null;
+            var traces = pieCharts.map(function (c, k) {{
+                if (c.kind === 'h') return pieSubtypeTrace(pieTemplates[k], c, recs, order);
+                if (c.kind === 'clade') return pieCladeTrace(pieTemplates[k], c, recs);
+                return pieGenotypeTrace(pieTemplates[k], c, recs);
+            }});
+            Plotly.react(plotDiv, traces, plotDiv.layout);
+            Plotly.relayout(plotDiv, {{ 'title.text': '<b>Subtype and Clade Report - ' + seasonRangeLabel(r) + '</b>' }});
         }}
-        document.getElementById('sel_season_pie').addEventListener('change', updatePiePlot);
+        document.getElementById('sel_season_from_pie').addEventListener('change', updatePiePlot);
+        document.getElementById('sel_season_to_pie').addEventListener('change', updatePiePlot);
         document.getElementById('sel_age_pie').addEventListener('change', updatePiePlot);
         document.getElementById('sel_sex_pie').addEventListener('change', updatePiePlot);
         window.addEventListener('load', updatePiePlot);

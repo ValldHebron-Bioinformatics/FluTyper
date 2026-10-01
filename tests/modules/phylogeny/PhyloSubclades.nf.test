@@ -1,0 +1,64 @@
+nextflow_process {
+
+    name "Test Process PhyloSubclades"
+    script "nf_pipeline/modules/phylogeny/PhyloSubclades.nf"
+    process "PhyloSubclades"
+
+    test("Should collect the sample's subclade from its Nextclade CSV and the root strains from the same dataset") {
+
+        when {
+            process {
+                """
+                input[0] = [file("${projectDir}/tests/data/phylo/nextclade/nextclade_results_01816372.csv", checkIfExists: true)]
+                input[1] = file("${projectDir}/tests/data/phylo/phylo_references.fasta", checkIfExists: true)
+                input[2] = file("${projectDir}/protocols/HUMAN/v2/resources/H3/nextclade_H3_dataset", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def lines = path(process.out.subclades.get(0)).text.readLines()
+            assert lines[0] == "tip\tsubclade\tclade\tsource"
+
+            def sampleLine = lines.find { it.startsWith("01816372\t") }
+            assert sampleLine != null : "no row for sample 01816372"
+            assert sampleLine == "01816372\tK\tK\tsample"
+
+            // Root strains are run through the same Nextclade dataset and marked source=root_strain
+            def rootLines = lines.findAll { it.endsWith("\troot_strain") }
+            assert rootLines.size() == 5 : "expected 5 root strain rows, got ${rootLines.size()}: ${rootLines}"
+            def darwinLine = lines.find { it.startsWith("REF_A_Darwin_6_2021\t") }
+            assert darwinLine == "REF_A_Darwin_6_2021\tG.1\tG.1\troot_strain"
+            def croatiaLine = lines.find { it.startsWith("REF_A_Croatia_10136RV_2023\t") }
+            assert croatiaLine == "REF_A_Croatia_10136RV_2023\tJ.2\tJ.2\troot_strain"
+        }
+    }
+
+    test("Should record NA for a sample whose Nextclade CSV is empty (no subclade call)") {
+
+        when {
+            process {
+                """
+                input[0] = [file("${projectDir}/tests/data/phylo/nextclade/nextclade_results_01999999.csv", checkIfExists: true)]
+                input[1] = file("${projectDir}/tests/data/phylo/phylo_references.fasta", checkIfExists: true)
+                input[2] = file("${projectDir}/protocols/HUMAN/v2/resources/H3/nextclade_H3_dataset", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def lines = path(process.out.subclades.get(0)).text.readLines()
+            def sampleLine = lines.find { it.contains("01999999") }
+            assert sampleLine != null
+            assert sampleLine == "01999999\tNA\tNA\tsample"
+
+            // A zero-byte per-sample CSV has no Nextclade row: PhyloSubclades reports it and sets subclade/clade to NA
+            assert path(process.out.log.get(0)).text.contains("no Nextclade row")
+            assert !process.stdout.join("\\n").contains("PhyloSubclades:") : "PhyloSubclades no longer prints step messages to the terminal"
+        }
+    }
+
+}
