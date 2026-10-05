@@ -110,4 +110,97 @@ nextflow_workflow {
     }
 
 
+
+    test("D24: a sample whose HA Nextclade analysis failed is excluded from every tree of its subtype (logged with the error); a bad-QC HA and a sample without a Nextclade result are kept") {
+
+        when {
+            params {
+                protocol = "HUMAN"
+                protocols = [
+                    HUMAN: [ resources: "${projectDir}/protocols/HUMAN/v2" ]
+                ]
+                version = "1.1.0"
+                inputFasta = "${projectDir}/tests/data/HUMAN.fasta"
+                outDir = "tests/results/phylogenetics_workflow_test"
+                metadata = "${projectDir}/tests/data/phylo/metadata_lab.csv"
+                labMap = null
+                phyloPanels = "${projectDir}/RESOURCES/phylo_panels.tsv"
+                phyloSubtype = "H3N2"
+                phyloWholeGenome = false
+                phyloSegmentTrees = "HA,PB1"
+                phyloReference = "A/Darwin/6/2021"
+                phyloReferenceFallback = "A/Massachusetts/18/2022"
+                phyloRootStrains = "A/Darwin/6/2021,A/Massachusetts/18/2022,A/Croatia/10136RV/2023,A/Singapore/GP20238/2024,A/Sydney/1359/2024"
+                phyloOutgroup = "A/Darwin/6/2021"
+                phyloSegmentOrder = "PB2,PB1,PA,HA,NP,NA,MP,NS"
+                phyloMinCoverage = 0.95
+                model = "GTR+G4"
+                bootstrap = 0
+                seed = 12345
+                clusterThreshold = 0.005
+                minSupportLabel = 70
+                periodBin = "month"
+                minPanelCoverage = 0.8
+                width = 6
+                height = 5
+                dpi = 72
+                phyloTools = [
+                    "mafft": "7.525", "iqtree2": "2.3.6", "treetime": "0.11.4", "TreeCluster.py": "1.0.4",
+                    "nextclade": "3.18.0", "Rscript": "4.5.3", "ggtree": "4.0.5", "ape": "5.8.1",
+                    "ggplot2": "4.0.3", "ggnewscale": "0.5.2", "svglite": "2.2.2"
+                ]
+            }
+            workflow {
+                """
+                input[0] = Channel.of(
+                    tuple("01816372", "H3", "N2", "LPAI"),
+                    tuple("01817974", "H3", "N2", "LPAI"),
+                    tuple("01818936", "H3", "N2", "LPAI"),
+                    tuple("198353883", "H3", "N2", "LPAI")
+                )
+                input[1] = Channel.of(
+                    tuple("01816372", file("${projectDir}/tests/data/phylo/samples/01816372", checkIfExists: true)),
+                    tuple("01817974", file("${projectDir}/tests/data/phylo/samples/01817974", checkIfExists: true)),
+                    tuple("01818936", file("${projectDir}/tests/data/phylo/samples/01818936", checkIfExists: true)),
+                    tuple("198353883", file("${projectDir}/tests/data/phylo/samples/198353883", checkIfExists: true))
+                )
+                // 01818936: HA Nextclade failed; 198353883: aligned, bad QC; 01817974: no Nextclade result (like a sample without HA)
+                input[2] = Channel.of(
+                    tuple("01816372", file("${projectDir}/tests/data/phylo/nextclade/nextclade_results_01816372.csv", checkIfExists: true)),
+                    tuple("01818936", file("${projectDir}/tests/data/phylo/nextclade/failed_ha/nextclade_results_01818936.csv", checkIfExists: true)),
+                    tuple("198353883", file("${projectDir}/tests/data/phylo/nextclade/badqc_ha/nextclade_results_198353883.csv", checkIfExists: true))
+                )
+                input[3] = Channel.of(file("${projectDir}/protocols/HUMAN/v2/resources/H3/nextclade_H3_dataset", checkIfExists: true))
+                input[4] = Channel.of(file("${projectDir}/tests/data/phylo/metadata_lab.csv", checkIfExists: true))
+                input[5] = ["HA1:62", "HA1:145", "HA1:239"]
+                input[6] = "H3N2"
+                input[7] = "H3N2"
+                input[8] = "A/Darwin/6/2021"
+                input[9] = "A/Massachusetts/18/2022"
+                input[10] = "A/Darwin/6/2021,A/Massachusetts/18/2022,A/Croatia/10136RV/2023,A/Singapore/GP20238/2024,A/Sydney/1359/2024"
+                input[11] = "A/Darwin/6/2021"
+                input[12] = Channel.empty()   // auspice_geography: --auspice is off
+                """
+            }
+        }
+
+        then {
+            assert workflow.success
+            def logs = workflow.out.outputs.findAll { path(it).getFileName().toString() == "phylo.log" }.collect { path(it) }
+            def trees = workflow.out.outputs.findAll { path(it).getFileName().toString() == "tree.nwk" }.collect { path(it) }
+            // HA: 3 samples without 01818936. PB1: 01817974 is at 86 % coverage, so only 01816372 and 198353883 pass; with
+            // 01818936 excluded there are 2 (< 3) and the PB1 tree is skipped: it is left out of PB1 as well
+            assert logs.size() == 1 && trees.size() == 1 : "expected only the HA tree: ${workflow.out.outputs}"
+            assert workflow.stdout.any { it.contains("segment tree PB1 skipped: only 2 sample(s) passed coverage QC for PB1") } : workflow.stdout.join("\n")
+            trees.each { t ->
+                def text = t.text
+                assert !text.contains("01818936") : "01818936 (failed HA Nextclade) must be in no tree: ${t}"
+                assert text.contains("198353883") && text.contains("01817974") && text.contains("01816372") : text
+            }
+            logs.each { l ->
+                def line = l.text.readLines().find { it.contains("01818936") }
+                assert line != null && line.contains("HA Nextclade analysis failed: When calculating seed matches") : "${l}: ${line}"
+            }
+        }
+    }
 }

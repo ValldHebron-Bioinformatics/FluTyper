@@ -94,7 +94,13 @@ workflow PHYLOGENETICS {
 
     // Coverage QC gates entry into every tree: the whole-genome tree needs every segment to PASS, a segment tree
     // only needs its own segment to PASS (so its candidate pool is usually larger than the whole-genome one)
-    PhyloCoverageQC(candidates, PhyloPreflight.out.coordinate_refs, params.phyloMinCoverage, params.phyloSegmentOrder)
+    // D24: each candidate travels with its HA Nextclade CSV ([] when there is none, e.g. no HA segment): a failed HA
+    // Nextclade analysis FAILs every segment in PhyloCoverageQC, i.e. the sample leaves every tree of this subtype.
+    // join(remainder) keeps candidates without a result; rows of other subtypes' samples (no sample_dir) are dropped.
+    def qc_input_ch = candidates.join(nextclade_results, remainder: true)
+        .filter { _sample_id, sample_dir, _csv -> sample_dir != null }
+        .map { sample_id, sample_dir, csv -> tuple(sample_id, sample_dir, csv ?: []) }
+    PhyloCoverageQC(qc_input_ch, PhyloPreflight.out.coordinate_refs, params.phyloMinCoverage, params.phyloSegmentOrder)
     qc_table = PhyloCoverageQC.out.results
         .map { _sample_id, _sample_dir, qc_tsv -> qc_tsv }
         .collectFile(name: 'phylo_coverage_qc.tsv', keepHeader: true, sort: { f -> f.name })

@@ -148,6 +148,14 @@ nextflow_process {
             // ... once: augur export's own two messages about the same value are not repeated in the log
             assert !log.contains("did not have an associated lat/long") && !log.contains("appears in the tree but not in the metadata") : log
             assert log =~ /PhyloAuspice: WARNING country: 1 sample tip\(s\) have no value.*Atlantis/ : log
+            // P7-3: region has one known state (Europe): skipped with one INFO line, no augur "only one state" WARNING;
+            // country (Spain, Austria) is still inferred
+            assert log.contains("PhyloAuspice: INFO trait 'region' has fewer than 2 known states (Europe): no ancestral-state reconstruction for it.") : log
+            assert !log.contains("only one state found") : log
+            assert byName["NODE_0000009"].node_attrs.country?.value in ["Spain", "Austria"]
+            assert !byName["NODE_0000009"].node_attrs.containsKey("region") || byName["NODE_0000009"].node_attrs.region.value == null
+            // P7-4: besides the samples' MRCA, the largest clade among the root's children is dated (NODE_0000003: 6 tips)
+            assert log =~ /PhyloAuspice: INFO time tree: root NODE_0000000 dated .*; largest root clade NODE_0000003 \(6 tips\) dated \d{4}-\d{2}-\d{2} \[\d{4}\.\d{2}, \d{4}\.\d{2}\]/ : log
             // Map levels
             assert js.meta.geo_resolutions.collect { it.key }.containsAll(["country", "division", "location"])
 
@@ -907,6 +915,9 @@ nextflow_process {
             assert tips.size() == 8 && tips.contains("198353883") : tips
             assert process.out.dropped.size() == 0
             assert !log.contains("left out of the time tree") : log
+            // P7-3: every sample is in Barcelona -> country (Spain) and region (Europe) have one state each: no augur traits at all
+            assert log.contains("PhyloAuspice: INFO no ancestral-state reconstruction: no trait column has 2 or more known states.") : log
+            assert !byName["NODE_0000009"].node_attrs.containsKey("country") : byName["NODE_0000009"].node_attrs
 
         }
     }

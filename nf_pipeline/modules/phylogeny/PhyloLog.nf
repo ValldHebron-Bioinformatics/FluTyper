@@ -76,6 +76,8 @@ def failure(sample):
         r = segs.get(seg)
         if r is None:
             reasons.append(f"{seg}: no QC row")
+        elif r["reason"].startswith("HA Nextclade analysis failed"):
+            return r["reason"]         # D24: the same reason on every segment: say it once
         elif r["status"] != "PASS":
             reason = re.sub(r"coverage [\\d.]+% below ([\\d.]+%)", r"coverage below \\1", r["reason"] or "failed")
             reasons.append(reason if not whole_genome else f"{seg} {reason}")

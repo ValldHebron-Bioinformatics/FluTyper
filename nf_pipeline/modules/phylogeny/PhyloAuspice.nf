@@ -606,6 +606,12 @@ def main():
         if len(dated_samples) >= 2:
             mrca = refined.common_ancestor(dated_samples).name
             msg += f"; MRCA of the {len(dated_samples)} samples {mrca} dated {when(mrca)}"
+        # P7-4: the samples' MRCA is often the root itself (a small group attaches at the root); the largest clade among
+        # the root's children dates the main body of the samples
+        kids = [c for c in refined.root.clades if not c.is_terminal()]
+        if kids:
+            big = max(kids, key=lambda c: c.count_terminals())
+            msg += f"; largest root clade {big.name} ({big.count_terminals()} tips) dated {when(big.name)}"
         say("INFO", msg + " (date, confidence interval in decimal years).")
 
     # ---- Branch mutations from FluTyper's reconstruction (D7) --------------------------------------------------------
@@ -708,7 +714,15 @@ def main():
         elif not any(values[t][c] is not None for t in tips):
             say("WARNING", f"trait '{c}': no tip has a value: no ancestral-state reconstruction.")
         else:
-            usable.append(c)
+            # P7-3: a DTA over one known state (e.g. every sample from Spain) says nothing and augur only warns about it
+            states = sorted({values[t][c] for t in tips if values[t][c] is not None})
+            if len(states) < 2:
+                say("INFO", f"trait '{c}' has fewer than 2 known states ({', '.join(states)}): no ancestral-state "
+                            "reconstruction for it.")
+            else:
+                usable.append(c)
+    if wanted and not usable:
+        say("INFO", "no ancestral-state reconstruction: no trait column has 2 or more known states.")
     if usable:
         rc = run(["augur", "traits", "--tree", "refined.nwk", "--metadata", "meta.tsv", "--columns", *usable,
                   "--confidence", "--output-node-data", "traits_raw.json"], "traits.log")   # + mugration model files
