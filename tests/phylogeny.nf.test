@@ -410,7 +410,7 @@ nextflow_pipeline {
                 protocols = [
                     HUMAN: [
                         directory: "${projectDir}/protocols/HUMAN",
-                        resources: "${projectDir}/protocols/HUMAN/v1"
+                        resources: "${projectDir}/protocols/HUMAN/v2"
                     ]
                 ]
                 inputFasta = "${projectDir}/tests/data/HUMAN.fasta"
@@ -480,7 +480,7 @@ nextflow_pipeline {
                 protocols = [
                     HUMAN: [
                         directory: "${projectDir}/protocols/HUMAN",
-                        resources: "${projectDir}/protocols/HUMAN/v1"
+                        resources: "${projectDir}/protocols/HUMAN/v2"
                     ]
                 ]
                 inputFasta = "${projectDir}/tests/data/HUMAN.fasta"
@@ -504,7 +504,7 @@ nextflow_pipeline {
                 protocols = [
                     HUMAN: [
                         directory: "${projectDir}/protocols/HUMAN",
-                        resources: "${projectDir}/protocols/HUMAN/v1"
+                        resources: "${projectDir}/protocols/HUMAN/v2"
                     ]
                 ]
                 inputFasta = "${projectDir}/tests/data/HUMAN.fasta"
@@ -547,7 +547,7 @@ nextflow_pipeline {
                 protocols = [
                     HUMAN: [
                         directory: "${projectDir}/protocols/HUMAN",
-                        resources: "${projectDir}/protocols/HUMAN/v1"
+                        resources: "${projectDir}/protocols/HUMAN/v2"
                     ]
                 ]
                 inputFasta = "${projectDir}/tests/data/HUMAN.fasta"
@@ -578,7 +578,7 @@ nextflow_pipeline {
                 protocols = [
                     HUMAN: [
                         directory: "${projectDir}/protocols/HUMAN",
-                        resources: "${projectDir}/protocols/HUMAN/v1"
+                        resources: "${projectDir}/protocols/HUMAN/v2"
                     ]
                 ]
                 inputFasta = "${projectDir}/tests/data/phylo/gate_test.fasta"

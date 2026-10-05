@@ -564,16 +564,18 @@ workflow {
 }
 
 output {
+    // Downloaded datasets, database and markers go back into the protocol's configured resources version
+    // (params.protocols.<protocol>.resources: HUMAN v2, AVIAN/SWINE v1), the same folder the pipeline reads them from
     datasets {
-        path { "${projectDir}/../protocols/${params.protocol}/v1/resources" }
+        path { "${params.protocols[params.protocol].resources}/resources" }
         mode "copy"
     }
     database {
-        path { "${projectDir}/../protocols/${params.protocol}/v1" }
+        path { "${params.protocols[params.protocol].resources}" }
         mode "copy"
     }
     markerfiles {
-        path { "${projectDir}/../protocols/${params.protocol}/v1/markers" }
+        path { "${params.protocols[params.protocol].resources}/markers" }
         mode "copy"
     }
     folder {
