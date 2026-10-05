@@ -16,8 +16,8 @@ nextflow_process {
                     "nextclade": "3.18.0", "Rscript": "4.5.3", "ggtree": "4.0.5", "ape": "5.8.1",
                     "ggplot2": "4.0.3", "ggnewscale": "0.5.2", "svglite": "2.2.2"
                 ]).bytes.encodeBase64().toString()
-                input[1] = file("${projectDir}/protocols/HUMAN/v1/HUMAN_references.fasta", checkIfExists: true)
-                input[2] = file("${projectDir}/protocols/HUMAN/v1/CDS_references.fasta", checkIfExists: true)
+                input[1] = file("${projectDir}/protocols/HUMAN/v2/HUMAN_references.fasta", checkIfExists: true)
+                input[2] = file("${projectDir}/protocols/HUMAN/v2/CDS_references.fasta", checkIfExists: true)
                 input[3] = "H3N2"
                 input[4] = "A/Darwin/6/2021"
                 input[5] = "A/Massachusetts/18/2022"
@@ -77,8 +77,8 @@ nextflow_process {
             process {
                 """
                 input[0] = groovy.json.JsonOutput.toJson(["mafft": "7.525"]).bytes.encodeBase64().toString()
-                input[1] = file("${projectDir}/protocols/HUMAN/v1/HUMAN_references.fasta", checkIfExists: true)
-                input[2] = file("${projectDir}/protocols/HUMAN/v1/CDS_references.fasta", checkIfExists: true)
+                input[1] = file("${projectDir}/protocols/HUMAN/v2/HUMAN_references.fasta", checkIfExists: true)
+                input[2] = file("${projectDir}/protocols/HUMAN/v2/CDS_references.fasta", checkIfExists: true)
                 input[3] = "H3N2"
                 input[4] = "A/Darwin/6/2021"
                 input[5] = "A/Massachusetts/18/2022"
@@ -101,8 +101,8 @@ nextflow_process {
             process {
                 """
                 input[0] = groovy.json.JsonOutput.toJson(["mafft": "7.525"]).bytes.encodeBase64().toString()
-                input[1] = file("${projectDir}/protocols/HUMAN/v1/HUMAN_references.fasta", checkIfExists: true)
-                input[2] = file("${projectDir}/protocols/HUMAN/v1/CDS_references.fasta", checkIfExists: true)
+                input[1] = file("${projectDir}/protocols/HUMAN/v2/HUMAN_references.fasta", checkIfExists: true)
+                input[2] = file("${projectDir}/protocols/HUMAN/v2/CDS_references.fasta", checkIfExists: true)
                 input[3] = "H3N2"
                 input[4] = "A/Darwin/6/2021"
                 input[5] = "A/Massachusetts/18/2022"
@@ -129,8 +129,8 @@ nextflow_process {
             process {
                 """
                 input[0] = groovy.json.JsonOutput.toJson(["notatool_xyz": "1.0"]).bytes.encodeBase64().toString()
-                input[1] = file("${projectDir}/protocols/HUMAN/v1/HUMAN_references.fasta", checkIfExists: true)
-                input[2] = file("${projectDir}/protocols/HUMAN/v1/CDS_references.fasta", checkIfExists: true)
+                input[1] = file("${projectDir}/protocols/HUMAN/v2/HUMAN_references.fasta", checkIfExists: true)
+                input[2] = file("${projectDir}/protocols/HUMAN/v2/CDS_references.fasta", checkIfExists: true)
                 input[3] = "H3N2"
                 input[4] = "A/Darwin/6/2021"
                 input[5] = "A/Massachusetts/18/2022"
@@ -156,8 +156,8 @@ nextflow_process {
             process {
                 """
                 input[0] = groovy.json.JsonOutput.toJson(["mafft": "99.99"]).bytes.encodeBase64().toString()
-                input[1] = file("${projectDir}/protocols/HUMAN/v1/HUMAN_references.fasta", checkIfExists: true)
-                input[2] = file("${projectDir}/protocols/HUMAN/v1/CDS_references.fasta", checkIfExists: true)
+                input[1] = file("${projectDir}/protocols/HUMAN/v2/HUMAN_references.fasta", checkIfExists: true)
+                input[2] = file("${projectDir}/protocols/HUMAN/v2/CDS_references.fasta", checkIfExists: true)
                 input[3] = "H3N2"
                 input[4] = "A/Darwin/6/2021"
                 input[5] = "A/Massachusetts/18/2022"
@@ -183,8 +183,8 @@ nextflow_process {
             process {
                 """
                 input[0] = groovy.json.JsonOutput.toJson(["mafft": "7.525"]).bytes.encodeBase64().toString()
-                input[1] = file("${projectDir}/protocols/HUMAN/v1/HUMAN_references.fasta", checkIfExists: true)
-                input[2] = file("${projectDir}/protocols/HUMAN/v1/CDS_references.fasta", checkIfExists: true)
+                input[1] = file("${projectDir}/protocols/HUMAN/v2/HUMAN_references.fasta", checkIfExists: true)
+                input[2] = file("${projectDir}/protocols/HUMAN/v2/CDS_references.fasta", checkIfExists: true)
                 input[3] = "H3N2"
                 input[4] = "A/Darwin/6/2021"
                 input[5] = "A/Massachusetts/18/2022"
