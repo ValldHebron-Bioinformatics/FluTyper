@@ -90,6 +90,34 @@ nextflow_process {
             ].each { tip ->
                 assert rows[tip][2] == "NA" : "root strain ${tip} should never be clustered, got ${rows[tip][2]}"
             }
+
+            // ---- for_report bundle: (tree_id, tree_folder, tree, support, clusters, ancestral_aa, segments,
+            //      alignment, ancestral_nt, gene_map subset), all own copies under report_bundle/ ----
+            assert process.out.for_report.size() == 1
+            def bundle = process.out.for_report.get(0)
+            assert bundle.size() == 10 : "for_report should have 10 elements, got ${bundle.size()}: ${bundle}"
+            assert bundle[0] == "H3N2"
+            assert bundle[1] == "whole_genome"
+            def expectedNames = [2: "tree.nwk", 3: "support.tsv", 4: "clusters.tsv", 5: "ancestral_aa", 6: "segments.tsv",
+                                 7: "alignment.fasta", 8: "ancestral_nt.fasta", 9: "gene_map.tsv"]
+            expectedNames.each { i, name ->
+                assert bundle[i].toString().endsWith("/report_bundle/${name}") : "for_report[${i}] should be report_bundle/${name}, got ${bundle[i]}"
+                assert new File(bundle[i].toString()).exists() : "for_report[${i}] ${bundle[i]} does not exist"
+            }
+            // The alignment is passed through unchanged
+            assert path(bundle[7]).text == path("${projectDir}/tests/data/phylo/phylo_alignment.fasta").text
+            // The bundled ancestral_nt.fasta is the reconstruction itself (same bytes as the `nucleotides` emit)...
+            def ntText = path(bundle[8]).text
+            assert ntText == path(process.out.nucleotides.get(0)[1]).text
+            // ...and holds every internal node of the tree (named NODE_* by PhyloTree) and every tip
+            def treeText = path("${projectDir}/tests/data/phylo/phylo_tree.nwk").text
+            def internalNodes = (treeText =~ /\)([^(),:;]+):/).collect { it[1] } + (treeText =~ /\)([^(),:;]+);/).collect { it[1] }
+            assert internalNodes.size() == 6 : "expected 6 named internal nodes in the fixture tree, got ${internalNodes}"
+            def ntIds = ntText.readLines().findAll { it.startsWith(">") }.collect { it.substring(1).trim() } as Set
+            internalNodes.each { n -> assert ntIds.contains(n) : "internal node ${n} missing from the bundled ancestral_nt.fasta" }
+            rows.keySet().each { tip -> assert ntIds.contains(tip) : "tip ${tip} missing from the bundled ancestral_nt.fasta" }
+            // Whole-genome tree: every segment is in segments.tsv, so the gene_map subset keeps every row
+            assert path(bundle[9]).text == path("${projectDir}/tests/data/phylo/gene_map.tsv").text
         }
     }
 
@@ -150,6 +178,49 @@ nextflow_process {
             def forReport = process.out.for_report.get(0)
             assert forReport[0] == "H3N2_HA"
             assert forReport[1] == "HA"
+            assert forReport.size() == 10 : "for_report should have 10 elements, got ${forReport.size()}"
+            assert forReport[8].toString().endsWith("/report_bundle/ancestral_nt.fasta")
+            assert forReport[9].toString().endsWith("/report_bundle/gene_map.tsv")
+        }
+    }
+
+    test("Should bundle only the gene_map rows of the tree's own segment(s) in for_report (HA-only segments.tsv -> HA1/HA2)") {
+
+        when {
+            process {
+                """
+                input[0] = tuple(
+                    "H3N2_HA",
+                    "HA",
+                    file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_alignment.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/phylo_segments_ha.tsv", checkIfExists: true)
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/gene_map.tsv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/subclades.tsv", checkIfExists: true)
+                input[3] = 0.005
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def bundle = process.out.for_report.get(0)
+            assert bundle.size() == 10
+            def fullLines = path("${projectDir}/tests/data/phylo/gene_map.tsv").text.readLines()
+            def subsetLines = path(bundle[9]).text.readLines()
+            // Same header, then exactly the HA rows of the full gene_map, in their original order
+            assert subsetLines[0] == fullLines[0]
+            def expectedRows = fullLines.drop(1).findAll { it.split("\t", -1)[2] == "HA" }
+            assert expectedRows.size() == 329 + 221
+            assert subsetLines.drop(1) == expectedRows
+            // ...which are exactly the genes that got an ancestral_aa/<gene>.fasta
+            def genes = subsetLines.drop(1).collect { it.split("\t", -1)[0] } as Set
+            assert genes == ["HA1", "HA2"] as Set
+            def aaFiles = new File(bundle[5].toString()).list().toList().sort()
+            assert aaFiles == ["HA1.fasta", "HA2.fasta"] : "ancestral_aa should only hold the HA genes, got ${aaFiles}"
+            assert path(bundle[6]).text == path("${projectDir}/tests/data/phylo/phylo_segments_ha.tsv").text
         }
     }
 

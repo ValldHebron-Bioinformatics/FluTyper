@@ -1,0 +1,58 @@
+nextflow_process {
+
+    name "Test Process AuspiceEnvCheck"
+    script "nf_pipeline/modules/phylogeny/AuspiceEnvCheck.nf"
+    process "AuspiceEnvCheck"
+
+    // AuspiceEnvCheck builds (first use) and verifies the Nextstrain env (envs/nextstrain.yaml) once per --auspice run,
+    // before any tree work (plan D21). Its report gates PhyloGeography and PhyloAuspice.
+
+    test("Builds/verifies the Nextstrain env and reports the tool versions (augur 34.1.4, treetime 0.12.1, geonamescache 3.0.2)") {
+
+        when {
+            process {
+                """
+                input[0] = file("${projectDir}/envs/nextstrain.yaml", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def report = path(process.out.versions.get(0)).text
+            assert report.contains("AuspiceEnvCheck: INFO Nextstrain env verified at ") : report
+            ["augur 34.1.4", "treetime 0.12.1", "python 3.13.15", "geonamescache 3.0.2", "biopython 1.88", "pandas 2.3.3"].each { v ->
+                assert report.contains(v) : "${v} missing: ${report}"
+            }
+            // every pin of envs/nextstrain.yaml matches: no pin WARNING
+            assert !report.contains("WARNING") : report
+        }
+    }
+
+    test("A --auspiceCondaEnv prefix without the Nextstrain tools fails after one retry, terminating the run with an actionable message") {
+
+        when {
+            params {
+                auspiceCondaEnv = "${launchDir}/fake_nextstrain_env"
+            }
+            process {
+                """
+                // a directory that looks like a conda prefix (conda-meta/) but has no augur/treetime/geonamescache: the
+                // conda directive activates it, so only the check itself can notice
+                new File("${launchDir}/fake_nextstrain_env/conda-meta").mkdirs()
+                input[0] = file("${projectDir}/envs/nextstrain.yaml", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.failed
+            // errorStrategy: one retry (e.g. a network blip), then terminate (not 'ignore')
+            assert process.trace.tasks().size() == 2 : process.trace.tasks()
+            def out = process.stdout.join("\n")
+            assert out.contains("AuspiceEnvCheck: ERROR the Nextstrain env is not usable") : out
+            assert out.contains("mamba env create -p") && out.contains("envs/nextstrain.yaml") : out
+            assert out.contains("mamba clean --index-cache") && out.contains("NXF_CONDA_CACHEDIR") : out
+        }
+    }
+}

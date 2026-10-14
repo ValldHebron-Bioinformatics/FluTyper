@@ -1,0 +1,297 @@
+nextflow_process {
+
+    name "Test Process PhyloGeography"
+    script "nf_pipeline/modules/phylogeny/PhyloGeography.nf"
+    process "PhyloGeography"
+
+    // PhyloGeography runs in the Nextstrain conda env (envs/nextstrain.yaml, geonamescache 3.0.2 = GeoNames cities500).
+    // Expected places below were checked against that snapshot (plan D12, .claude/context/nextstrain-auspice.md).
+
+    test("Should resolve European cities per D12: user table first, primary before alternate names, continent scope, COUNTRY override, no imputation") {
+
+        when {
+            process {
+                """
+                input[0] = file("${projectDir}/tests/data/phylo/geography/metadata_geo.csv", checkIfExists: true)
+                input[1] = file("${projectDir}/RESOURCES/coordenades_cat.tsv", checkIfExists: true)
+                input[2] = []
+                input[3] = file("${projectDir}/RESOURCES/geonames/admin1CodesASCII.txt", checkIfExists: true)
+                input[4] = "EU"
+                input[5] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def table = { p ->
+                def lines = path(p).readLines()
+                def header = lines[0].split('\t', -1) as List
+                lines.drop(1).collect { l -> [header, l.split('\t', -1) as List].transpose().collectEntries() }
+            }
+            def log = path(process.out.log.get(0)).text
+            def geo = table(process.out.geo.get(0))
+            def res = table(process.out.resolved.get(0))
+            def latlongs = path(process.out.lat_longs.get(0)).readLines()
+            def geoOf = { city, country_input = "" -> geo.find { it.location == city && it.country_input == country_input } }
+            def resOf = { city, country_input = "" -> res.find { it.city == city && it.country_input == country_input } }
+
+            assert geo.collect { it.keySet() }.every { it as List == ["location", "country_input", "auspice_location", "country", "division", "region"] }
+            assert (res[0].keySet() as List).take(7) == ["city", "country", "division", "lat", "long", "source", "n_candidates"]
+
+            // Barcelona: the Catalan coordinates table (params.coordinates) beats GeoNames -> its own coordinates
+            assert geoOf("Barcelona").subMap(["country", "division", "region", "auspice_location"]) ==
+                   [country: "Spain", division: "Catalonia", region: "Europe", auspice_location: "Barcelona"]
+            assert resOf("Barcelona").subMap(["lat", "long", "source", "n_samples"]) ==
+                   [lat: "41.38792", long: "2.169919", source: "coordinates", n_samples: "2"]
+            assert latlongs.contains("location\tBarcelona\t41.38792\t2.169919")
+            assert geoOf("Lleida").subMap(["country", "division"]) == [country: "Spain", division: "Catalonia"]
+
+            // Wien: only a GeoNames *alternate* name (of Vienna); the metadata value is kept as the location label
+            assert geoOf("Wien").subMap(["country", "division", "auspice_location"]) == [country: "Austria", division: "Vienna", auspice_location: "Wien"]
+            assert resOf("Wien").source == "geonames:alternate"
+            assert log.contains("PhyloGeography: INFO 'Wien' matched a GeoNames alternate name of Vienna (AT)") : log
+
+            // Valencia: the most populous Valencia worldwide is in Venezuela; the EU scope keeps the Spanish one
+            assert geoOf("Valencia").subMap(["country", "division"]) == [country: "Spain", division: "Valencia"]
+            assert resOf("Valencia").n_candidates == "1"
+
+            // Porto: primary-name matches (PT, IT, ES) rank before alternate names (Bordeaux has "Porto" as one).
+            // D16g: its namesakes (IT 4,703; ES 0) are < 10% of Porto PT (252,687) -> INFO, not WARNING; the audit
+            // table still lists every alternative and the full candidate count.
+            assert geoOf("Porto").country == "Portugal"
+            assert resOf("Porto").source == "geonames:name"
+            assert resOf("Porto").n_candidates == "3"
+            assert resOf("Porto").alternatives.contains("Porto (IT") && resOf("Porto").alternatives.contains("Porto (ES")
+            assert !log.contains("Bordeaux") : log
+            def porto = log.readLines().findAll { it.contains("'Porto'") && it.contains("namesake") }
+            assert porto.size() == 1 && porto[0].startsWith("PhyloGeography: INFO") : log
+            assert !log.readLines().any { it.startsWith("PhyloGeography: WARNING") && it.contains("'Porto'") } : log
+
+            // Frankfurt: am Main (650,000) is chosen; Frankfurt (Oder) has 57,107 = 8.8% < 10% but >= 50,000 -> WARNING (D16g)
+            assert geoOf("Frankfurt").subMap(["country", "division"]) == [country: "Germany", division: "Hesse"]
+            assert resOf("Frankfurt").n_candidates == "2"
+            assert resOf("Frankfurt").alternatives.contains("Frankfurt (Oder)")
+            def frankfurt = log.readLines().find { it.contains("'Frankfurt'") && it.contains("namesake") }
+            assert frankfurt?.startsWith("PhyloGeography: WARNING") : log
+            assert frankfurt.contains("Frankfurt am Main") && frankfurt.contains("Frankfurt (Oder)")
+
+            // COUNTRY column overrides the continent scope; the same city name in two countries gets distinct labels
+            assert geoOf("Córdoba", "Argentina").subMap(["country", "region", "auspice_location"]) ==
+                   [country: "Argentina", region: "South America", auspice_location: "Córdoba (Argentina)"]
+            assert geoOf("Córdoba").subMap(["country", "division", "auspice_location"]) ==
+                   [country: "Spain", division: "Andalusia", auspice_location: "Córdoba (Spain)"]
+            assert log.readLines().any { it.startsWith("PhyloGeography: WARNING") && it.contains("'Córdoba'") && it.contains("Córdoba (Argentina)") } : log
+
+            // Unknown city: WARNING, everything NA, no map point; never a guessed place
+            assert geoOf("Xyzzyville").subMap(["country", "division", "region"]) == [country: "NA", division: "NA", region: "NA"]
+            assert resOf("Xyzzyville").subMap(["lat", "long", "source", "n_candidates"]) == [lat: "NA", long: "NA", source: "unresolved", n_candidates: "0"]
+            assert !latlongs.any { it.toLowerCase().contains("xyzzyville") }
+            assert log.readLines().any { it.startsWith("PhyloGeography: WARNING") && it.contains("'Xyzzyville'") } : log
+
+            // Missing LOCATION stays NA: no geo.tsv row is made up for it, and it is reported
+            assert !geo.any { it.location in ["", "NA"] }
+            assert log.contains("PhyloGeography: INFO 1 sample(s) have no LOCATION") : log
+
+            // lat_longs.tsv: augur format (no header, level<TAB>name<TAB>lat<TAB>long), one row per used place
+            assert latlongs.every { it.split('\t', -1).size() == 4 && it.split('\t')[0] in ["country", "division", "location"] }
+            ["country\tSpain", "country\tAustria", "country\tPortugal", "country\tGermany", "country\tArgentina",
+             "division\tCatalonia", "division\tHesse", "location\tWien", "location\tCórdoba (Spain)", "location\tCórdoba (Argentina)"].each { key ->
+                assert latlongs.count { it.startsWith(key + "\t") } == 1 : "${key} missing or duplicated in lat_longs.tsv"
+            }
+            assert !latlongs.any { it.startsWith("location\tCórdoba\t") }
+            assert log.contains("PhyloGeography: INFO 11 samples, 8 distinct LOCATION values")
+            // the verified Nextstrain env (AuspiceEnvCheck, plan D21) is recorded once per run, and so in every phylo.log
+            assert log.readLines()[0] == "AuspiceEnvCheck: INFO Nextstrain env verified at /test/fixture/env: augur 34.1.4, treetime 0.12.1, python 3.13.15, geonamescache 3.0.2, biopython 1.88, pandas 2.3.3." : log
+        }
+    }
+
+    test("Should honour --auspiceContinent and --auspiceLatLongs overrides (South America: Valencia and Barcelona in Venezuela)") {
+
+        when {
+            process {
+                """
+                input[0] = file("${projectDir}/tests/data/phylo/geography/metadata_geo_sa.csv", checkIfExists: true)
+                input[1] = file("${projectDir}/RESOURCES/coordenades_cat.tsv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/geography/user_lat_longs.tsv", checkIfExists: true)
+                input[3] = file("${projectDir}/RESOURCES/geonames/admin1CodesASCII.txt", checkIfExists: true)
+                input[4] = "SA"
+                input[5] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def log = path(process.out.log.get(0)).text
+            def geo = path(process.out.geo.get(0)).readLines()
+            def res = path(process.out.resolved.get(0)).readLines()
+            def latlongs = path(process.out.lat_longs.get(0)).readLines()
+
+            assert geo.any { it.startsWith("Valencia\t\tValencia\tVenezuela\t") && it.endsWith("\tSouth America") } : geo
+            // The Catalan table only holds Spanish places: outside the continent scope it is not used
+            assert geo.any { it.startsWith("Barcelona\t\tBarcelona\tVenezuela\t") } : geo
+            assert log.contains("PhyloGeography: INFO coordinates table rows in Spain skipped (outside continent scope SA)") : log
+
+            // User lat_longs: a location point for a city GeoNames does not know (its country stays NA) ...
+            assert latlongs.contains("location\tXyzzyville\t10.5\t-66.9")
+            assert res.any { it.startsWith("Xyzzyville\tNA\tNA\t10.5\t-66.9\tauspiceLatLongs\t0") } : res
+            assert log.readLines().any { it.startsWith("PhyloGeography: WARNING") && it.contains("'Xyzzyville'") } : log
+            // ... and it beats the representative point of a country
+            assert latlongs.contains("country\tVenezuela\t8.0\t-66.0")
+            assert latlongs.count { it.startsWith("country\tVenezuela\t") } == 1
+            assert log.contains("PhyloGeography: INFO country 'Venezuela' drawn at 8.0, -66.0 from --auspiceLatLongs.") : log
+        }
+    }
+
+    test("Should WARN only for close contenders (D16g): namesake >= 10% of the chosen population, >= 50,000 people, or a tie; smaller namesakes are INFO") {
+
+        when {
+            process {
+                """
+                input[0] = file("${projectDir}/tests/data/phylo/geography/metadata_geo_threshold.csv", checkIfExists: true)
+                input[1] = file("${projectDir}/RESOURCES/coordenades_cat.tsv", checkIfExists: true)
+                input[2] = []
+                input[3] = file("${projectDir}/RESOURCES/geonames/admin1CodesASCII.txt", checkIfExists: true)
+                input[4] = "EU,AS"
+                input[5] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def lines = path(process.out.log.get(0)).text.readLines()
+            def levelOf = { city -> lines.find { it.contains("'${city}'") && (it.contains("ambiguous") || it.contains("namesake")) }?.tokenize(' ')?.getAt(1) }
+            // GeoNames cities500 has no pair exactly at 10% on any continent, so the boundary is bracketed with the
+            // closest real pairs; the comparison is integer-exact (10 * alternative >= chosen).
+            assert levelOf("Voronovytsya") == "WARNING"   // UA 652 vs 6,516: 10 * 652 = 6,520 >= 6,516 (10.006%)
+            assert levelOf("Feldioara") == "INFO"         // RO 628 vs 6,307: 10 * 628 = 6,280 <  6,307 (9.957%)
+            assert levelOf("Lystrup") == "WARNING"        // DK 10,273 vs 10,273: a tie is always close
+            // Absolute bound (real cities500 pairs, both namesakes < 10% of the chosen city):
+            assert levelOf("Donetsk") == "WARNING"        // RU 50,850 (5.6% of UA 901,645) but >= 50,000
+            assert levelOf("Takeo") == "INFO"             // JP 47,914 (5.7% of KH 843,931) and < 50,000
+            def res = path(process.out.resolved.get(0)).readLines()
+            ["Voronovytsya", "Feldioara", "Lystrup", "Donetsk", "Takeo"].each { city ->   // n_candidates keeps the full count
+                assert res.find { it.startsWith(city + "\t") }?.split('\t')?.getAt(6) == "2" : res
+            }
+        }
+    }
+
+    test("Should report and not fail when the metadata has no LOCATION column") {
+
+        when {
+            process {
+                """
+                input[0] = file("${projectDir}/tests/data/phylo/geography/metadata_geo_nolocation.csv", checkIfExists: true)
+                input[1] = file("${projectDir}/RESOURCES/coordenades_cat.tsv", checkIfExists: true)
+                input[2] = []
+                input[3] = file("${projectDir}/RESOURCES/geonames/admin1CodesASCII.txt", checkIfExists: true)
+                input[4] = "EU"
+                input[5] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def log = path(process.out.log.get(0)).text
+            assert log.contains("PhyloGeography: WARNING the metadata has no LOCATION column") : log
+            assert path(process.out.geo.get(0)).readLines() == ["location\tcountry_input\tauspice_location\tcountry\tdivision\tregion"]
+            assert path(process.out.resolved.get(0)).readLines().size() == 1
+            assert path(process.out.lat_longs.get(0)).readLines().isEmpty()
+        }
+    }
+
+    test("Should report and not fail without --metadata") {
+
+        when {
+            process {
+                """
+                input[0] = []
+                input[1] = file("${projectDir}/RESOURCES/coordenades_cat.tsv", checkIfExists: true)
+                input[2] = []
+                input[3] = file("${projectDir}/RESOURCES/geonames/admin1CodesASCII.txt", checkIfExists: true)
+                input[4] = "EU"
+                input[5] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert path(process.out.log.get(0)).text.contains("PhyloGeography: WARNING no --metadata")
+            assert path(process.out.lat_longs.get(0)).readLines().isEmpty()
+        }
+    }
+
+    test("Should fail with a clear message on an unknown --auspiceContinent") {
+
+        when {
+            process {
+                """
+                input[0] = file("${projectDir}/tests/data/phylo/geography/metadata_geo_sa.csv", checkIfExists: true)
+                input[1] = file("${projectDir}/RESOURCES/coordenades_cat.tsv", checkIfExists: true)
+                input[2] = []
+                input[3] = file("${projectDir}/RESOURCES/geonames/admin1CodesASCII.txt", checkIfExists: true)
+                input[4] = "EU,XX"
+                input[5] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            // errorStrategy 'ignore': the task fails (exit 1) but the process is reported successful and emits nothing;
+            // the caller (Phase 5 wiring) reports the missing geography. The reason is on the task's own stderr.
+            assert process.success
+            assert process.out.lat_longs.size() == 0
+            assert process.out.log.size() == 0
+            def taskErr = ""
+            new File("${launchDir}/work").eachFileRecurse(groovy.io.FileType.FILES) {
+                if (it.name == ".command.err") taskErr += it.text
+            }
+            assert taskErr.contains("PhyloGeography: unknown --auspiceContinent code(s) XX") : taskErr
+        }
+    }
+
+    test("M4: a Catalan-table hit still reports in-scope GeoNames namesakes outside Spain (D16g rule); L3: COUNTRY 'NA' is Namibia, not missing") {
+
+        when {
+            process {
+                """
+                input[0] = file("${projectDir}/tests/data/phylo/geography/metadata_geo_namesakes.csv", checkIfExists: true)
+                input[1] = file("${projectDir}/RESOURCES/coordenades_cat.tsv", checkIfExists: true)
+                input[2] = []
+                input[3] = file("${projectDir}/RESOURCES/geonames/admin1CodesASCII.txt", checkIfExists: true)
+                input[4] = "EU"
+                input[5] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def log = path(process.out.log.get(0)).text
+            def table = { p ->
+                def lines = path(p).readLines()
+                def header = lines[0].split('\t', -1) as List
+                lines.drop(1).collect { l -> [header, l.split('\t', -1) as List].transpose().collectEntries() }
+            }
+            def geo = table(process.out.geo.get(0))
+            def res = table(process.out.resolved.get(0))
+            // Breda: the Catalan table wins (Spain/Catalonia), but Breda NL (184,126 >= 50,000) is a close contender -> WARNING
+            def breda = geo.find { it.location == "Breda" }
+            assert breda.subMap(["country", "division", "country_input"]) == [country: "Spain", division: "Catalonia", country_input: ""] : breda
+            assert res.find { it.city == "Breda" }.alternatives.contains("Breda (NL") : res
+            assert log.readLines().any { it.startsWith("PhyloGeography: WARNING") && it.contains("'Breda'") && it.contains("Breda (NL") } : log
+            // Tiana: Tiana IT (521) is < 10% of Tiana ES (7,052) and < 50,000 -> INFO only
+            assert log.readLines().any { it.startsWith("PhyloGeography: INFO") && it.contains("'Tiana'") && it.contains("Tiana (IT") } : log
+            assert !log.readLines().any { it.startsWith("PhyloGeography: WARNING") && it.contains("'Tiana'") } : log
+            // COUNTRY "NA" is the ISO code of Namibia (pandas' default NA parsing would have dropped it)
+            def windhoek = geo.find { it.location == "Windhoek" }
+            assert windhoek.subMap(["country_input", "country", "region"]) == [country_input: "NA", country: "Namibia", region: "Africa"] : windhoek
+            // a blank COUNTRY is missing: the city is looked up in the continent scope
+            assert geo.find { it.location == "Barcelona" }.country_input == ""
+        }
+    }
+}

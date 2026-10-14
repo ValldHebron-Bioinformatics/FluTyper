@@ -10,17 +10,19 @@ process PhyloLog {
     //   2. a coverage QC summary for this tree, from the merged QC table: samples in, samples dropped and why
     //   3. the subclade step's notes (subclades.log)
     //   4. the tree's own steps: alignment, IQ-TREE, TreeTime/TreeCluster, report
+    //   5. with --auspice: the run-level geography notes (geography.log) and the tree's PhyloAuspice messages (auspice.log)
     // A tree whose later step failed (errorStrategy 'ignore') still gets a phylo.log with the steps that ran, so the
     // log shows where it stopped. The parts arrive already grouped by tree_id (groupTuple with remainder), so no
     // per-tree join can drop a tree.
     errorStrategy 'ignore'
 
     input:
-    tuple val(tree_id), val(tree_folder), path(parts)   // alignment.log, iqtree.log, phylo.treefile, posttree.log, report.log (whichever ran)
+    tuple val(tree_id), val(tree_folder), path(parts)   // alignment.log, iqtree.log, phylo.treefile, posttree.log, report.log [, geography.log, auspice.log] (whichever ran)
     path(preflight_log)                                 // <segments>\t<message> notes of this subtype (PhyloPreflight)
     path(subclades_log)
     path(qc_table)                                      // merged coverage QC table of all candidate samples
     val(segment_order)                                  // comma-separated segment names
+    val(auspice_on)                                     // --auspice: a tree with neither Auspice part gets a note (L1)
 
     output:
     tuple val(tree_id), path("${tree_folder}/phylo.log"), emit: log
@@ -74,6 +76,8 @@ def failure(sample):
         r = segs.get(seg)
         if r is None:
             reasons.append(f"{seg}: no QC row")
+        elif r["reason"].startswith("HA Nextclade analysis failed"):
+            return r["reason"]         # D24: the same reason on every segment: say it once
         elif r["status"] != "PASS":
             reason = re.sub(r"coverage [\\d.]+% below ([\\d.]+%)", r"coverage below \\1", r["reason"] or "failed")
             reasons.append(reason if not whole_genome else f"{seg} {reason}")
@@ -110,6 +114,20 @@ for title, part in [("Alignment", "alignment.log"), ("IQ-TREE", "iqtree.log"),
     if not lines and not os.path.isfile(part):
         lines = [f"(step did not finish: no {part} was produced)"] if part != "alignment.log" else []
     out.extend(lines)
+
+# 5. Auspice export (--auspice only): the run-level geography notes (PhyloGeography, once per run, the same for every
+# tree) then this tree's PhyloAuspice messages. Without --auspice neither part exists and there is no section.
+if os.path.isfile("geography.log") or os.path.isfile("auspice.log"):
+    out.append("")
+    out.append("## Auspice export")
+    out.extend(read_lines("geography.log"))
+    out.extend(read_lines("auspice.log") if os.path.isfile("auspice.log")
+               else ["(step did not finish: no auspice.log was produced)"])
+elif "${auspice_on}" == "true":
+    # geography.log is attached to every tree that reached PhyloReport: without it the tree never got to the export
+    out.append("")
+    out.append("## Auspice export")
+    out.append("(not attempted: --auspice is on, but this tree has no report, so there is nothing to export)")
 
 with open(f"{tree_folder}/phylo.log", "w") as f:
     f.write("\\n".join(out) + "\\n")

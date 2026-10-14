@@ -1,0 +1,10 @@
+# Collection dates of the root strains (WHO reference / vaccine strains, phyloSubtypeConfig.*.rootStrains) for the
+# Auspice time tree (augur refine --timetree). Root strains have no row in --metadata, so by default their date is
+# derived from the strain name (rule below, applied by PhyloAuspice, plan Phase 4); a row here overrides that.
+# Rule: the last '/'-separated field of the name must be a 4-digit year -> ambiguous date YYYY-XX-XX
+#   (A/Darwin/6/2021 -> 2021-XX-XX; TreeTime then infers the date within that year). A name without a 4-digit
+#   final year (e.g. A/Brisbane/10/07) gets no date: WARNING, the strain is left undated, never guessed.
+# ONLY add a row with a collection date taken from a citable source (GISAID EPI_ISL record, WHO/CDC report,
+# publication); put that reference in `source`. Formats: YYYY-MM-DD, or YYYY-MM-XX / YYYY-XX-XX when only partly known.
+# Lines starting with '#' are comments. Columns are tab-separated.
+strain	date	source

@@ -29,7 +29,7 @@ class PhyloTestHelpers {
     // The phylogenetics steps no longer print their per-task chatter; only the summary line and actionable warnings remain
     static void checkQuietTerminal(List stdout) {
         def text = stdout.join("\n")
-        ["PhyloPreflight:", "PhyloCoverageQC:", "PhyloAlignment:", "PhyloSegmentAlignment:", "PhyloTree:", "PhyloPostTree:", "PhyloReport:", "PhyloSubclades:"].each { chatter ->
+        ["PhyloPreflight:", "PhyloCoverageQC:", "PhyloAlignment:", "PhyloSegmentAlignment:", "PhyloTree:", "PhyloPostTree:", "PhyloReport:", "PhyloSubclades:", "PhyloGeography:", "PhyloAuspice:"].each { chatter ->
             assert !text.contains(chatter) : "'${chatter}' step chatter is still printed to the terminal"
         }
     }
