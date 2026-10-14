@@ -84,6 +84,10 @@ process GeographicReport {
     town_to_prov_raw = df_loc.set_index('Norm_Pob')['Provincia'].to_dict()
     town_to_prov = {k: town_to_prov_raw[k] for k in sorted(town_to_prov_raw.keys(), key=len, reverse=True) if k}
 
+    # Country level (optional): rows whose Población equals their Comunidad give the country coordinates
+    town_to_country_raw = df_loc.set_index('Norm_Pob')['Comunidad'].to_dict()
+    town_to_country = {k: town_to_country_raw[k] for k in sorted(town_to_country_raw.keys(), key=len, reverse=True) if k}
+
     town_mapping_raw = df_loc.set_index('Norm_Pob')['Población'].to_dict()
     town_mapping = {k: town_mapping_raw[k] for k in sorted(town_mapping_raw.keys(), key=len, reverse=True) if k}
 
@@ -91,6 +95,8 @@ process GeographicReport {
     capitals = df_loc[df_loc['Población'] == df_loc['Provincia']]
     prov_coord_dict = capitals.set_index('Provincia')[['Latitud', 'Longitud']].to_dict('index')
     town_coord_dict = df_loc.set_index('Población')[['Latitud', 'Longitud']].to_dict('index')
+    countries = df_loc[df_loc['Población'] == df_loc['Comunidad']].drop_duplicates(subset=['Comunidad'])
+    country_coord_dict = countries.set_index('Comunidad')[['Latitud', 'Longitud']].to_dict('index')
 
     df_geno = pd.read_csv("${genotyping_file}")
     df_meta = pd.read_csv("${meta_str}", skipinitialspace=True) if "${meta_str}" else pd.DataFrame()
@@ -108,23 +114,24 @@ process GeographicReport {
 
         if 'LOCATION' in df_meta.columns:
             def extract_location(loc):
-                if pd.isna(loc): return pd.Series(['Sense dades', 'Sense dades'])
+                if pd.isna(loc): return pd.Series(['Sense dades', 'Sense dades', 'Sense dades'])
                 norm_spaced = f" {normalize_str(loc)} "
 
                 # Match specific town. Assigns both Town and Province.
                 for town_norm, town_real in town_mapping.items():
                     if f" {town_norm} " in norm_spaced: 
-                        return pd.Series([town_real, town_to_prov[town_norm]])
+                        prov = town_to_prov[town_norm]
+                        return pd.Series([town_real, prov if pd.notna(prov) and prov else 'Sense dades', town_to_country[town_norm]])
 
                 # If no town is found, check for broad province match
-                if ' barcelona ' in norm_spaced: return pd.Series(['Sense dades', 'Barcelona'])
-                if ' girona ' in norm_spaced or ' gerona ' in norm_spaced: return pd.Series(['Sense dades', 'Girona'])
-                if ' tarragona ' in norm_spaced: return pd.Series(['Sense dades', 'Tarragona'])
-                if ' lleida ' in norm_spaced or ' lerida ' in norm_spaced: return pd.Series(['Sense dades', 'Lleida'])
+                if ' barcelona ' in norm_spaced: return pd.Series(['Sense dades', 'Barcelona', 'Sense dades'])
+                if ' girona ' in norm_spaced or ' gerona ' in norm_spaced: return pd.Series(['Sense dades', 'Girona', 'Sense dades'])
+                if ' tarragona ' in norm_spaced: return pd.Series(['Sense dades', 'Tarragona', 'Sense dades'])
+                if ' lleida ' in norm_spaced or ' lerida ' in norm_spaced: return pd.Series(['Sense dades', 'Lleida', 'Sense dades'])
 
-                return pd.Series(['Sense dades', 'Sense dades'])
+                return pd.Series(['Sense dades', 'Sense dades', 'Sense dades'])
 
-            df_meta[['TOWN_GROUP', 'PROV_GROUP']] = df_meta['LOCATION'].apply(extract_location)
+            df_meta[['TOWN_GROUP', 'PROV_GROUP', 'COUNTRY_GROUP']] = df_meta['LOCATION'].apply(extract_location)
 
     # Normalize missing values and ensure string type for key columns
     # Normalize missing values and ensure string type for key columns
@@ -161,6 +168,7 @@ process GeographicReport {
     # Establish columns for resolution layers and demographics
     df['Poblacion'] = df['TOWN_GROUP'] if 'TOWN_GROUP' in df.columns else 'Sense dades'
     df['Provincia'] = df['PROV_GROUP'] if 'PROV_GROUP' in df.columns else 'Sense dades'
+    df['Pais'] = df['COUNTRY_GROUP'] if 'COUNTRY_GROUP' in df.columns else 'Sense dades'
     df['Originating Lab'] = df['ORIGINATING_LAB'].fillna('Sense dades').astype(str).str.strip() if 'ORIGINATING_LAB' in df.columns else 'Sense dades'
     # Normalize laboratory names using the town_mapping dictionary
     df['Originating Lab'] = df['Originating Lab'].apply(
@@ -189,7 +197,7 @@ process GeographicReport {
     
     # Setup iterative parameters dynamically from the dataset
     seasons = sorted([s for s in df['Season'].unique() if pd.notna(s) and s != "Unknown Season"], reverse=True)
-    geo_levels = ['Province', 'Town', 'Originating Lab']
+    geo_levels = (['Country'] if country_coord_dict else []) + ['Province', 'Town', 'Originating Lab']
     age_order = {'0-2': 0, '3-4': 1, '5-14': 2, '15-65': 3, '>65': 4}
     age_groups = ['All'] + sorted(
         [a for a in df['Age_Group'].unique() if str(a) != 'nan'],
@@ -275,7 +283,10 @@ process GeographicReport {
                         all_view_colors[layer_id] = {label: color_map.get(label, '#999999') for label in current_labels if label != '-'}
 
                         # Switch targeting logic based on geographic level
-                        if level == 'Province':
+                        if level == 'Country':
+                            coords_dict_to_use = country_coord_dict
+                            loc_col = 'Pais'
+                        elif level == 'Province':
                             coords_dict_to_use = prov_coord_dict
                             loc_col = 'Provincia'
                         elif level == 'Town':
@@ -357,7 +368,7 @@ process GeographicReport {
     season_from_options = "".join([f'<option value="{s}"{" selected" if s == default_season else ""}>{s if s == "All Time" else "Season " + s}</option>' for s in ['All Time'] + seasons])
     season_to_options = "".join([f'<option value="{s}">Season {s}</option>' for s in seasons])
     season_to_disabled = " disabled" if default_season == 'All Time' else ""
-    level_options = '<option value="Province">Province</option><option value="Town">City/Town</option><option value="Originating Lab">Originating Lab</option>'
+    level_options = ('<option value="Country">Country</option>' if country_coord_dict else '') + '<option value="Province">Province</option><option value="Town">City/Town</option><option value="Originating Lab">Originating Lab</option>'
     class_options = "".join([f'<option value="{v["id"]}">{v["label"]}</option>' for v in valid_classifications])
     age_options = "".join([f'<option value="{a}">{a}</option>' for a in age_groups])
     sex_options = "".join([f'<option value="{g}">{g}</option>' for g in sexs])
