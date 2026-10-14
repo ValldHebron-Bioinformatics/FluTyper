@@ -131,7 +131,7 @@ nextflow_process {
             assert geo.any { it.startsWith("Valencia\t\tValencia\tVenezuela\t") && it.endsWith("\tSouth America") } : geo
             // The Catalan table only holds Spanish places: outside the continent scope it is not used
             assert geo.any { it.startsWith("Barcelona\t\tBarcelona\tVenezuela\t") } : geo
-            assert log.contains("PhyloGeography: INFO coordinates table skipped") : log
+            assert log.contains("PhyloGeography: INFO coordinates table rows in Spain skipped (outside continent scope SA)") : log
 
             // User lat_longs: a location point for a city GeoNames does not know (its country stays NA) ...
             assert latlongs.contains("location\tXyzzyville\t10.5\t-66.9")
