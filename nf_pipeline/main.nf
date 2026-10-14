@@ -528,7 +528,9 @@ workflow {
     MergeReports(all_reports_ch)
     // PUBLISH DECLARATIONS
     publish:
-    folder = OrganizeBySample.out.results.map { _id, path -> path }
+    // Publish the sample folder's files, not the folder: CDS, prot, mut and nextclade_csv publish into the same
+    // samples/<id>/, and overwriting a published directory deletes it first, racing their copies on -resume
+    folder = OrganizeBySample.out.results.flatMap { _id, path -> files("${path}/**", type: 'file') }
     subtype = published_subtypes_ch
     datasets = GetDatasets.out
     database = ch_database

@@ -132,6 +132,7 @@ PYEOF
 import csv, glob, os, subprocess, sys
 import treeswift
 from Bio import Phylo, SeqIO
+import sys; sys.setrecursionlimit(10000)  # Bio.Phylo recurses ~2 frames per tree level: a few thousand tips (depth > 500) exceed the default 1000
 
 TREE_FOLDER = "${tree_folder}"
 threshold = "${threshold}"

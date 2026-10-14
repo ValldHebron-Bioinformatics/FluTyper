@@ -81,6 +81,7 @@ process PhyloReport {
 import csv, os, re, sys
 import pandas as pd
 from Bio import Phylo, SeqIO
+import sys; sys.setrecursionlimit(10000)  # Bio.Phylo recurses ~2 frames per tree level: a few thousand tips (depth > 500) exceed the default 1000
 
 meta_path = "${metadata}".strip()
 lab_map_path = "${lab_map}".strip()
@@ -464,6 +465,7 @@ REOF
     python3 - <<'PYEOF'
 import csv, html, json
 from Bio import Phylo
+import sys; sys.setrecursionlimit(10000)  # Bio.Phylo recurses ~2 frames per tree level: a few thousand tips (depth > 500) exceed the default 1000
 from plotly.offline import get_plotlyjs_version
 
 SUBTYPE_LABEL = "${subtype_label}"  # tree_id, e.g. "H3N2" (whole genome) or "H3N2_HA" (segment tree): names the file

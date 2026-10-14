@@ -101,6 +101,7 @@ import csv, glob, json, math, os, re, subprocess, sys, traceback
 from datetime import date as Date
 import pandas as pd
 from Bio import Phylo, SeqIO
+import sys; sys.setrecursionlimit(10000)  # Bio.Phylo recurses ~2 frames per tree level: a few thousand tips (depth > 500) exceed the default 1000
 
 P = "PhyloAuspice"
 MISSING = "?"        # augur: '?' = missing (traits does not treat it as a state, export drops it); '' would be a state

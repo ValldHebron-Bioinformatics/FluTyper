@@ -55,6 +55,7 @@ process PhyloTree {
 
     python3 - <<'PYEOF'
 from Bio import Phylo
+import sys; sys.setrecursionlimit(10000)  # Bio.Phylo recurses ~2 frames per tree level: a few thousand tips (depth > 500) exceed the default 1000
 
 tree = Phylo.read("${tree_folder}/phylo.treefile", "newick")
 rows = []

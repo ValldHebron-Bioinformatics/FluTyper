@@ -7,8 +7,9 @@ process PhyloGeography {
     // location string parsing); country, division (admin-1) and coordinates are derived offline, first match wins:
     //  1. User tables. params.coordinates (coordenades_cat.tsv: Spanish/Catalan towns, no country column -> Spain; its
     //     Comunidad names are mapped to the GeoNames admin-1 name, "Catalunya" -> "Catalonia", so table and GeoNames
-    //     cities share one division). The table is only used when Spain is in scope (--auspiceContinent, or the
-    //     sample's COUNTRY). --auspiceLatLongs (augur format, level<TAB>name<TAB>lat<TAB>long) overrides every
+    //     cities share one division). A row whose Comunidad is a country name instead (scripts/gisaid_to_metadata.py:
+    //     Comunidad = country, Provincia = region) belongs to that country, with Provincia as its division. A row is
+    //     only used when its country is in scope (--auspiceContinent, or the sample's COUNTRY). --auspiceLatLongs (augur format, level<TAB>name<TAB>lat<TAB>long) overrides every
     //     coordinate (location, division and country points) and can place a city nothing else knows.
     //  2. GeoNames (geonamescache 3.0.2, cities with population >= 500, CC-BY 4.0) restricted to the continent scope
     //     (--auspiceContinent, default EU), or to the country of an optional metadata COUNTRY column, which overrides
@@ -111,11 +112,20 @@ with open(ADMIN1, encoding="utf-8") as f:
         parts = line.rstrip("\\n").split("\\t")
         if len(parts) >= 2:
             admin1[parts[0]] = parts[1]
+admin1_by_name = {}   # (country code, folded admin-1 name) -> admin-1 code
+for key, name in admin1.items():
+    cc, _, a1 = key.partition(".")
+    admin1_by_name.setdefault((cc, fold(name)), a1)
 
 country_by_key = {}
 for cc, c in countries.items():
     for key in (cc, c["iso3"], c["name"]):
         country_by_key[fold(key)] = cc
+# Common (GISAID) spellings GeoNames does not use: it says "The Netherlands", "Czechia"
+for key, cc in {"Netherlands": "NL", "Czech Republic": "CZ", "Republic of Moldova": "MD", "Russian Federation": "RU",
+                "Turkey": "TR", "Macedonia": "MK", "Kosovo": "XK"}.items():
+    if cc in countries:
+        country_by_key.setdefault(fold(key), cc)
 
 def country_name(cc):
     return countries[cc]["name"] if cc else NA
@@ -167,6 +177,8 @@ else:
 # params.coordinates (coordenades_cat.tsv: Comunidad Provincia Población Latitud Longitud Altitud) has no country
 # column: its rows are Spanish (plan D12). Its Comunidad names are mapped to the GeoNames admin-1 names so that
 # table cities and GeoNames cities share one division ("Catalunya" -> "Catalonia", admin1CodesASCII.txt ES.56).
+# Exception: a row whose Comunidad is a GeoNames country name (and not a Spanish comunidad) is a multi-country table
+# row (scripts/gisaid_to_metadata.py): Comunidad = country, Provincia = region, matched to that country's admin-1.
 ES_COMUNIDAD = {"catalunya": "56", "cataluna": "56", "catalonia": "56", "comunitat valenciana": "60",
                 "comunidad valenciana": "60", "illes balears": "07", "islas baleares": "07", "pais vasco": "59",
                 "euskadi": "59", "andalucia": "51", "aragon": "52", "castilla y leon": "55", "castilla la mancha": "54",
@@ -175,7 +187,7 @@ ES_COMUNIDAD = {"catalunya": "56", "cataluna": "56", "catalonia": "56", "comunit
                 "comunidad foral de navarra": "32", "galicia": "58", "cantabria": "39", "la rioja": "27",
                 "extremadura": "57", "ceuta": "CE", "melilla": "ML"}
 ES_COMUNIDAD = {fold_town(k): v for k, v in ES_COMUNIDAD.items()}   # same normalisation as the lookup ("la" dropped)
-table = {}   # fold_town(town) -> [(town, division, admin1 code, lat, long)]
+table = {}   # fold_town(town) -> [(town, division, admin1 code, lat, long, country code, multi-country table row)]
 TABLE_CC = "ES"
 if COORDS:
     ct = pd.read_csv(COORDS, sep="\\t", dtype=str, keep_default_na=False, quoting=csv.QUOTE_NONE)
@@ -189,22 +201,31 @@ if COORDS:
         if blank(r["Población"]) or blank(r["Latitud"]) or blank(r["Longitud"]):
             continue
         comunidad = "" if blank(r["Comunidad"]) else str(r["Comunidad"]).strip()
-        code = ES_COMUNIDAD.get(fold_town(comunidad))
-        if code is None:
-            unmapped.add(comunidad)
-        division = division_of(TABLE_CC, code) if code else (comunidad or NA)
+        row_cc = None if fold_town(comunidad) in ES_COMUNIDAD else country_by_key.get(fold(comunidad))
+        if row_cc:
+            prov = "" if "Provincia" not in ct.columns or blank(r["Provincia"]) else str(r["Provincia"]).strip()
+            code = admin1_by_name.get((row_cc, fold(prov))) if prov else None
+            division = division_of(row_cc, code) if code else (prov or NA)
+            multi = True
+        else:
+            multi = False
+            row_cc = TABLE_CC
+            code = ES_COMUNIDAD.get(fold_town(comunidad))
+            if code is None:
+                unmapped.add(comunidad)
+            division = division_of(TABLE_CC, code) if code else (comunidad or NA)
         try:
             float(r["Latitud"]), float(r["Longitud"])
         except ValueError:
             fail(f"--coordinates {COORDS}: non-numeric coordinates for {r['Población']}: {r['Latitud']}, {r['Longitud']}")
         table.setdefault(fold_town(r["Población"]), []).append((str(r["Población"]).strip(), division, code,
-                                                                 r["Latitud"].strip(), r["Longitud"].strip()))
+                                                                 r["Latitud"].strip(), r["Longitud"].strip(), row_cc, multi))
     for c in sorted(unmapped):
         say("WARNING", f"coordinates table Comunidad '{c}' has no GeoNames admin-1 name: kept as written, so it may "
                        "not merge with the same division resolved through GeoNames.")
-    if TABLE_CC not in scope_cc:
-        say("INFO", f"coordinates table skipped (its places are in {country_name(TABLE_CC)}, outside continent scope "
-                    f"{','.join(continent_codes)}) unless a sample's COUNTRY column says {country_name(TABLE_CC)}.")
+    for cc in sorted({h[5] for hits in table.values() for h in hits} - scope_cc):
+        say("INFO", f"coordinates table rows in {country_name(cc)} skipped (outside continent scope "
+                    f"{','.join(continent_codes)}) unless a sample's COUNTRY column says {country_name(cc)}.")
 
 user_ll = {}   # (level, name.lower()) -> (lat, long, name) -- augur matches lat_longs on lower-case (level, name)
 if USER_LL:
@@ -287,33 +308,42 @@ for (city, given), n in sorted(keys.items(), key=lambda kv: (kv[0][0] or "", kv[
         resolved[(city, given)] = r
         continue
     allowed = {gcc} if gcc else (set() if given is not None else scope_cc)
-    hits = table.get(fold_town(city), []) if TABLE_CC in allowed else []
+    hits = [h for h in table.get(fold_town(city), []) if h[5] in allowed]
     if hits:
-        town, division, code, lat, lon = hits[0]
-        r.update(cc=TABLE_CC, country=country_name(TABLE_CC), division=division, a1=code, lat=lat, long=lon,
+        town, division, code, lat, lon, hit_cc, multi = hits[0]
+        if multi and code is None and town != country_name(hit_cc):
+            # GISAID often gives a town or county where the region should be (United Kingdom / Kettering): take the
+            # admin-1 of that place in GeoNames, within the row's country
+            for name in dict.fromkeys((division, town)):
+                _, cand = geonames_lookup(name, {hit_cc})
+                if cand and division_of(hit_cc, cand[0]["admin1code"]) != NA:
+                    code = cand[0]["admin1code"]
+                    division = division_of(hit_cc, code)
+                    break
+        r.update(cc=hit_cc, country=country_name(hit_cc), division=division, a1=code, lat=lat, long=lon,
                  source="coordinates", n_candidates=len(hits))
         if len(hits) > 1:
             # the table has no population: always a WARNING (D16g, missing population = close contender)
             r["alternatives"] = "; ".join(f"{h[0]} ({h[1]}, {h[3]}, {h[4]})" for h in hits[1:])
             say("WARNING", f"'{city}' is ambiguous in the coordinates table ({len(hits)} rows): using the first row, "
                            f"{town} ({lat}, {lon}); others: {r['alternatives']}.")
-        # M4 (Phase 6): the table only knows Spain, so a hit must not hide in-scope namesakes elsewhere (Breda NL, Pau FR).
-        # D16g rule against the Spanish town's GeoNames population (none known -> close): WARNING if close, else INFO.
-        _, others = geonames_lookup(city, allowed - {TABLE_CC})
+        # M4 (Phase 6): a table hit must not hide in-scope namesakes in other countries (Breda NL, Pau FR).
+        # D16g rule against the table town's GeoNames population (none known -> close): WARNING if close, else INFO.
+        _, others = geonames_lookup(city, allowed - {hit_cc})
         if others:
-            _, spanish = geonames_lookup(city, {TABLE_CC})
+            _, spanish = geonames_lookup(city, {hit_cc})
             ref = spanish[0] if spanish else {}
             r["alternatives"] = "; ".join(x for x in (r["alternatives"], "; ".join(describe(c) for c in others)) if x)
             r["n_candidates"] += len(others)
             shown = "; ".join(describe(c) for c in others[:MAX_ALTERNATIVES])
             more = f" and {len(others) - MAX_ALTERNATIVES} more" if len(others) > MAX_ALTERNATIVES else ""
             if any(is_close(ref, c) for c in others):
-                say("WARNING", f"'{city}' was placed with the coordinates table ({town}, {division}, Spain), but GeoNames "
-                               f"has a close namesake elsewhere in scope (>= {CLOSE_PERCENT}% of the Spanish town's population, "
+                say("WARNING", f"'{city}' was placed with the coordinates table ({town}, {division}, {country_name(hit_cc)}), but GeoNames "
+                               f"has a close namesake elsewhere in scope (>= {CLOSE_PERCENT}% of the table town's population, "
                                f">= {CLOSE_ABSOLUTE:,} people, or no population to compare): {shown}{more}. Add a COUNTRY "
-                               "column (or an --auspiceLatLongs location row) if this sample is not from Spain.")
+                               f"column (or an --auspiceLatLongs location row) if this sample is not from {country_name(hit_cc)}.")
             else:
-                say("INFO", f"'{city}' was placed with the coordinates table ({town}, {division}, Spain); smaller GeoNames "
+                say("INFO", f"'{city}' was placed with the coordinates table ({town}, {division}, {country_name(hit_cc)}); smaller GeoNames "
                             f"namesake(s) elsewhere in scope: {shown}{more}.")
     else:
         tier, cand = geonames_lookup(city, allowed)
@@ -434,10 +464,15 @@ for name, cc, a1 in sorted(divisions_used, key=lambda x: (x[0], x[1] or "", x[2]
         say("INFO", f"division '{name}' drawn at {u[0]}, {u[1]} from --auspiceLatLongs.")
         continue
     pick = top_admin1.get((cc, a1)) if cc and a1 else None
+    # a coordinates-table row of the same name in the same country (multi-country tables geocode every region)
+    row = next((h for h in table.get(fold_town(name), []) if h[5] == cc), None)
     if pick:
         add_row("division", name, coord(pick["latitude"]), coord(pick["longitude"]))
         say("INFO", f"division '{name}' drawn at its most populous GeoNames city {pick['name']} "
                     f"({pick['latitude']:.3f}, {pick['longitude']:.3f}).")
+    elif row:
+        add_row("division", name, row[3], row[4])
+        say("INFO", f"division '{name}' drawn at the coordinates table row {row[0]} ({row[3]}, {row[4]}).")
     else:
         say("WARNING", f"division '{name}' has no map point (add an --auspiceLatLongs division row).")
 same_division = {}
