@@ -32,6 +32,7 @@ FluTyper is a modular, reproducible Nextflow pipeline for genotyping influenza v
 - [🧪 Testing & Continuous Integration](#-testing--continuous-integration)
 - [🧩 Dependencies & Acknowledgments](#-dependencies--acknowledgments)
 - [📖 Citation](#-citation)
+- [⚖️ License](#️-license)
 
 ---
 
@@ -515,3 +516,11 @@ A manuscript describing FluTyper is currently in preparation and has not yet bee
 The phylogenetics module reproduces the analysis of: Koumaty L, Dan S, De Clercq A, Destras G, Regue H, Oblette A, Le Meur A, Gaymard A, Escuret V, Bouscambert-Duchamp M, Chanard E, Fabre M, Vieillefond V, Visseaux B, Bal A, Josset L. *Emergence of a genetically distinct cluster of influenza A(H3N2) viruses within subclade J.2.2 associated with hospitalization during the 2024–2025 season in Auvergne–Rhône–Alpes, France.* Microbial Genomics 2026;12:001810. [doi:10.1099/mgen.0.001810](https://doi.org/10.1099/mgen.0.001810) (open access, CC-BY). Please also cite IQ-TREE, TreeTime, TreeCluster, MAFFT, Nextclade and ggtree when you use it.
 
 With `--auspice`, please also cite Nextstrain and TreeTime: Hadfield J, Megill C, Bell SM, Huddleston J, Potter B, Callender C, Sagulenko P, Bedford T, Neher RA. *Nextstrain: real-time tracking of pathogen evolution.* Bioinformatics 2018;34(23):4121–4123. [doi:10.1093/bioinformatics/bty407](https://doi.org/10.1093/bioinformatics/bty407); Sagulenko P, Puller V, Neher RA. *TreeTime: Maximum-likelihood phylodynamic analysis.* Virus Evolution 2018;4(1):vex042. [doi:10.1093/ve/vex042](https://doi.org/10.1093/ve/vex042); and Huddleston J, *et al.* *Augur: a bioinformatics toolkit for phylogenetic analyses of human pathogens.* Journal of Open Source Software 2021;6(57):2906. [doi:10.21105/joss.02906](https://doi.org/10.21105/joss.02906). City lookups use [GeoNames](https://www.geonames.org) data (CC BY 4.0).
+
+## ⚖️ License
+
+Copyright (C) 2026 Respiratory Viruses Unit, Microbiology Department, Vall d’Hebron Hospital Universitari, Vall d’Hebron Institut de Recerca (VHIR), Vall d’Hebron Barcelona Hospital Campus, Passeig Vall d’Hebron 119-129, 08035 Barcelona, Spain.
+
+FluTyper is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+FluTyper is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the [LICENSE](LICENSE) file for the full text.
