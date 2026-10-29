@@ -183,6 +183,7 @@ process GeographicReport {
         iso = df['DATE'].dt.isocalendar()
         s_year = iso.year.where(iso.week >= 40, iso.year - 1) # Assign season based on ISO week (season starts in week 40)
         df['Season'] = s_year.astype(str) + "-" + (s_year + 1).astype(str) # Season format "2020-2021"
+        df.loc[df['DATE'].isna(), 'Season'] = "Unknown Season" # Undated samples only count in "All Time"
     else:
         df['Season'] = "Unknown Season"
     
@@ -242,10 +243,12 @@ process GeographicReport {
     # Registry to keep track of layer names and colors
     trace_registry = {}
     all_view_colors = {}
+    # Per-season marker counts ("level|class|age|sex" -> season -> markers) so the page can sum a season range
+    range_data = {}
 
-    for season in seasons:
-        df_season = df[df['Season'] == season]
-        
+    for season in ['All Time'] + seasons:
+        df_season = df if season == 'All Time' else df[df['Season'] == season]
+
         for level in geo_levels:
             for classification in valid_classifications:
                 for age in age_groups:
@@ -283,6 +286,7 @@ process GeographicReport {
                             loc_col = 'Originating Lab'
 
                         # Generate visual markers
+                        range_markers = []
                         for loc_name, coords in coords_dict_to_use.items():
                             loc_df = df_view[df_view[loc_col] == loc_name]
                             if loc_df.empty: continue
@@ -294,6 +298,7 @@ process GeographicReport {
                             hover_details = []
                             current_pct = 0
                             
+                            label_rows = []
                             for label, count in counts.items():
                                 pct = (count / total) * 100
                                 color = color_map.get(label, '#999999')
@@ -302,12 +307,14 @@ process GeographicReport {
                                 hover_line = f"<span style='color:{color}'>&#9608;</span> <b>{label}</b>: {int(count)} / {total} ({pct:.1f}%)"
                                 
                                 breakdown = []
+                                sub_rows = []
                                 
                                 if classification['col'] == 'Root_Clade' and str(label).endswith("-like") and "${params.protocol}".upper() == "HUMAN":
                                     sub_counts = loc_df[loc_df['Root_Clade'] == label]['Clade'].value_counts()
                                     for sub_label, sub_count in sub_counts.items():
                                         if str(sub_label) not in ["Unassigned", "-", "No dataset available", "nan"]:
                                             sub_pct = (sub_count / total) * 100
+                                            sub_rows.append([sub_label, int(sub_count)])
                                             breakdown.append(f"&nbsp;&nbsp;&nbsp;&nbsp;- <b>{sub_label}:</b> {int(sub_count)} / {total} ({sub_pct:.2f}%)")
                                             
                                 elif classification['col'] == 'Genotype':
@@ -315,6 +322,7 @@ process GeographicReport {
                                     for sub_label, sub_count in sub_counts.items():
                                         if str(sub_label) not in ["Unassigned", "-", "None", "", "nan"]:
                                             sub_pct = (sub_count / total) * 100
+                                            sub_rows.append([sub_label, int(sub_count)])
                                             breakdown.append(f"&nbsp;&nbsp;&nbsp;&nbsp;- <b>{sub_label}:</b> {int(sub_count)} / {total} ({sub_pct:.2f}%)")
                                 
                                 if breakdown:
@@ -322,6 +330,8 @@ process GeographicReport {
                                     
                                 hover_details.append(hover_line + "<br>")
                                 current_pct += pct
+                                label_rows.append([label, int(count), sub_rows])
+                            range_markers.append({'n': loc_name, 'c': [float(coords['Latitud']), float(coords['Longitud'])], 'l': label_rows})
                             
                             icon_size = int(55 + min(45, total * 2.5))
                             pie_html = f'''<div style="width:{icon_size}px; height:{icon_size}px; border-radius:50%; 
@@ -337,9 +347,16 @@ process GeographicReport {
                         
                         fg.add_to(m)
                         trace_registry[layer_id] = fg.get_name()
+                        if season != 'All Time':
+                            range_data.setdefault(f"{level}|{classification['id']}|{age}|{sex}", {})[season] = range_markers
 
     # HTML controls
-    season_options = "".join([f'<option value="{s}">Season {s}</option>' for s in seasons])
+    # Season range: FROM = "All Time" or a season, TO = a season (disabled while FROM is "All Time").
+    # Initial view is the latest season (FROM = TO = latest), or "All Time" when no season is dated.
+    default_season = seasons[0] if seasons else 'All Time'
+    season_from_options = "".join([f'<option value="{s}"{" selected" if s == default_season else ""}>{s if s == "All Time" else "Season " + s}</option>' for s in ['All Time'] + seasons])
+    season_to_options = "".join([f'<option value="{s}">Season {s}</option>' for s in seasons])
+    season_to_disabled = " disabled" if default_season == 'All Time' else ""
     level_options = '<option value="Province">Province</option><option value="Town">City/Town</option><option value="Originating Lab">Originating Lab</option>'
     class_options = "".join([f'<option value="{v["id"]}">{v["label"]}</option>' for v in valid_classifications])
     age_options = "".join([f'<option value="{a}">{a}</option>' for a in age_groups])
@@ -349,8 +366,12 @@ process GeographicReport {
     <div style="position:fixed; top:20px; left:60px; z-index:9999; background:white; padding:15px; border-radius:8px; display:flex; flex-direction:column; gap:10px; box-shadow:0 4px 15px rgba(0,0,0,0.1); font-family:Arial; min-width:650px;">
         <div style="display:flex; gap:10px;">
             <div style="flex:1.5; min-width:130px;">
-                <label style="font-size:10px; font-weight:bold; color:#666;">SEASON</label><br>
-                <select id="seasonSel" style="padding:5px; border-radius:4px; width:100%; box-sizing:border-box;">{season_options}</select>
+                <label style="font-size:10px; font-weight:bold; color:#666;">SEASON FROM</label><br>
+                <select id="seasonSel" style="padding:5px; border-radius:4px; width:100%; box-sizing:border-box;">{season_from_options}</select>
+            </div>
+            <div style="flex:1.5; min-width:130px;">
+                <label style="font-size:10px; font-weight:bold; color:#666;">SEASON TO</label><br>
+                <select id="seasonToSel" style="padding:5px; border-radius:4px; width:100%; box-sizing:border-box;"{season_to_disabled}>{season_to_options}</select>
             </div>
             <div style="flex:1; min-width:100px;">
                 <label style="font-size:10px; font-weight:bold; color:#666;">GEOGRAPHIC LEVEL</label><br>
@@ -377,24 +398,116 @@ process GeographicReport {
     <script>
         const REGISTRY = {json.dumps(trace_registry)};
         const COLORS = {json.dumps(all_view_colors)};
+        const SEASONS = {json.dumps(sorted(seasons))};
+        const RANGE_DATA = {json.dumps(range_data)};
+        const COLOR_MAPS = {json.dumps(global_color_map)};
+        const RANGE_LAYERS = {{}};
+        let rangeLayer = null;
+
+        // Number formatting as in Python (exact halves round to even: 6.25 -> "6.2"), unlike toFixed
+        function pyFixed(x, d) {{
+            const full = x.toFixed(d + 30);
+            const cut = full.indexOf('.') + d + 1;
+            const kept = full.slice(0, cut);
+            if (/^50*\$/.test(full.slice(cut)) && /[02468]\$/.test(kept)) return kept;
+            return x.toFixed(d);
+        }}
+
+        // Sum the per-season counts of every season from..to (inclusive) into one marker per location
+        function buildRangeLayer(from, to, rest) {{
+            const perSeason = RANGE_DATA[rest] || {{}};
+            const colorMap = COLOR_MAPS[rest.split('|')[1]] || {{}};
+            const locs = {{}}, locOrder = [], legend = {{}};
+            SEASONS.filter(s => s >= from && s <= to).forEach(s => {{
+                (perSeason[s] || []).forEach(mk => {{
+                    let loc = locs[mk.n];
+                    if (!loc) {{ loc = locs[mk.n] = {{ c: mk.c, labels: {{}}, order: [] }}; locOrder.push(mk.n); }}
+                    mk.l.forEach(row => {{
+                        let e = loc.labels[row[0]];
+                        if (!e) {{ e = loc.labels[row[0]] = {{ n: 0, subs: {{}}, subOrder: [] }}; loc.order.push(row[0]); }}
+                        e.n += row[1];
+                        row[2].forEach(sub => {{
+                            if (!(sub[0] in e.subs)) {{ e.subs[sub[0]] = 0; e.subOrder.push(sub[0]); }}
+                            e.subs[sub[0]] += sub[1];
+                        }});
+                    }});
+                }});
+            }});
+            const group = L.featureGroup();
+            locOrder.forEach(name => {{
+                const loc = locs[name];
+                // Same order as pandas value_counts: highest count first
+                const labels = loc.order.slice().sort((a, b) => loc.labels[b].n - loc.labels[a].n);
+                const total = labels.reduce((acc, lab) => acc + loc.labels[lab].n, 0);
+                const pieColors = [], hover = [];
+                let currentPct = 0;
+                labels.forEach(lab => {{
+                    const e = loc.labels[lab];
+                    const pct = (e.n / total) * 100;
+                    const color = colorMap[lab] || '#999999';
+                    if (lab !== '-') legend[lab] = color;
+                    pieColors.push(color + " " + pyFixed(currentPct, 2) + "% " + pyFixed(currentPct + pct, 2) + "%");
+                    let line = "<span style='color:" + color + "'>&#9608;</span> <b>" + lab + "</b>: " + e.n + " / " + total + " (" + pyFixed(pct, 1) + "%)";
+                    const subs = e.subOrder.slice().sort((a, b) => e.subs[b] - e.subs[a]).map(sl =>
+                        "&nbsp;&nbsp;&nbsp;&nbsp;- <b>" + sl + ":</b> " + e.subs[sl] + " / " + total + " (" + pyFixed((e.subs[sl] / total) * 100, 2) + "%)");
+                    if (subs.length) line += "<br>" + subs.join("<br>");
+                    hover.push(line + "<br>");
+                    currentPct += pct;
+                }});
+                const iconSize = Math.trunc(55 + Math.min(45, total * 2.5));
+                const pieHtml = '<div style="width:' + iconSize + 'px; height:' + iconSize + 'px; border-radius:50%; background:conic-gradient(' + pieColors.join(", ") + '); border:2px solid white; box-shadow:0 0 5px rgba(0,0,0,0.3);"></div>';
+                const hoverHtml = "<div style='font-family:Arial; min-width:150px;'><b>" + name + "</b><hr style='margin: 4px 0;'><b>Occurrences:</b> " + total + "<br><br>" + hover.join("") + "</div>";
+                L.marker(loc.c, {{ icon: L.divIcon({{ html: pieHtml, iconAnchor: [iconSize / 2, iconSize / 2], className: 'empty' }}) }})
+                    .bindTooltip("<div>" + hoverHtml + "</div>", {{ sticky: true }})
+                    .addTo(group);
+            }});
+            return {{ layer: group, colors: legend }};
+        }}
+
+        function onSeasonFromChange() {{
+            const fromSel = document.getElementById('seasonSel');
+            const toSel = document.getElementById('seasonToSel');
+            toSel.disabled = fromSel.value === 'All Time';
+            if (!toSel.disabled && toSel.value < fromSel.value) toSel.value = fromSel.value;
+            update();
+        }}
+
+        function onSeasonToChange() {{
+            const fromSel = document.getElementById('seasonSel');
+            const toSel = document.getElementById('seasonToSel');
+            if (toSel.value < fromSel.value) toSel.value = fromSel.value;
+            update();
+        }}
         
         function update() {{
-            const key = document.getElementById('seasonSel').value + "|" + 
-                        document.getElementById('levelSel').value + "|" + 
+            const from = document.getElementById('seasonSel').value;
+            const to = document.getElementById('seasonToSel').value;
+            const rest = document.getElementById('levelSel').value + "|" + 
                         document.getElementById('classSel').value + "|" +
                         document.getElementById('ageSel').value + "|" +
                         document.getElementById('sexSel').value;
+            // "All Time" or a single season use the precomputed layers; a longer range is summed on the fly
+            const isRange = from !== 'All Time' && to && to !== from;
+            const key = (from === 'All Time' || !to ? from : to === from ? from : from + ".." + to) + "|" + rest;
                         
             for (const k in REGISTRY) {{
                 const layer = window[REGISTRY[k]];
                 if (layer) k === key ? layer.addTo(window.map_instance) : window.map_instance.removeLayer(layer);
             }}
+            if (rangeLayer) {{ window.map_instance.removeLayer(rangeLayer); rangeLayer = null; }}
+            let colors = COLORS[key];
+            if (isRange) {{
+                if (!RANGE_LAYERS[key]) RANGE_LAYERS[key] = buildRangeLayer(from, to, rest);
+                rangeLayer = RANGE_LAYERS[key].layer;
+                rangeLayer.addTo(window.map_instance);
+                colors = RANGE_LAYERS[key].colors;
+            }}
             
             const legendList = document.getElementById('legendList');
             legendList.innerHTML = "";
-            if (COLORS[key]) {{
-                Object.keys(COLORS[key]).sort().forEach(label => {{
-                    const color = COLORS[key][label];
+            if (colors) {{
+                Object.keys(colors).sort().forEach(label => {{
+                    const color = colors[label];
                     const item = document.createElement('div');
                     item.style.display = 'flex'; item.style.alignItems = 'center'; item.style.fontSize = '12px';
                     item.innerHTML = `<span style="display:inline-block; width:12px; height:12px; background:\${{color}}; margin-right:8px; border-radius:2px; border:1px solid #ddd;"></span><span>\${{label}}</span>`;
@@ -403,7 +516,8 @@ process GeographicReport {
             }}
         }}
         
-        document.getElementById('seasonSel').addEventListener('change', update);
+        document.getElementById('seasonSel').addEventListener('change', onSeasonFromChange);
+        document.getElementById('seasonToSel').addEventListener('change', onSeasonToChange);
         document.getElementById('levelSel').addEventListener('change', update);
         document.getElementById('classSel').addEventListener('change', update);
         document.getElementById('ageSel').addEventListener('change', update);

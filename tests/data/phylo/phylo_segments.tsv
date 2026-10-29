@@ -1,0 +1,9 @@
+segment	reference_strain	start	end	length	insertion_columns_removed
+PB2	A/Darwin/6/2021	1	2316	2316	0
+PB1	A/Darwin/6/2021	2317	4632	2316	0
+PA	A/Massachusetts/18/2022	4633	6840	2208	1
+HA	A/Darwin/6/2021	6841	8577	1737	0
+NP	A/Darwin/6/2021	8578	10118	1541	0
+NA	A/Darwin/6/2021	10119	11559	1441	0
+MP	A/Darwin/6/2021	11560	12561	1002	0
+NS	A/Darwin/6/2021	12562	13426	865	0

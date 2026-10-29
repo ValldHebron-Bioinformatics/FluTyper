@@ -101,3 +101,29 @@ jobs:
 
       - name: Run Pipeline (nf-test)
         run: nf-test test tests/main.nf.test --verbose
+
+  # Job 3: Optional phylogenetics module (needs IQ-TREE, TreeTime, TreeCluster and R/ggtree from FluTyper_env.yaml)
+  phylogenetics-test:
+    name: Phylogenetics Module Tests
+    needs: [nf-test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6.0.3
+
+      - name: Create FluTyper environment
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: FluTyper_env.yaml
+          cache-environment: true
+
+      - name: Run Phylogenetics Module Tests
+        run: nf-test test tests/modules/phylogeny/*.nf.test --verbose
+
+      - name: Run Phylogenetics Pipeline Tests
+        # ci profile: the default 12 big_mem cpus exceed the runner's cores and IQ-TREE aborts on that
+        run: nf-test test tests/phylogeny.nf.test --profile ci --verbose

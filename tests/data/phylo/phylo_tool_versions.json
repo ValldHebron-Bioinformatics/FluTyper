@@ -1,0 +1,57 @@
+{
+  "Rscript": {
+    "expected": "4.5.3",
+    "found": "4.5.3",
+    "status": "ok"
+  },
+  "TreeCluster.py": {
+    "expected": "1.0.4",
+    "found": "1.0.4",
+    "status": "ok"
+  },
+  "ape": {
+    "expected": "5.8.1",
+    "found": "5.8.1",
+    "status": "ok"
+  },
+  "ggnewscale": {
+    "expected": "0.5.2",
+    "found": "0.5.2",
+    "status": "ok"
+  },
+  "ggplot2": {
+    "expected": "4.0.3",
+    "found": "4.0.3",
+    "status": "ok"
+  },
+  "ggtree": {
+    "expected": "4.0.5",
+    "found": "4.0.5",
+    "status": "ok"
+  },
+  "iqtree2": {
+    "expected": "2.3.6",
+    "found": "2.3.6",
+    "status": "ok"
+  },
+  "mafft": {
+    "expected": "7.525",
+    "found": "7.525",
+    "status": "ok"
+  },
+  "nextclade": {
+    "expected": "3.18.0",
+    "found": "3.18.0",
+    "status": "ok"
+  },
+  "svglite": {
+    "expected": "2.2.2",
+    "found": "2.2.2",
+    "status": "ok"
+  },
+  "treetime": {
+    "expected": "0.11.4",
+    "found": "0.11.4",
+    "status": "ok"
+  }
+}

@@ -1,0 +1,6 @@
+column	metadata_field	available	note
+source_group	ORIGINATING_LAB	no	metadata has no ORIGINATING_LAB column
+period	DATE	yes	binned by month
+HA1:62		yes	invariant across samples (G)
+HA1:145		yes	invariant across samples (S)
+HA1:239		yes	invariant across samples (P)

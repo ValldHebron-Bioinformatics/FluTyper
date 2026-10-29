@@ -1,0 +1,8 @@
+panel	column	scale	required
+subclade	subclade	categorical	yes
+source	source_group	categorical	no
+period	period	ordinal	no
+season	season	ordinal	no
+age group	age_group	categorical	no
+sex	sex	categorical	no
+aa	@aa_positions	residue	yes

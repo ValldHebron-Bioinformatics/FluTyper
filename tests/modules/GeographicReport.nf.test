@@ -32,4 +32,77 @@ nextflow_process {
 
     }
 
+    test("Season range: FROM/TO selectors with All Time and per-season counts that add up") {
+
+        when {
+            params {
+                protocol = "HUMAN"
+            }
+            process {
+                """
+                input[0] = file("${projectDir}/tests/data/Graphs_test/final_genotyping_results.csv")
+                input[1] = file("${projectDir}/tests/data/Graphs_seasons/metadata.csv")
+                input[2] = file("${projectDir}/RESOURCES/coordenades_cat.tsv")
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.geo_report.size() == 1 : "Geographic report file was not generated"
+
+            def html = path(process.out.geo_report.get(0)).text
+            def slurper = new groovy.json.JsonSlurper()
+            def jsConst = { String name ->
+                def m = (html =~ /const ${name} = (.*);/)
+                assert m.find() : "Constant ${name} is not embedded in the report"
+                slurper.parseText(m.group(1))
+            }
+
+            // FROM starts with "All Time", then every season (newest first); the latest season is selected
+            // on load, as the single Season dropdown did. TO lists every season.
+            def fromSel = (html =~ /(?s)<select id="seasonSel"[^>]*>(.*?)<\/select>/)
+            assert fromSel.find() : "SEASON FROM selector (seasonSel) is missing"
+            def fromValues = (fromSel.group(1) =~ /<option value="([^"]*)"/).collect { it[1] }
+            assert fromValues == ['All Time', '2024-2025', '2023-2024', '2022-2023']
+            assert fromSel.group(1).contains('<option value="2024-2025" selected>')
+
+            def toSel = (html =~ /(?s)<select id="seasonToSel"[^>]*>(.*?)<\/select>/)
+            assert toSel.find() : "SEASON TO selector (seasonToSel) is missing"
+            assert (toSel.group(1) =~ /<option value="([^"]*)"/).collect { it[1] } == ['2024-2025', '2023-2024', '2022-2023']
+            assert html.contains('SEASON FROM') && html.contains('SEASON TO')
+
+            // Undated samples are not offered as a season of their own (they only count in "All Time")
+            assert !html.contains('<NA>') : "Undated samples produced a bogus '<NA>-<NA>' season"
+
+            // Chronological season list used to resolve a range
+            assert jsConst('SEASONS') == ['2022-2023', '2023-2024', '2024-2025']
+
+            // "All Time" and every single season have their own precomputed layer
+            def registry = jsConst('REGISTRY')
+            ['All Time', '2022-2023', '2023-2024', '2024-2025'].each { s ->
+                assert registry.containsKey("${s}|Province|subtypes|All|All".toString()) : "No layer for ${s}"
+            }
+
+            // Per-season counts embedded for range aggregation: 12 dated samples per season, per province
+            def rangeData = jsConst('RANGE_DATA')
+            def perSeason = rangeData['Province|subtypes|All|All']
+            def provTotals = { String season ->
+                perSeason[season].collectEntries { mk -> [(mk.n): mk.l.sum { it[1] }] }
+            }
+            assert provTotals('2022-2023') == [Barcelona: 7, Girona: 3, Lleida: 1, Tarragona: 1]
+            assert provTotals('2023-2024') == [Barcelona: 8, Girona: 4]
+            assert provTotals('2024-2025') == [Barcelona: 8, Girona: 2, Tarragona: 2]
+
+            // Filters keep working with the range data: female samples only (19 in total, 18 dated)
+            def femaleTotal = rangeData['Province|subtypes|All|F'].values().sum { markers -> markers.sum { mk -> mk.l.sum { it[1] } } }
+            assert femaleTotal == 18
+
+            // Longer ranges are summed in the page; TO is disabled while FROM is "All Time"
+            assert html.contains('function buildRangeLayer(from, to, rest)')
+            assert html.contains("toSel.disabled = fromSel.value === 'All Time'")
+        }
+
+    }
+
 }

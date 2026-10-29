@@ -6,15 +6,18 @@ process GenotypingNextclade {
     // if clade 2.3.4.4b is detected, it also runs genin2 for further genotyping.
     errorStrategy 'ignore'
     debug true
-    
+
     input:
     tuple val(sample_id), path(ha_fasta), val(h_tag), val(n_tag), val(pathotype), val(dataset_dir), path(sample_dir)
-    
+
     output:
     tuple val(sample_id), path("nextclade_results_${sample_id}.csv"), emit: results
     tuple val(sample_id), path("genin_results_${sample_id}.tsv"), optional: true, emit: genin
     tuple val(sample_id), path("GNerrors.log"), optional: true, emit: errors
-    
+    // Copy of the CSV inside the sample's own published folder (samples/<id>/nextclade_results.csv), so a later
+    // --append run (with --phylogenetics) can reuse this sample's subclade instead of rerunning Nextclade for it
+    path("samples/${sample_id}/nextclade_results.csv"), optional: true, emit: sample_csv
+
     script:
     """
     # Genotyping using Nextclade with the appropriate dataset based on the H subtype
@@ -39,7 +42,10 @@ process GenotypingNextclade {
         --input-dataset "${dataset_dir}" \
         --output-csv nextclade_results_${sample_id}.csv \
         "${ha_fasta}"
-    
+
+    mkdir -p "samples/${sample_id}"
+    cp "nextclade_results_${sample_id}.csv" "samples/${sample_id}/nextclade_results.csv"
+
     # Genotyping with genin2 if clade 2.3.4.4b is detected in the Nextclade results
     if grep -q "2.3.4.4b" "nextclade_results_${sample_id}.csv"; then
         if [ -s "${sample_dir}/${sample_id}.fasta" ]; then

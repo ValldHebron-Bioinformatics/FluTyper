@@ -1,0 +1,39 @@
+ID,DATE,LOCATION,AGE GROUP,SEX,ORIGINATING_LAB
+148126,2022-11-14,Barcelona,0-4,F,CAP El Carmel
+19014392,2023-01-09,Girona,5-14,M,Hospital Universitari Vall d'Hebron
+19135815,2023-02-20,Girona,15-65,F,CAP Horta
+19136146,2022-11-14,Barcelona,65+,M,Hospital Universitari de Bellvitge
+19136162,2023-01-09,Tarragona,0-4,F,CAP El Carmel
+19136163,2023-02-20,Barcelona,5-14,M,Hospital Universitari Vall d'Hebron
+19136375,2022-11-14,Lleida,15-65,F,CAP Horta
+19770715,2023-01-09,Santa Coloma de Farners,65+,M,Hospital Universitari de Bellvitge
+19770724,2023-02-20,Barcelona,0-4,F,CAP El Carmel
+200832,2022-11-14,Barcelona,5-14,M,Hospital Universitari Vall d'Hebron
+200918,2023-01-09,Barcelona,15-65,F,CAP Horta
+200921,2023-02-20,Barcelona,65+,M,Hospital Universitari de Bellvitge
+200922,2023-10-30,Barcelona,0-4,F,CAP El Carmel
+200924,2023-12-11,Barcelona,5-14,M,Hospital Universitari Vall d'Hebron
+200927,2024-02-05,Barcelona,15-65,F,CAP Horta
+200929,2023-10-30,Barcelona,65+,M,Hospital Universitari de Bellvitge
+200930,2023-12-11,Barcelona,0-4,F,CAP El Carmel
+201365,2024-02-05,Barcelona,5-14,M,Hospital Universitari Vall d'Hebron
+201383,2023-10-30,Barcelona,15-65,F,CAP Horta
+201898,2023-12-11,Barcelona,65+,M,Hospital Universitari de Bellvitge
+20206696,2024-02-05,Girona,0-4,F,CAP El Carmel
+203003,2023-10-30,Girona,5-14,M,Hospital Universitari Vall d'Hebron
+203004,2023-12-11,Girona,15-65,F,CAP Horta
+205107,2024-02-05,Girona,65+,M,Hospital Universitari de Bellvitge
+205109,2024-10-07,Girona,0-4,F,CAP El Carmel
+205127,2024-11-18,Girona,5-14,M,Hospital Universitari Vall d'Hebron
+205128,2025-01-13,Barcelona,15-65,F,CAP Horta
+205130,2024-10-07,Barcelona,65+,M,Hospital Universitari de Bellvitge
+205134,2024-11-18,Barcelona,0-4,F,CAP El Carmel
+205135,2025-01-13,Barcelona,5-14,M,Hospital Universitari Vall d'Hebron
+205136,2024-10-07,Barcelona,15-65,F,CAP Horta
+205139,2024-11-18,Barcelona,65+,M,Hospital Universitari de Bellvitge
+205146,2025-01-13,Barcelona,0-4,F,CAP El Carmel
+205148,2024-10-07,Barcelona,5-14,M,Hospital Universitari Vall d'Hebron
+205149,2024-11-18,Tarragona,15-65,F,CAP Horta
+205313,2025-01-13,Tarragona,65+,M,Hospital Universitari de Bellvitge
+205314,,Tarragona,0-4,F,CAP El Carmel
+206036,,Lleida,5-14,M,Hospital Universitari Vall d'Hebron

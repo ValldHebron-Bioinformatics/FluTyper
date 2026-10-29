@@ -35,20 +35,22 @@ process MergeHistoricalData {
     old_mut_path = os.path.join("${append_dir}", "final_mutations_report.xlsx")
     old_meta_path = os.path.join("${append_dir}", "metadata.csv")
 
-    # Merge Subtypes
-    df_new_sub = pd.read_csv("new_sub.csv")
+    # Merge Subtypes. dtype=str on the ID column: pandas' default dtype inference otherwise reads a purely-numeric
+    # Sample_ID (e.g. "01816372") as an integer and silently strips its leading zero(s) on to_csv(), breaking every
+    # downstream string-keyed join (sample_dirs, PhyloCoverageQC, etc.) against the real sample folder name.
+    df_new_sub = pd.read_csv("new_sub.csv", dtype={'Sample_ID': str})
     if os.path.exists(old_sub_path):
-        df_old_sub = strip_meta_cols(pd.read_csv(old_sub_path))
+        df_old_sub = strip_meta_cols(pd.read_csv(old_sub_path, dtype={'Sample_ID': str}))
         df_old_sub = df_old_sub[~df_old_sub['Sample_ID'].isin(df_new_sub['Sample_ID'])]
         df_final_sub = pd.concat([df_old_sub, df_new_sub], ignore_index=True)
     else:
         df_final_sub = df_new_sub
     df_final_sub.to_csv("inferred_subtypes.csv", index=False)
 
-    # Merge Genotyping
-    df_new_geno = pd.read_csv("new_geno.csv")
+    # Merge Genotyping (same leading-zero pitfall for SampleID)
+    df_new_geno = pd.read_csv("new_geno.csv", dtype={'SampleID': str})
     if os.path.exists(old_geno_path):
-        df_old_geno = strip_meta_cols(pd.read_csv(old_geno_path))
+        df_old_geno = strip_meta_cols(pd.read_csv(old_geno_path, dtype={'SampleID': str}))
         if 'SampleID' in df_old_geno.columns and 'SampleID' in df_new_geno.columns:
             df_old_geno = df_old_geno[~df_old_geno['SampleID'].isin(df_new_geno['SampleID'])]
         df_final_geno = pd.concat([df_old_geno, df_new_geno], ignore_index=True)
@@ -56,12 +58,12 @@ process MergeHistoricalData {
         df_final_geno = df_new_geno
     df_final_geno.to_csv("final_genotyping_results.csv", index=False)
 
-    # Merge Mutations
-    new_mut_sheets = pd.read_excel("new_mut.xlsx", sheet_name=None, keep_default_na=False)
-    
+    # Merge Mutations (same leading-zero pitfall for SAMPLE_ID)
+    new_mut_sheets = pd.read_excel("new_mut.xlsx", sheet_name=None, keep_default_na=False, dtype={'SAMPLE_ID': str})
+
     with pd.ExcelWriter("final_mutations_report.xlsx") as writer:
         if os.path.exists(old_mut_path):
-            old_mut_sheets = pd.read_excel(old_mut_path, sheet_name=None, keep_default_na=False)
+            old_mut_sheets = pd.read_excel(old_mut_path, sheet_name=None, keep_default_na=False, dtype={'SAMPLE_ID': str})
             
             for sheet_name, df_new in new_mut_sheets.items():
                 if sheet_name in old_mut_sheets:
@@ -80,14 +82,14 @@ process MergeHistoricalData {
     
     if os.path.exists(old_meta_path):
         try:
-            df_meta_list.append(pd.read_csv(old_meta_path))
+            df_meta_list.append(pd.read_csv(old_meta_path, dtype={'ID': str}))
         except Exception:
             pass
 
     new_meta_path = "${meta_path}"
     if os.path.exists(new_meta_path) and os.path.getsize(new_meta_path) > 0:
         try:
-            df_meta_list.append(pd.read_csv(new_meta_path))
+            df_meta_list.append(pd.read_csv(new_meta_path, dtype={'ID': str}))
         except Exception:
             pass
 

@@ -1,0 +1,87 @@
+nextflow_process {
+
+    name "Test Process MetadataMerge"
+    script "nf_pipeline/modules/MetadataMerge.nf"
+    process "MetadataMerge"
+
+    test("Should append metadata columns by ID, collapse duplicated metadata IDs, and leave missing metadata empty") {
+
+        when {
+            process {
+                """
+                input[0] = file("${projectDir}/tests/data/MetadataMerge_test/inferred_subtypes.csv", checkIfExists: true)
+                input[1] = file("${projectDir}/tests/data/MetadataMerge_test/final_genotyping_results.csv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/MetadataMerge_test/mutations.xlsx", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/MetadataMerge_test/metadata.csv", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            // Validate that all expected channels successfully emitted files
+            assert process.out.subtypes != null : "Output channel 'subtypes' is null"
+            assert process.out.genotyping != null : "Output channel 'genotyping' is null"
+            assert process.out.mutations != null : "Output channel 'mutations' is null"
+
+            assert process.out.subtypes.get(0).toString().endsWith('inferred_subtypes.csv')
+            assert process.out.genotyping.get(0).toString().endsWith('final_genotyping_results.csv')
+            assert process.out.mutations.get(0).toString().endsWith('final_mutations_report.xlsx')
+
+            def subtypesFile = path(process.out.subtypes.get(0))
+            def genotypingFile = path(process.out.genotyping.get(0))
+            assert subtypesFile.exists() : "inferred_subtypes.csv was not generated"
+            assert genotypingFile.exists() : "final_genotyping_results.csv was not generated"
+
+            def subtypesText = subtypesFile.text
+            def genotypingText = genotypingFile.text
+
+            // metadata.csv in tests/data/MetadataMerge_test/ has TWO rows for sample S001
+            // (a duplicated ID): the first one (Adult/F/Barcelona/LabA, DATE 2024-10-01) must
+            // win, and it must appear only ONCE in the merged output (no row duplication)
+            assert subtypesText.contains("S001,H5N1,HPAI,Season 2024-2025,Adult,F,Barcelona,LabA") : \
+                "S001 was not merged with its first metadata row (Season/AGE GROUP/SEX/LOCATION/ORIGINATING_LAB) by ID"
+            assert subtypesText.readLines().findAll { it.startsWith("S001,") }.size() == 1 : \
+                "The duplicated S001 metadata ID produced more than one output row"
+            assert genotypingText.contains("S001,H5N1(HPAI),nextclade_H5_dataset,2024-01-01T00:00:00Z,2.3.4.4b,2.1.6,EA-2020-C,,,Season 2024-2025,Adult,F,Barcelona,LabA") : \
+                "S001 genotyping row was not merged with the expected first metadata row"
+            assert genotypingText.readLines().findAll { it.startsWith("S001,") }.size() == 1 : \
+                "The duplicated S001 metadata ID produced more than one genotyping row"
+
+            // S002 has a single, non-duplicated metadata row and must be merged as-is
+            assert subtypesText.contains("S002,H3N2,,Season 2023-2024,Senior,M,Lleida,LabC") : \
+                "S002 was not merged with its metadata by ID"
+            assert genotypingText.contains("S002,A(H3N2),nextclade_H3_dataset,2024-01-01T00:00:00Z,G.1,-,-,-,-,Season 2023-2024,Senior,M,Lleida,LabC") : \
+                "S002 genotyping row was not merged with its metadata by ID"
+
+            // S003 has NO metadata row at all: the merge must leave the metadata columns
+            // empty rather than inventing values (e.g. defaulting Season to "Unknown Season")
+            assert subtypesText.contains("S003,H9N2,LPAI,,,,,") : \
+                "S003 (absent from metadata.csv) should have empty metadata columns, not invented values"
+            assert !subtypesText.contains("S003,H9N2,LPAI,Unknown Season") : \
+                "S003 must not be assigned an invented 'Unknown Season' value when it has no metadata row at all"
+            assert genotypingText.contains("S003,H9N2(LPAI),nextclade_H9_dataset,-,-,-,-,-,-,,,,,") : \
+                "S003 (absent from metadata.csv) should have empty metadata columns in the genotyping report too"
+
+            // The mutations Excel report must receive the same metadata merge treatment
+            def mutationsFile = path(process.out.mutations.get(0))
+            assert mutationsFile.exists() : "final_mutations_report.xlsx was not generated"
+
+            def fileContains = { reportPath, text ->
+                def cmd = "unzip -p ${reportPath}"
+                return cmd.execute().text.contains(text)
+            }
+
+            // S001's winning metadata (from the FIRST duplicated row) must be embedded once
+            assert fileContains(mutationsFile, "LabA") : "S001 first-row metadata (ORIGINATING_LAB=LabA) missing from mutations report"
+            assert fileContains(mutationsFile, "Barcelona") : "S001 first-row metadata (LOCATION=Barcelona) missing from mutations report"
+            // The overwritten duplicate metadata row for S001 must NOT leak into the report
+            assert !fileContains(mutationsFile, "LabB") : "Overwritten duplicate metadata (ORIGINATING_LAB=LabB) leaked into the mutations report"
+            assert !fileContains(mutationsFile, "Girona") : "Overwritten duplicate metadata (LOCATION=Girona) leaked into the mutations report"
+            // S002's metadata must also be present
+            assert fileContains(mutationsFile, "LabC") : "S002 metadata (ORIGINATING_LAB=LabC) missing from mutations report"
+        }
+    }
+
+}

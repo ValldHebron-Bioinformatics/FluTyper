@@ -87,7 +87,7 @@ nextflow_pipeline {
                 protocol = "HUMAN"
                 protocols = [
                     HUMAN: [
-                        resources : "${projectDir}/protocols/HUMAN/v1"
+                        resources : "${projectDir}/protocols/HUMAN/v2"
                     ]
                 ]
                 inputFasta = "${projectDir}/tests/data/HUMAN.fasta"
@@ -124,8 +124,9 @@ nextflow_pipeline {
             // Updated to reflect the new empty fields for standard substitutions: "No,,No,,,"
             assert csvText.contains('198353883,A(H3N2),M2,A(H3N2),1,1,M,E,M1E,Substitution,No,,No,,,')
             
-            // Updated to reflect the new marker IDs, combination flags, FOUND_IN values, and joined metadata
-            assert csvText.contains('198353883,A(H3N2),HA1,A(H3N2),189,186,K,R,K189R,Marker,Yes,179 | 365,No,EPITOP(B) | EPITOP(RBD - 180LOOP),H3N2,')
+            // Verify marker mutations are detected with updated references (S96R and Y195F from current H3N2_HA1 reference)
+            assert csvText.contains('198353883,A(H3N2),HA1,A(H3N2),96,89,S,R,S96R,Marker,Yes,239,No,EPITOP(D),H3N2,')
+            assert csvText.contains('198353883,A(H3N2),HA1,A(H3N2),195,192,Y,F,Y195F,Marker,Yes,371,No,EPITOP(RBD - 180LOOP),H3N2,')
             
             def individualGraphicReport = outputDir.resolve("samples/198353883/198353883_MutationsReport.html")
             assert individualGraphicReport.exists() : "198353883_MutationsReport.html was not published"

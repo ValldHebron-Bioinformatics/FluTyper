@@ -1,0 +1,112 @@
+nextflow_workflow {
+
+    name "Test Workflow PHYLOGENETICS"
+    script "nf_pipeline/subworkflows/Phylogenetics.nf"
+    workflow "PHYLOGENETICS"
+
+    test("Should build the whole-genome phylogeny end to end: 3 of 4 H3N2 candidates pass QC, outputs and the interactive report are emitted, and the QC failure is surfaced as an error") {
+
+        when {
+            params {
+                protocol = "HUMAN"
+                protocols = [
+                    HUMAN: [ resources: "${projectDir}/protocols/HUMAN/v2" ]
+                ]
+                version = "1.1.0"
+                inputFasta = "${projectDir}/tests/data/HUMAN.fasta"
+                outDir = "tests/results/phylogenetics_workflow_test"
+                metadata = "${projectDir}/tests/data/phylo/metadata_lab.csv"
+                labMap = null
+                phyloPanels = "${projectDir}/RESOURCES/phylo_panels.tsv"
+                phyloSubtype = "H3N2"
+                phyloWholeGenome = true
+                phyloSegmentTrees = "none"
+                phyloReference = "A/Darwin/6/2021"
+                phyloReferenceFallback = "A/Massachusetts/18/2022"
+                phyloRootStrains = "A/Darwin/6/2021,A/Massachusetts/18/2022,A/Croatia/10136RV/2023,A/Singapore/GP20238/2024,A/Sydney/1359/2024"
+                phyloOutgroup = "A/Darwin/6/2021"
+                phyloSegmentOrder = "PB2,PB1,PA,HA,NP,NA,MP,NS"
+                phyloMinCoverage = 0.95
+                model = "GTR+G4"
+                bootstrap = 0
+                seed = 12345
+                clusterThreshold = 0.005
+                minSupportLabel = 70
+                periodBin = "month"
+                minPanelCoverage = 0.8
+                width = 6
+                height = 5
+                dpi = 72
+                phyloTools = [
+                    "mafft": "7.525", "iqtree2": "2.3.6", "treetime": "0.11.4", "TreeCluster.py": "1.0.4",
+                    "nextclade": "3.18.0", "Rscript": "4.5.3", "ggtree": "4.0.5", "ape": "5.8.1",
+                    "ggplot2": "4.0.3", "ggnewscale": "0.5.2", "svglite": "2.2.2"
+                ]
+            }
+            workflow {
+                """
+                input[0] = Channel.of(
+                    tuple("01816372", "H3", "N2", "LPAI"),
+                    tuple("01817974", "H3", "N2", "LPAI"),
+                    tuple("01818936", "H3", "N2", "LPAI"),
+                    tuple("198353883", "H3", "N2", "LPAI")
+                )
+                input[1] = Channel.of(
+                    tuple("01816372", file("${projectDir}/tests/data/phylo/samples/01816372", checkIfExists: true)),
+                    tuple("01817974", file("${projectDir}/tests/data/phylo/samples/01817974", checkIfExists: true)),
+                    tuple("01818936", file("${projectDir}/tests/data/phylo/samples/01818936", checkIfExists: true)),
+                    tuple("198353883", file("${projectDir}/tests/data/phylo/samples/198353883", checkIfExists: true))
+                )
+                input[2] = Channel.of(
+                    tuple("01816372", file("${projectDir}/tests/data/phylo/nextclade/nextclade_results_01816372.csv", checkIfExists: true))
+                )
+                input[3] = Channel.of(file("${projectDir}/protocols/HUMAN/v2/resources/H3/nextclade_H3_dataset", checkIfExists: true))
+                input[4] = Channel.of(file("${projectDir}/tests/data/phylo/metadata_lab.csv", checkIfExists: true))
+                input[5] = ["HA1:62", "HA1:145", "HA1:239"]
+                input[6] = "H3N2"
+                input[7] = "H3N2"
+                input[8] = "A/Darwin/6/2021"
+                input[9] = "A/Massachusetts/18/2022"
+                input[10] = "A/Darwin/6/2021,A/Massachusetts/18/2022,A/Croatia/10136RV/2023,A/Singapore/GP20238/2024,A/Sydney/1359/2024"
+                input[11] = "A/Darwin/6/2021"
+                """
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def outputFiles = workflow.out.outputs.collect { f -> path(f).getFileName().toString() }
+
+            // 01817974 is missing PB2 entirely and fails coverage QC: it never reaches the alignment, but its
+            // failure is recorded in the tree's phylo.log coverage QC summary (PQerrors.log/the errors channel is
+            // reserved for internal script failures such as a missing coordinate reference or a failed MAFFT run)
+            assert workflow.out.errors.size() == 0 : "no PQerrors.log is expected: 01817974's missing segment is a normal QC FAIL, not an internal script error"
+
+            // Only the ML tree, the tree's log and the interactive HTML report are published; every other file stays in work/
+            assert outputFiles.sort() == ["PhylogeneticTreeReport_H3N2.html", "phylo.log", "tree.nwk"].sort() : "unexpected PHYLOGENETICS outputs: ${outputFiles}"
+            def phyloLog = path(workflow.out.outputs.find { path(it).getFileName().toString() == "phylo.log" }).text
+            assert phyloLog.contains("PhyloCoverageQC: 3 of 4 candidate samples enter this tree; 1 dropped.") : phyloLog
+            def pb2Line = phyloLog.readLines().find { it.contains("01817974") }
+            assert pb2Line != null && pb2Line.contains("PB2 segment missing") : "expected 01817974 to be dropped for 'PB2 segment missing': ${pb2Line}"
+            assert phyloLog.contains("PhyloAlignment: whole-genome alignment of")
+
+            // The interactive HTML report is also emitted on its own channel (main.nf feeds it into MergeReports)
+            assert workflow.out.report.size() == 1
+            def reportFile = path(workflow.out.report.get(0))
+            assert reportFile.toString().endsWith("PhylogeneticTreeReport_H3N2.html")
+            assert reportFile.text.contains("<title>Phylogenetic Tree - H3N2 - whole-genome phylogeny</title>")
+
+            // Only the 3 fully-covered samples (01816372, 01818936, 198353883) make it into the tree
+            def treeText = path(workflow.out.outputs.find { path(it).getFileName().toString() == "tree.nwk" }).text
+            assert treeText.contains("01816372") && treeText.contains("01818936") && treeText.contains("198353883")
+            assert !treeText.contains("01817974") : "01817974 should have failed coverage QC and be excluded from the tree"
+
+            // One summary line for the subtype, and no step chatter on the terminal
+            assert workflow.stdout.count { it.startsWith("PHYLOGENETICS(H3N2): whole-genome tree built (3 samples) -> phylogeny/H3N2/") } == 1
+            assert !workflow.stdout.join("\n").contains("PhyloPreflight:")
+        }
+    }
+
+
+}

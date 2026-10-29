@@ -23,6 +23,11 @@ include { MergeHistoricalData       } from './modules/MergeHistoricalData'
 include { GeographicReport          } from './modules/GeographicReport'
 include { MetadataMerge             } from './modules/MetadataMerge'
 include { MergeReports              } from './modules/MergeReports.nf'
+include { PhyloHistoricalNextclade; PhyloHistoricalNextcladeReuse } from './modules/phylogeny/PhyloHistoricalNextclade'
+include {
+    PHYLOGENETICS as PHYLOGENETICS_H3N2; PHYLOGENETICS as PHYLOGENETICS_H1N1PDM09;
+    parseAaPositions; parseAaPositionsFile; validatePhyloParams; resolvePhyloConfig; phyloSubtypeTag
+} from './subworkflows/Phylogenetics'
 
 // Comprovació invisible per decidir si generem el mapa
 def check_location_column(metadata_path) {
@@ -48,6 +53,41 @@ workflow {
     } else if (params.protocol != "AVIAN" && params.protocol != "HUMAN") {
         def available = params.protocols.keySet() 
         exit 1, "PROTOCOL ERROR: Invalid protocol specified ('${params.protocol}'). Available protocols are: ${available}."
+    }
+
+    // PHYLOGENETICS PARAMETER VALIDATION: fail fast, before any process runs
+    def run_phylogenetics = params.get('phylogenetics', false).toString().toLowerCase() == 'true'
+    def phylo_subtypes = []
+    def phylo_positions_h3n2 = []
+    def phylo_positions_h1n1 = []
+    if (run_phylogenetics) {
+        def phylo_errors = validatePhyloParams(params)
+        if (phylo_errors) {
+            exit 1, "PHYLOGENETICS ERROR:\n  " + phylo_errors.join("\n  ")
+        }
+        phylo_subtypes = params.phyloSubtype.toString().split(',').collect { s -> s.trim() }.findAll { s -> s }
+        phylo_positions_h3n2 = parseAaPositions(params.aaPositions, params.aaGene)
+        phylo_positions_h1n1 = parseAaPositions(params.aaPositionsH1n1, params.aaGene)
+        // --aa-positions-file replaces --aa-positions/--aa-positions-h1n1 (and the aaPositions default) for the
+        // subtypes it actually has rows for; a subtype it never mentions keeps its --aa-positions(-h1n1) value
+        if (params.aaPositionsFile) {
+            def file_positions = parseAaPositionsFile(params.aaPositionsFile)
+            def default_aa_positions = "HA1:62,HA1:145,HA1:239"
+            if ((params.aaPositions != null && params.aaPositions.toString() != default_aa_positions) || params.aaPositionsH1n1 != null) {
+                log.warn "PHYLOGENETICS: --aa-positions-file is given; --aa-positions/--aa-positions-h1n1 are ignored for the subtypes it covers."
+            }
+            if (file_positions.containsKey('H3N2'))      phylo_positions_h3n2 = file_positions['H3N2']
+            if (file_positions.containsKey('H1N1pdm09')) phylo_positions_h1n1 = file_positions['H1N1pdm09']
+        }
+        // The flat phyloReference/phyloReferenceFallback/phyloRootStrains/phyloOutgroup params are H3N2-only
+        // overrides (see resolvePhyloConfig()): warn if they were changed from their built-in default but H3N2 isn't requested
+        if (!('H3N2' in phylo_subtypes)) {
+            def h3n2_defaults = resolvePhyloConfig('H3N2', [:])
+            if (params.phyloReference != h3n2_defaults.reference || params.phyloReferenceFallback != h3n2_defaults.referenceFallback ||
+                params.phyloRootStrains != h3n2_defaults.rootStrains || params.phyloOutgroup != h3n2_defaults.outgroup) {
+                log.warn "PHYLOGENETICS: --phyloReference/--phyloReferenceFallback/--phyloRootStrains/--phyloOutgroup are H3N2 overrides, but H3N2 is not in --phyloSubtype (${params.phyloSubtype}); they have no effect."
+            }
+        }
     }
 
     // INPUT & INITIAL FOLDER ORGANIZATION
@@ -84,7 +124,25 @@ workflow {
         )
 
     // DATASET PREPARATION
-    GetDatasets(SubtypeMerged_ch)
+    // --append + --phylogenetics: a subtype's samples may exist ONLY in the append directory's history (e.g. an
+    // H1N1pdm09 tree resumed from a new FASTA that only has H3N2 samples). GetDatasets only scans the CURRENT
+    // run's inferred subtypes, so without this its Nextclade dataset would never be fetched and that subtype's
+    // PhyloSubclades/PhyloHistoricalNextclade/PhyloReport would silently never run (no failed task to notice).
+    // Concatenating the historical inferred_subtypes.csv in here (content only; the real old+new merge for
+    // publishing still happens in MergeHistoricalData below) is enough, since GetDatasets just scans for H tags.
+    GetDatasetsInput_ch = SubtypeMerged_ch
+    if (run_phylogenetics && params.get('append')) {
+        def hist_subtypes_file = file("${params.append}/inferred_subtypes.csv")
+        if (hist_subtypes_file.exists()) {
+            GetDatasetsInput_ch = SubtypeMerged_ch
+                .mix(channel.fromPath(hist_subtypes_file))
+                .collectFile(name: 'inferred_subtypes_for_datasets.csv', keepHeader: true, sort: { f -> f.name })
+        } else {
+            def msg = "PHYLOGENETICS: --append directory '${params.append}' has no inferred_subtypes.csv; historical subtypes are not considered when fetching Nextclade datasets."
+            println "WARN: ${msg}"
+        }
+    }
+    GetDatasets(GetDatasetsInput_ch)
 
     // Initialize empty channels for downstream publish assignments
     ch_database = channel.empty()
@@ -149,7 +207,7 @@ workflow {
         ch_database = FluMutDB.out
         MarkersFiles(FluMutDB.out) 
     } else {
-        def humanMarkersDir = file("${projectDir}/../protocols/HUMAN/v1/markers")
+        def humanMarkersDir = file("${projectDir}/../protocols/HUMAN/v2/markers")
         MarkersFiles(humanMarkersDir)
     }
     ch_markerfiles = MarkersFiles.out
@@ -248,6 +306,133 @@ workflow {
         ch_geo_report = GeographicReport.out.geo_report
     }
 
+    // PHYLOGENETICS (OPTIONAL, --phylogenetics): one annotated whole-genome tree per requested --phyloSubtype
+    ch_phylogeny_h3n2 = channel.empty()
+    ch_phylogeny_h1n1 = channel.empty()
+    ch_phylo_errors = channel.empty()
+    ch_phylo_report = channel.empty()
+    ch_phylo_tree_problems = channel.empty()
+    if (run_phylogenetics) {
+        // --append: MergeHistoricalData only merges the summary tables, so PHYLOGENETICS would otherwise only see
+        // this run's samples. Build phylo-only genotyping/sample-dir/Nextclade channels covering both runs.
+        if (params.get('append')) {
+            def append_path = params.append.toString()
+            def hist_samples_dir = file("${append_path}/samples")
+            if (!hist_samples_dir.exists() || !hist_samples_dir.isDirectory()) {
+                def msg = "PHYLOGENETICS: --append directory '${append_path}' has no 'samples' folder; only this run's own samples are considered for the tree(s)."
+                println "WARN: ${msg}"
+            }
+
+            // (a) genotyping info parsed from the merged (old+new) subtypes table
+            PhyloGenotypingInfo_ch = final_subtypes_ch
+                .splitCsv(header: true)
+                .map { row ->
+                    def subtype = row['inferred_subtype'] ?: ''
+                    def h_tag = subtype.find(/H\d+/) ?: "Hx"
+                    def n_tag = subtype.find(/N\d+/) ?: "Nx"
+                    tuple(row['Sample_ID'], h_tag, n_tag, row['pathotype'])
+                }
+
+            // (b) sample dirs: new OrganizeBySample results, plus historical <appendDir>/samples/<id> dirs that
+            // have a segments/ folder and are not superseded by this run (new run wins on a duplicate ID)
+            NewSampleIds_ch = OrganizeBySample.out.results.map { sample_id, _dir -> sample_id }.toList()
+            AllHistSampleDirs_ch = channel.fromPath("${append_path}/samples/*", type: 'dir')
+            AllHistSampleDirs_ch
+                .filter { d -> !file("${d}/segments").isDirectory() }
+                .map { d -> d.name }
+                .toList()
+                .subscribe { ids ->
+                    if (ids) {
+                        def msg = "PHYLOGENETICS: ${ids.size()} historical sample folder(s) under '${append_path}/samples' have no segments/ subfolder and are skipped: ${ids.take(10).join(', ')}${ids.size() > 10 ? ', ...' : ''}."
+                        println "WARN: ${msg}"
+                    }
+                }
+            // NewSampleIds_ch.toList() emits a single List item; combine() would otherwise treat that List as
+            // several fields to spread rather than one opaque value (Map is never spread this way)
+            NewSampleIdsMap_ch = NewSampleIds_ch.map { ids -> [ids: ids] }
+            HistSampleDirs_ch = AllHistSampleDirs_ch
+                .filter { d -> file("${d}/segments").isDirectory() }
+                .map { d -> tuple(d.name, d) }
+                .combine(NewSampleIdsMap_ch)
+                .filter { sample_id, _dir, new_ids_map -> !(sample_id in new_ids_map.ids) }
+                .map { sample_id, dir, _new_ids_map -> tuple(sample_id, dir) }
+            PhyloSampleDirs_ch = OrganizeBySample.out.results.mix(HistSampleDirs_ch)
+
+            // (c) Nextclade results: reuse a historical sample's persisted CSV (samples/<id>/nextclade_results.csv,
+            // written by GenotypingNextclade) when present; otherwise rerun Nextclade on its HA segment against the
+            // current subtype's dataset, so it is never left with subclade NA just because it predates that file.
+            HistNextcladeReuse_ch = HistSampleDirs_ch
+                .map { sample_id, dir -> tuple(sample_id, dir, file("${dir}/nextclade_results.csv")) }
+                .filter { _sample_id, _dir, csv -> csv.exists() }
+                .map { sample_id, _dir, csv -> tuple(sample_id, csv) }
+            HistNextcladeRerunInput_ch = HistSampleDirs_ch
+                .map { sample_id, dir -> tuple(sample_id, dir, file("${dir}/nextclade_results.csv")) }
+                .filter { _sample_id, _dir, csv -> !csv.exists() }
+                .map { sample_id, dir, _csv -> tuple(sample_id, file("${dir}/segments/${sample_id}_HA.fasta")) }
+                .filter { _sample_id, ha_fasta -> ha_fasta.exists() }
+                .combine(PhyloGenotypingInfo_ch.map { sample_id, h_tag, _n_tag, _pathotype -> tuple(sample_id, h_tag) }, by: 0)
+                .combine(GetDatasets.out.flatMap { dataset_dirs -> dataset_dirs })
+                .filter { _sample_id, _ha_fasta, h_tag, dataset_dir -> dataset_dir.name.contains(h_tag) }
+                .map { sample_id, ha_fasta, _h_tag, dataset_dir -> tuple(sample_id, ha_fasta, dataset_dir) }
+            PhyloHistoricalNextclade(HistNextcladeRerunInput_ch)
+            // Reused historical CSVs are on disk as plain "nextclade_results.csv" (no per-sample suffix): rename to
+            // nextclade_results_<sample_id>.csv, the name PhyloSubclades' own glob requires to recover the sample_id
+            // (see PhyloHistoricalNextcladeReuse's comment).
+            PhyloHistoricalNextcladeReuse(HistNextcladeReuse_ch)
+            ch_phylo_hist_errors = PhyloHistoricalNextclade.out.errors
+            PhyloNextcladeResults_ch = GenotypingNextclade.out.results.mix(PhyloHistoricalNextcladeReuse.out.results, PhyloHistoricalNextclade.out.results)
+        } else {
+            PhyloGenotypingInfo_ch = GenotypingInfo_ch
+            PhyloSampleDirs_ch = OrganizeBySample.out.results
+            PhyloNextcladeResults_ch = GenotypingNextclade.out.results
+            ch_phylo_hist_errors = channel.empty()
+        }
+
+        if ('H3N2' in phylo_subtypes) {
+            def cfg_h3n2 = resolvePhyloConfig('H3N2', params)
+            PHYLOGENETICS_H3N2(
+                PhyloGenotypingInfo_ch,
+                PhyloSampleDirs_ch,
+                PhyloNextcladeResults_ch,
+                GetDatasets.out,
+                final_metadata_ch,
+                phylo_positions_h3n2.collect { pos -> pos.label },
+                'H3N2',
+                phyloSubtypeTag('H3N2'),
+                cfg_h3n2.reference,
+                cfg_h3n2.referenceFallback,
+                cfg_h3n2.rootStrains,
+                cfg_h3n2.outgroup
+            )
+            ch_phylogeny_h3n2 = PHYLOGENETICS_H3N2.out.outputs
+            ch_phylo_errors = ch_phylo_errors.mix(PHYLOGENETICS_H3N2.out.errors)
+            ch_phylo_report = ch_phylo_report.mix(PHYLOGENETICS_H3N2.out.report)
+            ch_phylo_tree_problems = ch_phylo_tree_problems.mix(PHYLOGENETICS_H3N2.out.tree_problems)
+        }
+        if ('H1N1pdm09' in phylo_subtypes) {
+            def cfg_h1n1 = resolvePhyloConfig('H1N1pdm09', params)
+            PHYLOGENETICS_H1N1PDM09(
+                PhyloGenotypingInfo_ch,
+                PhyloSampleDirs_ch,
+                PhyloNextcladeResults_ch,
+                GetDatasets.out,
+                final_metadata_ch,
+                phylo_positions_h1n1.collect { pos -> pos.label },
+                'H1N1pdm09',
+                phyloSubtypeTag('H1N1pdm09'),
+                cfg_h1n1.reference,
+                cfg_h1n1.referenceFallback,
+                cfg_h1n1.rootStrains,
+                cfg_h1n1.outgroup
+            )
+            ch_phylogeny_h1n1 = PHYLOGENETICS_H1N1PDM09.out.outputs
+            ch_phylo_errors = ch_phylo_errors.mix(PHYLOGENETICS_H1N1PDM09.out.errors)
+            ch_phylo_report = ch_phylo_report.mix(PHYLOGENETICS_H1N1PDM09.out.report)
+            ch_phylo_tree_problems = ch_phylo_tree_problems.mix(PHYLOGENETICS_H1N1PDM09.out.tree_problems)
+        }
+        ch_phylo_errors = ch_phylo_errors.mix(ch_phylo_hist_errors)
+    }
+
     // CONDITIONALLY RUN INDIVIDUAL GRAPHIC REPORTS
     if (params.get('IndividualReports', false).toString().toLowerCase() == 'true') {
         IndividualMutations_Ch = MutationsFinder.out.results.map { sample_id, _mut_files, combined_csv -> tuple(sample_id, combined_csv) }
@@ -263,13 +448,16 @@ workflow {
             GenotypingResults.out.errors,
             GetCDS.out.errors,
             TranslateToProtein.out.errors,
-            MutationsFinder.out.errors
+            MutationsFinder.out.errors,
+            ch_phylo_errors
         )
         
     Errors_ch = BaseErrors_ch.groupTuple()
 
     CompileErrors(Errors_ch)
-    // Merge all individual error logs into a single comprehensive log file
+    // Merge all individual error logs into a single comprehensive log file. Also folds in PHYLOGENETICS'
+    // tree_problems (trees an 'ignore'd task silently dropped, per subtype: see subworkflows/Phylogenetics.nf),
+    // since sample-keyed CompileErrors has no natural place for a tree-level (not sample-level) problem.
     ErrorsMerged_ch = CompileErrors.out
         .map { sample_id, log_file ->
             def content = log_file.text
@@ -278,6 +466,14 @@ workflow {
                    "========================================\n" +
                    "${content}\n"
         }
+        .mix(
+            ch_phylo_tree_problems.map { log_file ->
+                "========================================\n" +
+                "Phylogenetics: trees requested but never produced a report\n" +
+                "========================================\n" +
+                "${log_file.text}\n"
+            }
+        )
         .collectFile(
             name: 'pipeline_errors.log',
         )
@@ -288,6 +484,7 @@ workflow {
         .mix(ch_interactive_mutations_table)
         .mix(date_report_ch)
         .mix(ch_geo_report)
+        .mix(ch_phylo_report)
         .collect()
 
     MergeReports(all_reports_ch)
@@ -308,6 +505,9 @@ workflow {
     merged_metadata = final_metadata_ch
     errors = CompileErrors.out.map { _id, log -> log }
     errors_merged = ErrorsMerged_ch
+    phylogeny_h3n2 = ch_phylogeny_h3n2
+    phylogeny_h1n1 = ch_phylogeny_h1n1
+    nextclade_csv = GenotypingNextclade.out.sample_csv
 
     onComplete:
     // Processes use errorStrategy 'ignore', so a failed task silently drops its outputs: make that visible
@@ -375,6 +575,18 @@ output {
     }
     errors_merged {
         path { "${projectDir}/../${params.outDir}" }
+        mode "copy"
+    }
+    nextclade_csv {
+        path { "${projectDir}/../${params.outDir}" }
+        mode "copy"
+    }
+    phylogeny_h3n2 {
+        path { "${projectDir}/../${params.outDir}/phylogeny/H3N2" }
+        mode "copy"
+    }
+    phylogeny_h1n1 {
+        path { "${projectDir}/../${params.outDir}/phylogeny/H1N1pdm09" }
         mode "copy"
     }
 }

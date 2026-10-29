@@ -2,7 +2,6 @@ name: FluTyper
 channels:
   - conda-forge
   - bioconda
-  - defaults
 dependencies:
   - python=3.9.15
   - nextflow=26.04.6
@@ -12,6 +11,17 @@ dependencies:
   - nf-test=0.9.5
   - biopython=1.85
   - numpy=1.26.4
+  # Phylogenetics module (--phylogenetics)
+  - iqtree=2.3.6
+  - treetime=0.11.4
+  - treecluster=1.0.4
+  - r-base=4.5.3
+  - bioconductor-ggtree=4.0.5
+  - bioconductor-treeio=1.34.0
+  - r-ape=5.8_1
+  - r-ggplot2=4.0.3
+  - r-ggnewscale=0.5.2
+  - r-svglite=2.2.2
   - pip
   - pip:
     - pandas==2.3.0

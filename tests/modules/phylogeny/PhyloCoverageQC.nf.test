@@ -1,0 +1,90 @@
+nextflow_process {
+
+    name "Test Process PhyloCoverageQC"
+    script "nf_pipeline/modules/phylogeny/PhyloCoverageQC.nf"
+    process "PhyloCoverageQC"
+
+    test("Should PASS every segment for a sample with high coverage") {
+
+        when {
+            process {
+                """
+                input[0] = tuple("01816372", file("${projectDir}/tests/data/phylo/samples/01816372", checkIfExists: true))
+                input[1] = file("${projectDir}/tests/data/phylo/reference_segments.fasta", checkIfExists: true)
+                input[2] = 0.95
+                input[3] = "PB2,PB1,PA,HA,NP,NA,MP,NS"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def qcFile = path(process.out.results.get(0).get(2))
+            def lines = qcFile.text.readLines()
+            assert lines.size() == 9 : "expected a header + 8 segment rows"
+            def dataLines = lines.drop(1)
+            assert dataLines.every { it.split("\t")[5] == "PASS" } : "every segment should PASS for 01816372: ${dataLines}"
+            assert dataLines.size() == 8
+
+            // No PQerrors.log should be emitted when MAFFT succeeds for every segment
+            assert process.out.errors == null || process.out.errors.size() == 0
+        }
+    }
+
+    test("Should FAIL the PB2 segment with 'segment missing' for a sample lacking that segment") {
+
+        when {
+            process {
+                """
+                input[0] = tuple("01817974", file("${projectDir}/tests/data/phylo/samples/01817974", checkIfExists: true))
+                input[1] = file("${projectDir}/tests/data/phylo/reference_segments.fasta", checkIfExists: true)
+                input[2] = 0.95
+                input[3] = "PB2,PB1,PA,HA,NP,NA,MP,NS"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def qcFile = path(process.out.results.get(0).get(2))
+            def lines = qcFile.text.readLines()
+            def pb2Line = lines.find { it.startsWith("01817974\tPB2\t") }
+            assert pb2Line != null : "no PB2 row found"
+            assert pb2Line.contains("FAIL")
+            assert pb2Line.endsWith("segment missing")
+
+            // The other 7 segments of 01817974 are present and should not report 'segment missing'
+            def otherLines = lines.drop(1).findAll { !it.startsWith("01817974\tPB2\t") }
+            assert otherLines.size() == 7
+            assert otherLines.every { !it.contains("segment missing") }
+        }
+    }
+
+    test("Should PASS a segment at 86% coverage when min_coverage is lowered to 0.5") {
+
+        when {
+            process {
+                """
+                input[0] = tuple("01817974", file("${projectDir}/tests/data/phylo/samples/01817974", checkIfExists: true))
+                input[1] = file("${projectDir}/tests/data/phylo/reference_segments.fasta", checkIfExists: true)
+                input[2] = 0.5
+                input[3] = "PB1"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def qcFile = path(process.out.results.get(0).get(2))
+            def lines = qcFile.text.readLines()
+            def pb1Line = lines.find { it.startsWith("01817974\tPB1\t") }
+            assert pb1Line != null
+            // Coverage for 01817974 PB1 against the fixture reference is ~86%: with a 0.5 threshold it PASSes
+            assert pb1Line.split("\t")[5] == "PASS" : "PB1 at ~86% coverage should PASS with min_coverage 0.5: ${pb1Line}"
+        }
+    }
+
+}

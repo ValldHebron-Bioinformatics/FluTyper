@@ -1,0 +1,7 @@
+panel	column	status	coverage	reason
+subclade	subclade	rendered	1.0000	
+source	source_group	skipped	0.0000	metadata has no ORIGINATING_LAB column
+period	period	rendered	1.0000	binned by month
+HA1:62	HA1:62	rendered	1.0000	invariant across samples (G)
+HA1:145	HA1:145	rendered	1.0000	invariant across samples (S)
+HA1:239	HA1:239	rendered	1.0000	invariant across samples (P)
