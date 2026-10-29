@@ -1,0 +1,3 @@
+# TEST FIXTURE (not a real rate table): the H3N2 HA rate is not a number, so PhyloAuspice must fail that tree and report it
+subtype	segment	rate	generic	source
+H3N2	HA	not-a-number	no	synthetic

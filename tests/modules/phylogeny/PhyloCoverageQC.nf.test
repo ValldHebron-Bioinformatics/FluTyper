@@ -9,7 +9,7 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = tuple("01816372", file("${projectDir}/tests/data/phylo/samples/01816372", checkIfExists: true))
+                input[0] = tuple("01816372", file("${projectDir}/tests/data/phylo/samples/01816372", checkIfExists: true), [])
                 input[1] = file("${projectDir}/tests/data/phylo/reference_segments.fasta", checkIfExists: true)
                 input[2] = 0.95
                 input[3] = "PB2,PB1,PA,HA,NP,NA,MP,NS"
@@ -37,7 +37,7 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = tuple("01817974", file("${projectDir}/tests/data/phylo/samples/01817974", checkIfExists: true))
+                input[0] = tuple("01817974", file("${projectDir}/tests/data/phylo/samples/01817974", checkIfExists: true), [])
                 input[1] = file("${projectDir}/tests/data/phylo/reference_segments.fasta", checkIfExists: true)
                 input[2] = 0.95
                 input[3] = "PB2,PB1,PA,HA,NP,NA,MP,NS"
@@ -67,7 +67,7 @@ nextflow_process {
         when {
             process {
                 """
-                input[0] = tuple("01817974", file("${projectDir}/tests/data/phylo/samples/01817974", checkIfExists: true))
+                input[0] = tuple("01817974", file("${projectDir}/tests/data/phylo/samples/01817974", checkIfExists: true), [])
                 input[1] = file("${projectDir}/tests/data/phylo/reference_segments.fasta", checkIfExists: true)
                 input[2] = 0.5
                 input[3] = "PB1"
@@ -87,4 +87,49 @@ nextflow_process {
         }
     }
 
+    test("D24: a failed HA Nextclade analysis (errors column set) FAILs every segment with the Nextclade error as reason") {
+
+        when {
+            process {
+                """
+                input[0] = tuple("01818936", file("${projectDir}/tests/data/phylo/samples/01818936", checkIfExists: true),
+                                 file("${projectDir}/tests/data/phylo/nextclade/failed_ha/nextclade_results_01818936.csv", checkIfExists: true))
+                input[1] = file("${projectDir}/tests/data/phylo/reference_segments.fasta", checkIfExists: true)
+                input[2] = 0.95
+                input[3] = "PB2,PB1,PA,HA,NP,NA,MP,NS"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def rows = path(process.out.results.get(0)[2]).readLines().drop(1).collect { it.split("\t", -1) }
+            assert rows.size() == 8
+            rows.each { r ->
+                assert r[5] == "FAIL" : r
+                assert r[6] == "HA Nextclade analysis failed: When calculating seed matches: Unable to align: no matches found (TEST FIXTURE)" : r
+            }
+        }
+    }
+
+    test("D24: an aligned HA with a bad Nextclade QC score (errors empty) is not excluded") {
+
+        when {
+            process {
+                """
+                input[0] = tuple("198353883", file("${projectDir}/tests/data/phylo/samples/198353883", checkIfExists: true),
+                                 file("${projectDir}/tests/data/phylo/nextclade/badqc_ha/nextclade_results_198353883.csv", checkIfExists: true))
+                input[1] = file("${projectDir}/tests/data/phylo/reference_segments.fasta", checkIfExists: true)
+                input[2] = 0.95
+                input[3] = "HA"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def rows = path(process.out.results.get(0)[2]).readLines().drop(1).collect { it.split("\t", -1) }
+            assert rows.size() == 1 && rows[0][5] == "PASS" : rows
+        }
+    }
 }

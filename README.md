@@ -22,6 +22,7 @@ FluTyper is a modular, reproducible Nextflow pipeline for genotyping influenza v
   - [HUMAN Protocol Notes](#human-protocol-notes)
   - [Integrating Extra Markers](#integrating-extra-markers)
   - [Phylogenetics Module (Optional)](#phylogenetics-module-optional)
+  - [Auspice / Nextstrain Export (Optional)](#auspice--nextstrain-export-optional)
 - [🔄 Pipeline Architecture](#-pipeline-architecture)
 - [🔢 Standardized Cross-Subtype Numbering](#-standardized-cross-subtype-numbering)
 - [📂 Outputs](#-outputs)
@@ -31,6 +32,7 @@ FluTyper is a modular, reproducible Nextflow pipeline for genotyping influenza v
 - [🧪 Testing & Continuous Integration](#-testing--continuous-integration)
 - [🧩 Dependencies & Acknowledgments](#-dependencies--acknowledgments)
 - [📖 Citation](#-citation)
+- [⚖️ License](#️-license)
 
 ---
 
@@ -45,6 +47,7 @@ FluTyper is a modular, reproducible Nextflow pipeline for genotyping influenza v
 * Aggregate, per-sample, and time-series HTML mutation reports compiled into a single `index.html` interactive dashboard.
 * Deep linkage of markers, allowing you to click a marker to open its frequency evolution automatically.
 * Continuous surveillance support via an `--append` mode for longitudinal tracking without reprocessing old data.
+* Optional per-segment and whole-genome phylogenetics for human H3N2 and H1N1pdm09 (`--phylogenetics`), with an interactive [Nextstrain/Auspice](https://nextstrain.org) export (`--auspice`): time trees, subclade/cluster colourings and a city-level map.
 * Comprehensive error reporting and logging.
 * Support for avian and human influenza workflows (SWINE protocol is still in development).
 * Modular, reproducible workflow built with Nextflow DSL2.
@@ -238,7 +241,7 @@ nextflow run nf_pipeline/main.nf \
 | Process | Method |
 | --- | --- |
 | `PhyloPreflight` | Stops the run if a tool or R package is missing (names it and the expected version; a different version only warns), builds the codon map of every protein on the coordinate references and validates `--aa-positions` against it. Every other step waits for it. |
-| `PhyloCoverageQC` | Per sample and segment, in parallel: a segment passes when it covers ≥ `--phyloMinCoverage` (0.95) of the reference with non-N bases; missing segments and segments with several records fail. A sample enters a segment tree when that segment passes, and the whole-genome tree only when **every** segment passes. |
+| `PhyloCoverageQC` | Per sample and segment, in parallel: a segment passes when it covers ≥ `--phyloMinCoverage` (0.95) of the reference with non-N bases; missing segments and segments with several records fail. A sample whose HA Nextclade analysis failed (seed matching or alignment failed, e.g. a genome typed with the wrong subtype) fails every segment, so it enters none of its subtype's trees; a merely poor Nextclade QC score does not count. A sample enters a segment tree when that segment passes, and the whole-genome tree only when **every** segment passes. |
 | `PhyloAlignment` | MAFFT `--auto` per segment against the subtype's coordinate reference, trimmed to reference columns (no manual curation), concatenated PB2, PB1, PA, HA, NP, NA, MP, NS. |
 | `PhyloTree` | IQ-TREE, `--model GTR+G4`, `--bootstrap 1000` ultrafast bootstraps, `--seed`, rooted on the subtype's outgroup root strain. |
 | `PhyloSubclades` | Nextclade `subclade` column (per-sample results; root strains run against the same dataset). |
@@ -324,6 +327,65 @@ Everything else the module computes (alignments, IQ-TREE report, `annotations.ts
 <a id="append-and-phylogenetics"></a>**`--append` and phylogenetics.** `MergeHistoricalData` only merges the summary tables, so with both `--append` and `--phylogenetics` the module also pulls in samples from the append directory: their sample folders (`<appendDir>/samples/<sample_id>/`, matched by having a `segments/` folder; the current run's own samples win on a duplicate ID) and their subclade. Since sample folders only started keeping a per-sample `nextclade_results.csv` recently, a historical sample without one has Nextclade rerun on its HA segment against the current subtype's dataset instead of being left with subclade `NA`. Nextclade datasets are fetched for every subtype of the merged (previous + new) table, so a subtype that only has previous samples still gets its trees. FluTyper warns when `<appendDir>/samples` is missing or empty, and lists previous samples dropped for lacking a `segments/` folder.
 
 Note that the new `--outDir` only receives the sample folders of the new run: the previous sample folders stay in the append directory. To append again later, point `--append` at the directory that holds the previous sample folders (or use the same folder for `--append` and `--outDir`).
+
+### Auspice / Nextstrain Export (Optional)
+
+With `--phylogenetics --auspice`, every tree the module builds is also exported as a [Nextstrain](https://nextstrain.org) dataset that opens in [Auspice](https://docs.nextstrain.org/projects/auspice/), the interactive viewer used by nextstrain.org:
+
+```bash
+nextflow run nf_pipeline/main.nf --protocol HUMAN --inputFasta samples.fasta --metadata metadata.csv \
+  --outDir results --phylogenetics --auspice
+npx auspice@3.0.0 view results/auspice      # then open http://localhost:4000
+```
+
+**What you can explore.** One dataset per tree (`flutyper/h3n2/ha`, `flutyper/h1n1pdm09/na`, ..., `flutyper/h3n2/genome` with `--phyloWholeGenome`), each with:
+
+- a **time-scaled tree** that switches to **divergence** (substitutions per site), amino-acid mutations on the branches, and the entropy panel;
+- **Color By**: subclade, cluster (the static report's clusters), region, country, division, city (`location`), age group, sex, season and sampling date;
+- a **map** that switches between country, division and city, with inferred transmission lines between countries;
+- **bootstrap support** as a branch label (Branch Labels → `support`), drawn only where it reaches `--minSupportLabel` (default 70); every branch is kept, and hovering a node shows its exact value;
+- two trees of the same subtype side by side (Second Tree → tanglegram), e.g. HA against NA to spot reassortment.
+
+**Viewing.** Nothing is uploaded anywhere. Either run the local viewer above (needs Node.js ≥ 24; do not use conda's `auspice` package, it is an old 2.x release), or drag a `.json` file onto [auspice.us](https://auspice.us), which reads it inside your browser. Only the map background tiles come from the internet. **The JSONs contain per-sample metadata (age group, sex, city, dates): share them only with people allowed to see that data.**
+
+**Outputs.**
+
+- `<outDir>/auspice/flutyper_<subtype>_<segment>.json`: one validated dataset per tree (`augur validate export-v2`); all in one folder so the viewer lists them together;
+- `<outDir>/auspice/lat_longs_resolved.tsv`: how every city was placed (`city`, `country`, `division`, `lat`, `long`, `source`, `n_candidates`, `alternatives`, ...), for auditing; it is not needed for viewing;
+- each tree's `phylo.log` gains an `## Auspice export` section (dates, clock rate, root date, samples left out, warnings), and the terminal prints one line per subtype, e.g. `AUSPICE(H3N2): 8 datasets -> auspice/ (view: npx auspice@3.0.0 view results/auspice)`. A tree whose export fails is still published as usual; the failure is listed in that line and in `pipeline_errors.log`, never silently missing.
+
+**Geography from the city.** Only the `LOCATION` column (a city) is needed; country, division (region/province) and coordinates are looked up offline, first match wins: (1) `--coordinates` (the bundled Catalan table: Barcelona, Lleida, Girona, Tarragona... → Spain / Catalonia) and `--auspiceLatLongs`; (2) [GeoNames](https://www.geonames.org) city names, including other languages (Wien = Vienna, Sevilla = Seville), restricted to `--auspiceContinent` (default `EU`) so that Valencia means Spain, not Venezuela. An optional `COUNTRY` column (name, ISO2 or ISO3 code) overrides the lookup for its row. When several cities share a name, the most populous one is used and a WARNING lists the alternatives if one of them is a real contender (≥ 10% of the chosen city's population, or ≥ 50,000 people); smaller namesakes are only listed in the audit table. A city that cannot be found gets a WARNING and no map point; nothing is guessed. On the map, a country sits at its capital and a division at its largest city (use `--auspiceLatLongs` to move them).
+
+**Dates and the time tree.** `DATE` is read as `YYYY-MM-DD`, `YYYY-MM` or `YYYY` only; any other format (`03/04/2024`, `Mar 2024`, ...) is reported and treated as undated rather than guessed. Partial dates stay uncertain within their stated month or year. Samples without a usable date are left out of the time tree (listed in `phylo.log`; they remain in the static report), so no collection date is ever inferred. Root strains are dated from the year in their name (`A/Darwin/6/2021` → 2021) unless `--auspiceRootDates` gives a sourced date. A tree is exported without a time axis (divergence only, with a WARNING) when a root strain has no date, when fewer than `--auspiceMinDatedTips` samples are dated to at least the month, or when its segment has no clock rate.
+
+**Nextstrain environment.** augur cannot be installed next to FluTyper's pinned Python, so the export runs in its own conda environment, [`envs/nextstrain.yaml`](envs/nextstrain.yaml) (augur 34.1.4, TreeTime 0.12.1), which Nextflow builds on first use and reuses afterwards; every other step keeps running in the activated FluTyper environment. Things to know:
+
+- the first build downloads about 400 MB (it needs internet) and takes ~1.1 GB in `~/.flutyper/conda`; set `NXF_CONDA_CACHEDIR` to put it elsewhere (e.g. a shared or larger filesystem on a cluster, where `$HOME` quotas are small);
+- every `--auspice` run first checks that the environment works (`AuspiceEnvCheck`); if it cannot be built or is broken, the run stops straight away with the likely cause and fix (no internet, a stale mamba index → `mamba clean --index-cache`, an unwritable cache folder) instead of failing tree by tree;
+- **offline machines / HPC:** build the environment once where there is internet, `mamba env create -p /path/to/nextstrain-env -f envs/nextstrain.yaml`, copy it over if needed, and run with `--auspiceCondaEnv /path/to/nextstrain-env`;
+- if a build was interrupted, delete the half-built `env-<hash>` folder in the cache and rerun.
+
+**Parameters:**
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `auspice` | `false` | Export every tree as an Auspice dataset (requires `--phylogenetics`). |
+| `auspiceContinent` | `EU` | GeoNames continent code(s), comma-separated (`AF,AN,AS,EU,NA,OC,SA`), that city names are looked up in. |
+| `auspiceLatLongs` | *None* | TSV `level<TAB>name<TAB>lat<TAB>long` (level `country`, `division` or `location`) that overrides map coordinates. |
+| `auspiceTraits` | `country,region` | Columns reconstructed on internal nodes (transmission lines on the map); `none` turns it off. |
+| `auspiceMinDatedTips` | `10` | Minimum samples dated to at least the month for a time tree; fewer → divergence-only tree. |
+| `auspiceClockRates` | `RESOURCES/auspice_clock_rates.tsv` | Fixed clock rate per subtype × segment (`subtype`, `segment`, `rate`, `generic`, `source`). |
+| `auspiceRootDates` | `RESOURCES/root_strain_dates.tsv` | Sourced collection dates of root strains, overriding the year in their name. |
+| `auspiceConfig` | `RESOURCES/auspice_config.json` | Auspice display settings (colourings, filters, map levels, panels). |
+| `auspiceCondaEnv` | *None* | Existing, pre-built Nextstrain environment to use instead of building `envs/nextstrain.yaml`. |
+
+**Scientific caveats.**
+
+- **Fixed clock.** A sampling window of a couple of seasons is too short to estimate a substitution rate, so each segment uses Nextstrain's rate from [nextstrain/seasonal-flu](https://github.com/nextstrain/seasonal-flu) (PB2, PB1, PA, HA, NP, NA). **MP and NS have no segment-specific rate**: they use Nextstrain's generic 0.001, which tends to push their root dates back by several years; supply your own rates with `--auspiceClockRates` if you have them. The whole-genome tree uses the length-weighted mean of the segment rates.
+- **Ancestral locations are exploratory.** The country/region of internal nodes comes from discrete trait analysis (`augur traits`), which follows sampling effort: a country that sequences more will look like the source. Samples without a country are never assigned one, and a trait with a single value (e.g. every sample from Spain) is not reconstructed at all.
+- **Reassortment.** Influenza segments evolve and reassort independently, so segment trees can disagree (a sample can sit in different clades in HA and NA); the whole-genome tree assumes they share one history.
+- **Polytomies.** Branches of zero length (identical sequences) are merged, so Auspice shows them as polytomies while the static report keeps IQ-TREE's binary tree; no mutation is lost (this is checked on every tree).
+- The branch mutations are FluTyper's own reconstruction, the same as in the static report and `cluster_mutations.tsv`.
 
 ## 🔄 Pipeline Architecture
 
@@ -420,7 +482,7 @@ FluTyper is strictly verified using `nf-test`. The repository utilizes GitHub Ac
 * **Run all tests:** `nf-test test tests/main.nf.test`
 * **Run module tests:** `nf-test test tests/modules/*.nf.test`
 * **Run specific module:** `nf-test test tests/modules/<module_name>.nf.test`
-* **Run phylogenetics tests:** `nf-test test tests/modules/phylogeny/*.nf.test tests/phylogeny.nf.test` (needs the tools from `FluTyper_env.yaml`; CI runs them in a separate job)
+* **Run phylogenetics tests:** `nf-test test tests/modules/phylogeny/*.nf.test tests/phylogeny.nf.test` (needs the tools from `FluTyper_env.yaml`, run with the `FluTyper` environment activated; the Auspice tests also build `envs/nextstrain.yaml` on first use; CI runs them in a separate job)
 
 ---
 
@@ -439,6 +501,9 @@ FluTyper is strictly verified using `nf-test`. The repository utilizes GitHub Ac
 | **[TreeTime](https://treetime.readthedocs.io/)** | Ancestral state reconstruction (phylogenetics module). |
 | **[TreeCluster](https://github.com/niemasd/TreeCluster)** | Genetic-distance clustering (phylogenetics module). |
 | **R / [ggtree](https://bioconductor.org/packages/ggtree/)** | Annotated tree figure (phylogenetics module; `ape`, `ggplot2`, `ggnewscale`, `svglite`). |
+| **[augur](https://docs.nextstrain.org/projects/augur/)** | Time tree, ancestral locations and dataset export for Auspice (`--auspice`, separate `envs/nextstrain.yaml` environment). |
+| **[Auspice](https://docs.nextstrain.org/projects/auspice/)** | Interactive viewer for the exported datasets (`npx auspice view` or [auspice.us](https://auspice.us)). |
+| **[GeoNames](https://www.geonames.org)** / [`geonamescache`](https://github.com/yaph/geonamescache) | Offline city → country / division / coordinates lookup (`--auspice`). GeoNames data is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/); `RESOURCES/geonames/admin1CodesASCII.txt` is an unmodified copy (see its README). |
 
 *The minimizer indices used by this pipeline were generated using the methodology and tools developed by the Nextstrain team for the [nextclade_data](https://github.com/nextstrain/nextclade_data.git) repository.*
 
@@ -449,3 +514,13 @@ FluTyper is strictly verified using `nf-test`. The repository utilizes GitHub Ac
 A manuscript describing FluTyper is currently in preparation and has not yet been published. In the meantime, if you use FluTyper in your work, please cite the repository directly.
 
 The phylogenetics module reproduces the analysis of: Koumaty L, Dan S, De Clercq A, Destras G, Regue H, Oblette A, Le Meur A, Gaymard A, Escuret V, Bouscambert-Duchamp M, Chanard E, Fabre M, Vieillefond V, Visseaux B, Bal A, Josset L. *Emergence of a genetically distinct cluster of influenza A(H3N2) viruses within subclade J.2.2 associated with hospitalization during the 2024–2025 season in Auvergne–Rhône–Alpes, France.* Microbial Genomics 2026;12:001810. [doi:10.1099/mgen.0.001810](https://doi.org/10.1099/mgen.0.001810) (open access, CC-BY). Please also cite IQ-TREE, TreeTime, TreeCluster, MAFFT, Nextclade and ggtree when you use it.
+
+With `--auspice`, please also cite Nextstrain and TreeTime: Hadfield J, Megill C, Bell SM, Huddleston J, Potter B, Callender C, Sagulenko P, Bedford T, Neher RA. *Nextstrain: real-time tracking of pathogen evolution.* Bioinformatics 2018;34(23):4121–4123. [doi:10.1093/bioinformatics/bty407](https://doi.org/10.1093/bioinformatics/bty407); Sagulenko P, Puller V, Neher RA. *TreeTime: Maximum-likelihood phylodynamic analysis.* Virus Evolution 2018;4(1):vex042. [doi:10.1093/ve/vex042](https://doi.org/10.1093/ve/vex042); and Huddleston J, *et al.* *Augur: a bioinformatics toolkit for phylogenetic analyses of human pathogens.* Journal of Open Source Software 2021;6(57):2906. [doi:10.21105/joss.02906](https://doi.org/10.21105/joss.02906). City lookups use [GeoNames](https://www.geonames.org) data (CC BY 4.0).
+
+## ⚖️ License
+
+Copyright (C) 2026 Respiratory Viruses Unit, Microbiology Department, Vall d’Hebron Hospital Universitari, Vall d’Hebron Institut de Recerca (VHIR), Vall d’Hebron Barcelona Hospital Campus, Passeig Vall d’Hebron 119-129, 08035 Barcelona, Spain.
+
+FluTyper is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+FluTyper is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the [LICENSE](LICENSE) file for the full text.

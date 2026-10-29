@@ -6,12 +6,20 @@ process PhyloCoverageQC {
     // reference positions covered by a non-N base in a pairwise MAFFT alignment. A sample enters the whole-genome
     // phylogeny only if every segment reaches --phyloMinCoverage. Missing segments and segments with more than one
     // record (possible coinfection) fail the sample instead of being guessed.
+    // D24 (user decision 2026-09-30): a sample whose HA Nextclade analysis FAILED is excluded from every phylogeny of its
+    // subtype: all its segments FAIL with reason "HA Nextclade analysis failed: <error>" (so it enters neither the
+    // whole-genome nor any segment tree, and the reason reaches every phylo.log and the QC table). Failed = the
+    // Nextclade CSV's `errors` column is non-empty: Nextclade fills it only when the sequence could not be analysed
+    // (seed matching / alignment failed; clade and QC columns are then empty). A merely "bad" qc.overallStatus, or an
+    // aligned sequence without a clade, has an empty `errors` column and is kept. No Nextclade CSV (e.g. no HA segment)
+    // or an empty one (Nextclade not run for this H type) is not a failure. Real case: VH_24-26 samples 600497186 and
+    // 198309324 (non-pdm09 genomes typed A(H1N1)pdm09, Phase 7 finding P7-1).
     errorStrategy 'ignore'
     // Cache on file content: PhyloPreflight reruns when --aa-positions changes, but its reference outputs do not
     cache 'deep'
 
     input:
-    tuple val(sample_id), path(sample_dir)
+    tuple val(sample_id), path(sample_dir), path(nextclade, stageAs: "nextclade/*")   // HA Nextclade CSV (';'), or []
     path(reference_segments)   // one record per segment, header = segment name
     val(min_coverage)
     val(segments)              // comma-separated segment names
@@ -23,7 +31,7 @@ process PhyloCoverageQC {
     script:
     """
 #!/usr/bin/env python3
-import csv, io, os, subprocess
+import csv, io, os, re, subprocess
 from Bio import SeqIO
 
 sample_id = "${sample_id}"
@@ -35,8 +43,22 @@ def log(msg):
     with open("PQerrors.log", "a") as f:
         f.write(f"PhyloCoverageQC: {msg}\\n")
 
+def nextclade_failure(path):
+    # the first non-empty `errors` cell of the sample's HA Nextclade CSV, without the per-sequence prefix; None = not failed
+    if not path or not os.path.isfile(path) or os.path.getsize(path) == 0:
+        return None
+    with open(path, newline="", encoding="utf-8") as f:
+        errs = [(r.get("errors") or "").strip() for r in csv.DictReader(f, delimiter=";")]
+    errs = [e for e in errs if e]
+    if not errs:
+        return None
+    return re.sub(r"^When processing sequence #\\d+ '.*?': ", "", errs[0])[:200]
+
 rows = []
-for seg in segments:
+failed = nextclade_failure("${nextclade}".strip())
+if failed:
+    rows = [[sample_id, seg, "", "", "", "FAIL", f"HA Nextclade analysis failed: {failed}"] for seg in segments]
+for seg in ([] if failed else segments):
     if seg not in refs:
         log(f"segment {seg} is missing from the coordinate references")
         rows.append([sample_id, seg, "", "", "", "FAIL", "segment missing from the coordinate references"])

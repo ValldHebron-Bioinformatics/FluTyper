@@ -1,0 +1,27 @@
+# Fixed molecular clock rates for the Auspice time trees (augur refine --timetree --clock-rate; plan D8), used by
+# PhyloAuspice. Substitutions per site per year; the clock std-dev passed to augur is rate / 5 (as Nextstrain does).
+# Source of the segment-specific rates: nextstrain/seasonal-flu, workflow/snakemake_rules/core.smk L189-219 at commit
+# a1e704c7 ("12y" builds, rates estimated 2019-10-18), https://github.com/nextstrain/seasonal-flu/blob/a1e704c7/workflow/snakemake_rules/core.smk
+# MP and NS have no segment-specific rate there: seasonal-flu falls back to its generic 0.001 for them, and so does
+# FluTyper (generic = yes -> PhyloAuspice logs a WARNING "generic rate, not segment-specific").
+# Whole-genome tree: no row; PhyloAuspice uses the length-weighted mean of the 8 segment rates of the subtype (weights
+# = the segment lengths in the tree's segments.tsv) and logs the value.
+# A subtype/segment without a row gets no time tree (divergence-only export + WARNING); no rate is ever guessed.
+# Columns (tab-separated): subtype, segment, rate, generic (yes/no), source. Lines starting with '#' are comments.
+subtype	segment	rate	generic	source
+H3N2	PB2	0.00218	no	nextstrain/seasonal-flu core.smk@a1e704c7
+H3N2	PB1	0.00139	no	nextstrain/seasonal-flu core.smk@a1e704c7
+H3N2	PA	0.00178	no	nextstrain/seasonal-flu core.smk@a1e704c7
+H3N2	HA	0.00382	no	nextstrain/seasonal-flu core.smk@a1e704c7
+H3N2	NP	0.00157	no	nextstrain/seasonal-flu core.smk@a1e704c7
+H3N2	NA	0.00267	no	nextstrain/seasonal-flu core.smk@a1e704c7
+H3N2	MP	0.001	yes	nextstrain/seasonal-flu core.smk@a1e704c7 generic fallback
+H3N2	NS	0.001	yes	nextstrain/seasonal-flu core.smk@a1e704c7 generic fallback
+H1N1pdm09	PB2	0.00277	no	nextstrain/seasonal-flu core.smk@a1e704c7
+H1N1pdm09	PB1	0.00205	no	nextstrain/seasonal-flu core.smk@a1e704c7
+H1N1pdm09	PA	0.00217	no	nextstrain/seasonal-flu core.smk@a1e704c7
+H1N1pdm09	HA	0.00329	no	nextstrain/seasonal-flu core.smk@a1e704c7
+H1N1pdm09	NP	0.00221	no	nextstrain/seasonal-flu core.smk@a1e704c7
+H1N1pdm09	NA	0.00326	no	nextstrain/seasonal-flu core.smk@a1e704c7
+H1N1pdm09	MP	0.001	yes	nextstrain/seasonal-flu core.smk@a1e704c7 generic fallback
+H1N1pdm09	NS	0.001	yes	nextstrain/seasonal-flu core.smk@a1e704c7 generic fallback

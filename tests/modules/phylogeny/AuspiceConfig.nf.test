@@ -1,0 +1,52 @@
+nextflow_process {
+
+    name "Test RESOURCES/auspice_config.json"
+    script "tests/modules/phylogeny/support/AugurValidateConfig.nf"
+    process "AugurValidateConfig"
+
+    test("augur validate auspice-config-v2 accepts RESOURCES/auspice_config.json, which has every D4 colouring, map level and panel") {
+
+        when {
+            process {
+                """
+                input[0] = file("${projectDir}/RESOURCES/auspice_config.json", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert path(process.out.log.get(0)).text.contains("Validating schema of")
+
+            def cfg = new groovy.json.JsonSlurper().parse(file("${projectDir}/RESOURCES/auspice_config.json"))
+            def keys = cfg.colorings.collect { it.key }
+            assert keys.containsAll(["subclade", "cluster", "region", "country", "division", "location", "age_group", "sex", "season", "num_date"])
+            assert cfg.colorings.findAll { it.key in ["season", "age_group"] }.every { it.type == "ordinal" }
+            assert cfg.geo_resolutions.collect { it.key } == ["country", "division", "location"]
+            assert cfg.panels.containsAll(["tree", "map", "entropy"])
+            assert cfg.display_defaults.color_by in keys
+            assert cfg.display_defaults.geo_resolution in cfg.geo_resolutions.collect { it.key }
+            assert cfg.display_defaults.distance_measure == "num_date"
+            assert cfg.filters.every { it in keys }
+        }
+    }
+
+    test("augur validate rejects a config that breaks the schema (the check is not a no-op)") {
+
+        when {
+            process {
+                """
+                def bad = new File("${launchDir}/bad_auspice_config.json")
+                bad.text = '{"colorings": [{"key": "season", "type": "not-a-type"}], "panels": ["tree"]}'
+                input[0] = file(bad.path)
+                """
+            }
+        }
+
+        then {
+            assert process.failed
+            // default errorStrategy: the task's stderr (augur's schema message) is in the Nextflow console output
+            assert process.stdout.join("\n").contains("not-a-type") : process.stdout.join("\n")
+        }
+    }
+}
