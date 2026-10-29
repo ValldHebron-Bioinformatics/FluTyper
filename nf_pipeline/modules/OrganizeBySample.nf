@@ -22,7 +22,8 @@ process OrganizeBySample {
     raw_sample="samples/${sample_id}/${sample_id}.fasta"
     combined_fasta="${sample_id}_combined.fasta"
     # Use seqkit to extract sequences for the given sample ID from the staged FASTA file
-    seqkit grep -r -p "^${sample_id}" "${staged_fasta}" > "\$raw_sample"
+    # The ID must be followed by a header separator (or end the ID) so that e.g. sample 1913 does not also match 19135815
+    seqkit grep -r -p "^\\Q${sample_id}\\E([|_\\[\\]]|\$)" "${staged_fasta}" > "\$raw_sample"
 
     if [ ! -s "\$raw_sample" ]; then
         echo "OrganizeBySample: No records found for sample ${sample_id}." >> "OSerrors.log"
@@ -31,6 +32,9 @@ process OrganizeBySample {
 
     # Generate reverse complements and rename headers with seqkit
     seqkit seq --reverse --complement --validate-seq "\$raw_sample" | sed 's/^>/>rev_/' > rev_comp.fasta
+    if [ "\${PIPESTATUS[0]}" -ne 0 ]; then
+        echo "OrganizeBySample: seqkit failed to reverse-complement sample ${sample_id} (invalid sequence characters?). Orientation check used forward sequences only." >> "OSerrors.log"
+    fi
     cat "\$raw_sample" rev_comp.fasta > "\$combined_fasta"
 
     # Orientation check using Nextclade with the appropriate minimizer index based on the protocol

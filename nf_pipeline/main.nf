@@ -56,7 +56,13 @@ workflow {
         .splitFasta(record: [id: true])
         .map { rec -> rec.id.tokenize('[|_]')[0] } // Extract sample ID from FASTA header using the first token before '|' or '_'
         .unique()
- 
+        .filter { sample_id ->
+            // Sample IDs are embedded in shell/Python scripts and file paths: skip IDs with characters that could break them
+            def safe = sample_id && !(sample_id =~ /[\s'"`$\\{};&<>*?\/(),]/) && !(sample_id in ['.', '..'])
+            if (!safe) log.warn "Skipping sample '${sample_id}': sample IDs cannot be empty or contain whitespace, quotes or any of \$ \\ { } ; & < > * ? / ( ) ,"
+            return safe
+        }
+
     OrganizeBySample(SampleInput_ch)
 
     // SUBTYPE DETECTION
@@ -302,6 +308,12 @@ workflow {
     merged_metadata = final_metadata_ch
     errors = CompileErrors.out.map { _id, log -> log }
     errors_merged = ErrorsMerged_ch
+
+    onComplete:
+    // Processes use errorStrategy 'ignore', so a failed task silently drops its outputs: make that visible
+    if (workflow.stats.ignoredCount > 0) {
+        log.warn "${workflow.stats.ignoredCount} task(s) failed and were ignored, so some samples or reports may be missing. Check pipeline_errors.log and .nextflow.log for details."
+    }
 }
 
 output {

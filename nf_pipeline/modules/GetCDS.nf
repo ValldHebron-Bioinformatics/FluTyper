@@ -10,14 +10,15 @@ process GetCDS {
     tuple val(h_tag), val(n_tag), val(sample_id), val(pathotype), path(sample_dir)
 
     output:
-    tuple val(sample_id), path("samples/${sample_id}/CDS/*_CDS.fasta"), emit: results
-    tuple val(sample_id), path("${sample_id}_*_CDS_aligned.fasta"), emit: aligned
+    // Optional so that a sample with no valid CDS still publishes its CDSerrors.log instead of failing silently
+    tuple val(sample_id), path("samples/${sample_id}/CDS/*_CDS.fasta"), optional: true, emit: results
+    tuple val(sample_id), path("${sample_id}_*_CDS_aligned.fasta"), optional: true, emit: aligned
     tuple val(sample_id), path("CDSerrors.log"), optional: true, emit: errors
 
     script:
     """
 #!/usr/bin/env python3
-import os, subprocess, io
+import os, subprocess, io, shlex
 from Bio import SeqIO
 
 ref_fasta = "${params.protocols[params.protocol].resources}/CDS_references.fasta"
@@ -120,7 +121,7 @@ for seg, prots in prot_dict.items():
         max_n_ratio = 0.5
         
         # Use MAFFT to align the query sequence with the reference sequence
-        cmd = f"(seqkit grep -r -p '{pattern}' {ref_fasta} | seqkit head -n 1; printf '\\n'; cat '{seg_fasta}') | mafft --localpair --maxiterate 1000 --op 3 --ep 0.123 --quiet -"
+        cmd = f"(seqkit grep -r -p {shlex.quote(pattern)} {shlex.quote(ref_fasta)} | seqkit head -n 1; printf '\\n'; cat {shlex.quote(seg_fasta)}) | mafft --localpair --maxiterate 1000 --op 3 --ep 0.123 --quiet -"
         try:
             result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=True)
             

@@ -44,9 +44,10 @@ process GenotypingNextclade {
     if grep -q "2.3.4.4b" "nextclade_results_${sample_id}.csv"; then
         if [ -s "${sample_dir}/${sample_id}.fasta" ]; then
             # Adapt the header for genin2 input (replace '|' with '_' and keep only the first two fields)
-            cat "${sample_dir}/${sample_id}.fasta" | tr "|" "_" | cut -d "_" -f1,2 > "${sample_dir}/${sample_id}_genin_input.fasta"
+            # Written to this task's own directory, not into the staged sample_dir that belongs to OrganizeBySample
+            cat "${sample_dir}/${sample_id}.fasta" | tr "|" "_" | cut -d "_" -f1,2 > "./${sample_id}_genin_input.fasta"
             
-            genin2 -o "genin_results_${sample_id}.tsv" "${sample_dir}/${sample_id}_genin_input.fasta"
+            genin2 -o "genin_results_${sample_id}.tsv" "./${sample_id}_genin_input.fasta"
             
             if [ ! -f "genin_results_${sample_id}.tsv" ]; then
                 echo "GenotypingNextclade: Genin2 failed to produce output for ${sample_id}" >> GNerrors.log
