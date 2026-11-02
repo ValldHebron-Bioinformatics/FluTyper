@@ -1,4 +1,4 @@
-# FluTyper 🧬🐔🐷
+# FluTyper 🧬🐔🐷👨‍🦲
 [![nf-test](https://img.shields.io/badge/tested_with-nf--test-337ab7.svg)](https://code.askimed.com/nf-test)
 
 FluTyper is a modular, reproducible Nextflow pipeline for genotyping influenza viruses (avian and human) and characterizing relevant mutations. It is designed for genomic surveillance, research, and integration within a **One Health** framework.
