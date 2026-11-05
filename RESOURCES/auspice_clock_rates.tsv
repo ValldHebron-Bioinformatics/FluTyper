@@ -25,3 +25,24 @@ H1N1pdm09	NP	0.00221	no	nextstrain/seasonal-flu core.smk@a1e704c7
 H1N1pdm09	NA	0.00326	no	nextstrain/seasonal-flu core.smk@a1e704c7
 H1N1pdm09	MP	0.001	yes	nextstrain/seasonal-flu core.smk@a1e704c7 generic fallback
 H1N1pdm09	NS	0.001	yes	nextstrain/seasonal-flu core.smk@a1e704c7 generic fallback
+# H5 (AVIAN). Source of the rates: nextstrain/avian-flu, segment-focused/config.yaml at commit
+# 3e3a74e84f9e1a3169d2a3ff646f9b187323164a, read at
+# https://raw.githubusercontent.com/nextstrain/avian-flu/3e3a74e84f9e1a3169d2a3ff646f9b187323164a/segment-focused/config.yaml
+# Two caveats, both deliberate:
+#  - Those rates are keyed by SUBTYPE and by a 2-year build window. They say nothing about
+#    clade 2.3.4.4b, and no clade-specific published rate was found. A 6-month dataset is
+#    inside a 2-year window, so the 2y values are the closest citable ones.
+#  - The h5nx values are used here, not the h5n1 ones, because FluTyper's H5 subtype matches on
+#    the H tag alone: one H5 tree holds H5N1, H5N2, H5N3 and H5N4 tips, which is exactly the
+#    case nextstrain covers with h5nx. For a run whose tips are all H5N1, pass
+#    --auspiceClockRates RESOURCES/auspice_clock_rates_h5n1.tsv instead.
+# nextstrain gives every H5 rate one fixed std-dev (0.00211); PhyloAuspice derives rate / 5, as
+# it does for every other subtype, so the std-dev used here is not nextstrain's.
+H5	PB2	0.00287	no	nextstrain/avian-flu segment-focused/config.yaml@3e3a74e8 (h5nx/pb2/2y)
+H5	PB1	0.00267	no	nextstrain/avian-flu segment-focused/config.yaml@3e3a74e8 (h5nx/pb1/2y)
+H5	PA	0.00238	no	nextstrain/avian-flu segment-focused/config.yaml@3e3a74e8 (h5nx/pa/2y)
+H5	HA	0.0048	no	nextstrain/avian-flu segment-focused/config.yaml@3e3a74e8 (h5nx/ha/2y)
+H5	NP	0.0022	no	nextstrain/avian-flu segment-focused/config.yaml@3e3a74e8 (h5nx/np/2y)
+H5	NA	0.0028	no	nextstrain/avian-flu segment-focused/config.yaml@3e3a74e8 (h5nx/na/2y)
+H5	MP	0.0017	no	nextstrain/avian-flu segment-focused/config.yaml@3e3a74e8 (h5nx/mp/2y)
+H5	NS	0.0017	no	nextstrain/avian-flu segment-focused/config.yaml@3e3a74e8 (h5nx/ns/2y)
