@@ -921,4 +921,70 @@ nextflow_process {
 
         }
     }
+
+    test("AVIAN: the annotation columns of annotations.tsv become colourings and filters") {
+
+        when {
+            process {
+                """
+                input[0] = tuple(
+                    "H5_HA",
+                    "HA",
+                    file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_alignment.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_ancestral_nt.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_ancestral_aa", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_segments.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_gene_map.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/annotations_avian.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true)
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/auspice/geo.tsv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/auspice/lat_longs.tsv", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/auspice/metadata_auspice.csv", checkIfExists: true)
+                input[4] = file("${projectDir}/RESOURCES/auspice_config_avian.json", checkIfExists: true)
+                input[5] = file("${projectDir}/RESOURCES/auspice_clock_rates.tsv", checkIfExists: true)
+                input[6] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
+                input[7] = []
+                input[8] = 3
+                input[9] = "country,region"
+                input[10] = "1.1.0"
+                input[11] = 70
+                input[12] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def js = new JsonSlurper().parse(file(process.out.json.get(0)[1]))
+
+            // The avian columns are not in any hardcoded list: they reach the dataset because
+            // the annotation fields are read from annotations.tsv's own header
+            def keys = js.meta.colorings.collect { it.key }
+            assert keys.containsAll(["pathotype", "clade", "genotype", "host"]) : keys
+            assert js.meta.filters.containsAll(["pathotype", "clade", "genotype", "host"]) : js.meta.filters
+            assert js.meta.geo_resolutions.collect { it.key }.contains("country")
+
+            // and they carry the real values, per tip
+            def byName = [:]
+            js.tree.with { node -> }
+            def collect
+            collect = { node ->
+                if (node.name) byName[node.name] = node
+                (node.children ?: []).each { child -> collect(child) }
+            }
+            collect(js.tree)
+            assert byName["01816372"].node_attrs.pathotype.value == "HPAI"
+            assert byName["198353883"].node_attrs.pathotype.value == "LPAI"
+            assert byName["01816372"].node_attrs.host.value == "Larus argentatus"
+            assert byName["01818936"].node_attrs.genotype.value == "B.24"
+
+            // The columns the HUMAN config uses are gone from this dataset, so nothing is
+            // carried over by a stale hardcoded list
+            assert !keys.contains("age_group") : keys
+            assert !keys.contains("sex") : keys
+        }
+    }
+
 }

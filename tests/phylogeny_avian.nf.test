@@ -18,7 +18,7 @@ nextflow_pipeline {
                 outDir = "tests/results/phylo_avian_1"
                 metadata = "${projectDir}/tests/data/avianmetadata.csv"
                 phylogenetics = true
-                auspice = false
+                auspice = true
                 phyloSubtype = "H5"
                 phyloWholeGenome = false
                 phyloSegmentTrees = "HA,NP"
@@ -42,6 +42,17 @@ nextflow_pipeline {
             // H5 matches on the H tag alone, so SIXSEG (no NA segment, subtype H5Nx) is a tip
             assert outputDir.resolve("phylogeny/H5/HA/tree.nwk").text.contains("SIXSEG")
             assert workflow.stdout.any { it.startsWith("PHYLOGENETICS(H5):") }
+
+            // --auspice: one dataset per tree, coloured by the avian annotations. The avian
+            // panel spec and auspice config are picked from the protocol, and PhyloReport has
+            // to put those columns in annotations.tsv for them to reach the dataset at all.
+            def datasets = outputDir.resolve("auspice").toFile().list().toList()
+            assert datasets.contains("flutyper_h5_ha.json") : datasets
+            def js = new groovy.json.JsonSlurper().parse(
+                outputDir.resolve("auspice/flutyper_h5_ha.json").toFile())
+            def keys = js.meta.colorings.collect { it.key }
+            assert keys.containsAll(["pathotype", "clade", "genotype", "host"]) : keys
+            assert js.meta.panels.contains("map")
         }
     }
 

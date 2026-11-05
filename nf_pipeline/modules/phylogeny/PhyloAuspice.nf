@@ -110,10 +110,24 @@ AA_SKIP = set("-X")
 ORDINAL_COLOURS = ["#440154", "#482878", "#3E4A89", "#31688E", "#26828E", "#1F9E89", "#35B779", "#6DCD59",
                    "#B4DE2C", "#FDE725"]   # viridis, 10 steps: ordinal legends (age_group, season)
 AUGUR_TIMEOUT = 6 * 3600   # s per augur call (refine of ~700 tips takes ~20 s): generous, but a hang is a reported failure
-ANN_FIELDS = ["subclade", "cluster", "season", "age_group", "sex"]    # from PhyloReport's annotations.tsv (plan D9)
+ANN_IDENTITY = {"id", "tip_type"}    # identify the tip, not properties of it
+
+# The annotation columns of PhyloReport's annotations.tsv: its own header, minus the two
+# identity columns and the amino-acid columns (GENE:POS, exported as mutations instead).
+# Read from the file rather than listed here, so a column the panel spec adds for a protocol
+# (an avian run annotates pathotype, clade, genotype and host where a human one annotates
+# season, age group and sex) reaches the dataset's colourings, filters and --auspiceTraits
+# without this module knowing its name.
+def annotation_fields(path):
+    with open(path) as fh:
+        header = fh.readline().rstrip("\\n").split("\\t")
+    return [c for c in header if c not in ANN_IDENTITY and ":" not in c]
+
+ANN_FIELDS = annotation_fields(ANNOT)                                # from PhyloReport's annotations.tsv (plan D9)
 GEO_FIELDS = ["region", "country", "division", "location"]           # from PhyloGeography's geo.tsv (plan D12)
 FIELDS = ANN_FIELDS + GEO_FIELDS   # the categorical columns of meta.tsv; also the only valid --auspiceTraits columns
-                                   # (keep in sync with validateAuspiceParams' trait_columns in subworkflows/Phylogenetics.nf)
+                                   # (validateAuspiceParams' trait_columns in subworkflows/Phylogenetics.nf lists the
+                                   # ones a user may name on the command line)
 
 # ---- Pure helpers (no I/O) -------------------------------------------------------------------------------------------
 def augur_date(raw):

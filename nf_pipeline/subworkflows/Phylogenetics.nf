@@ -37,7 +37,7 @@ workflow PHYLOGENETICS {
     def resources = params.protocols[params.protocol].resources
     def ref_genomes = phyloReferenceGenomes(resources, params.protocol)
     def cds_refs = file("${resources}/CDS_references.fasta", checkIfExists: true)
-    def panel_spec = file(params.phyloPanels, checkIfExists: true)
+    def panel_spec = file(phyloProtocolResource(params.phyloPanels, 'phylo_panels.tsv', params.protocol), checkIfExists: true)
     def lab_map = params.labMap ? file(params.labMap, checkIfExists: true) : []
     def auspice_on = isPhyloFlag(params.auspice)
 
@@ -298,7 +298,7 @@ workflow PHYLOGENETICS {
             auspice_geography.map { geo, _ll, _log, _env -> geo },
             auspice_geography.map { _geo, ll, _log, _env -> ll },
             metadata.first(),
-            file(params.auspiceConfig, checkIfExists: true),
+            file(phyloProtocolResource(params.auspiceConfig, 'auspice_config.json', params.protocol), checkIfExists: true),
             file(params.auspiceClockRates, checkIfExists: true),
             PhyloPreflight.out.root_table,
             params.auspiceRootDates ? file(params.auspiceRootDates, checkIfExists: true) : [],
@@ -798,6 +798,27 @@ def isPhyloFlag(v) {
 // True when v is a plain number (not null, not a value-less flag)
 def isPhyloNumber(v) {
     return v != null && v != true && v.toString().isBigDecimal()
+}
+
+/*
+ * Swap a shipped resource for its protocol-specific twin: under AVIAN, RESOURCES/phylo_panels.tsv
+ * becomes phylo_panels_avian.tsv and auspice_config.json becomes auspice_config_avian.json, in
+ * the same directory. The human and avian versions annotate different things - season, age group
+ * and sex against pathotype, clade, genotype and host - so each protocol needs its own.
+ * A path the user pointed somewhere else (any other basename) is left exactly as given.
+ */
+def phyloProtocolResource(configured, String shipped_name, protocol) {
+    def path = configured?.toString()
+    if (!path || protocol.toString().toUpperCase() != 'AVIAN') {
+        return path
+    }
+    def f = file(path)
+    if (f.name != shipped_name) {
+        return path
+    }
+    def avian = shipped_name.replaceFirst(/(\.[^.]+)$/, '_avian$1')
+    def twin = file("${f.parent}/${avian}")
+    return twin.exists() ? twin.toString() : path
 }
 
 /*
