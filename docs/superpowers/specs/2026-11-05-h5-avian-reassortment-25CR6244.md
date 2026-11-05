@@ -5,15 +5,20 @@
 
 ## 1. Pregunta científica
 
-25CR6244 és un H5 LPAIV que **no pertany al linatge Gs/GD**, però durant la tardor
-els H5 LPAIV i els H5 HPAIV del clade 2.3.4.4b co-circulen en poblacions d'aus
-silvestres que se solapen (gavians, *Larus* spp., i anàtids). El reassortment pot
-afectar **qualsevol segment**. Cal determinar, **segment a segment**, si algun
-segment de 25CR6244 s'agrupa amb virus HPAIV Gs/GD en lloc del seu context LPAIV.
+**Objectiu (reformulat el 2026-11-05):** caracteritzar **d'on ve 25CR6244** — origen i
+parentiu dins la diversitat H5 europea de juny–novembre 2025. Per a cada segment avaluable:
+on cau 25CR6244 a l'arbre i amb quin suport de bootstrap; els seus 5–10 parents més propers
+(país, hoste, data, genotip); si el clade on cau és geogràficament coherent (els LPAI del
+conjunt són només de Suècia, Itàlia i Països Baixos) o cau en un lloc inesperat; i si HA, NS i
+NP apunten al mateix origen geogràfic i d'hoste. Si convergeixen, la lectura d'origen és
+sòlida; si divergeixen, es reporta com a observació.
 
-Un segment de 25CR6244 que caigui dins d'un clade HPAIV 2.3.4.4b amb suport de
-bootstrap és evidència de reassortment amb virus HP Gs/GD. Aquest és el resultat
-que l'anàlisi ha de poder afirmar o descartar per a cada segment.
+**Reassortment: NO contestable amb aquesta mostra.** La pregunta original — si algun segment
+s'agrupa amb virus HPAIV Gs/GD 2.3.4.4b — exigeix comparar segment a segment tot el genoma.
+Amb la cobertura real de §2, 25CR6244 només té material interpretable en 3 dels 8 segments
+(HA, NS i, com a exploratori, NP). Amb 3 segments de 8 **no es pot afirmar ni descartar
+reassortment**, i l'informe ho ha de dir així; qualsevol lectura que ho suggereixi seria
+excedir-se. Els segments que falten (PB2, PB1, PA, NA, MP) són el que caldria resequenciar.
 
 ## 2. Dades d'entrada (ja al repositori)
 
@@ -30,10 +35,30 @@ Composició del conjunt GISAID (camp `Pathogenicity`):
 - **LPAI:** 33 — H5N3 ×19, H5N4 ×8, H5N2 ×3, H5 ×2, H5N1 ×1. Només Suècia (24), Itàlia (7), Països Baixos (2). Hostes: *Mallard* 23, *Duck* 5, *Teal* 2, altres anàtids 3. **Cap *Larus* spp.**
 - **Patogenicitat en blanc:** 9 — s'han de classificar amb la crida pròpia de FluTyper.
 
-**Limitació acceptada:** 25CR6244 no té PA ni NA en les dades disponibles. L'avaluació
-de reassortment cobreix 6 dels 8 segments. Sense NA no es pot confirmar el subtipus
-N1 des de la seqüència; el subtipus notificat es documenta com a procedent del
-laboratori, no de l'anàlisi.
+**Cobertura real de 25CR6244** (definició de `PhyloCoverageQC`: posicions de la referència
+cobertes per la mostra, no N ni forat, sobre la longitud de la referència; referència H5
+`A/American_wigeon/South_Dakota/23-033792-006-original/2023`). Els registres estan farcits
+amb N i guions fins a 2341 bp, cosa que amaga la mancança real:
+
+| Segment | Cobertes / long. ref. | Cobertura | Estatus |
+|---|---|---|---|
+| NS | 838 / 838 | 100,00% | primari (llindar 0,95) |
+| HA | 1695 / 1704 | 99,47% | primari (llindar 0,95) |
+| NP | 1407 / 1497 | 93,99% | **secundari / exploratori** (llindar 0,93 declarat a part; per sota del primari) |
+| PB1 | 258 / 2274 | 11,35% | no avaluable |
+| PB2 | 238 / 2280 | 10,44% | no avaluable |
+| MP | 65 / 982 | 6,62% | no avaluable |
+| PA, NA | — | absents | no avaluable |
+
+El llindar primari **no es mou** per encabir NP: triar-lo mirant el resultat de la mostra
+d'interès no és defensable. NP s'executa a part, etiquetat com a exploratori; una col·locació
+interessant demanaria confirmació independent abans d'afirmar res. No s'executen PB1, PB2 ni MP.
+
+Sense NA no es pot confirmar el subtipus N1 des de la seqüència; el N1 ve de PCR i es
+documenta com a procedent del laboratori, no de l'anàlisi.
+
+**Pathotype:** el de 25CR6244 és LPAI llegit del motiu de tall d'HA (`RNVPQRETR/GLF`, 2
+residus bàsics en P1–P5), no heretat del sufix de la referència del nextclade.
 
 ## 3. Disseny dels datasets
 
