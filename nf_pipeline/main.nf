@@ -32,6 +32,25 @@ include {
     parseAaPositions; parseAaPositionsFile; validatePhyloParams; resolvePhyloConfig; phyloSubtypeTag
 } from './subworkflows/Phylogenetics'
 
+/*
+ * Sample ID of a FASTA record.
+ *
+ * Our own headers put the segment after the sample id, separated by '_'
+ * (25CR6244_HA_...), while a GISAID download puts the accession first, separated by '|'
+ * (01816747|HA|...). Some GISAID downloads keep the EPI_ISL_ prefix on that accession, and
+ * that prefix contains the very '_' that separates sample from segment in our own headers:
+ * splitting on both characters at once turns EPI_ISL_20298047 into 'EPI', which collapses
+ * every isolate of the download into one sample. So the accession form is recognised first
+ * and only the rest is split.
+ */
+def sampleIdFromHeader(header) {
+    def first = (header ?: '').toString().tokenize('|')[0] ?: ''
+    if (first ==~ /^EPI_ISL_\d+$/) {
+        return first
+    }
+    return first.tokenize('[_]')[0] ?: ''
+}
+
 // Comprovació invisible per decidir si generem el mapa
 def check_location_column(metadata_path) {
     if (!metadata_path) return false
@@ -110,7 +129,7 @@ workflow {
     SampleInput_ch = channel
         .fromPath(params.inputFasta, checkIfExists: true)
         .splitFasta(record: [id: true])
-        .map { rec -> rec.id.tokenize('[|_]')[0] } // Extract sample ID from FASTA header using the first token before '|' or '_'
+        .map { rec -> sampleIdFromHeader(rec.id) }
         .unique()
         .filter { sample_id ->
             // Sample IDs are embedded in shell/Python scripts and file paths: skip IDs with characters that could break them

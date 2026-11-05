@@ -1,0 +1,76 @@
+nextflow_function {
+
+    name "Test Function sampleIdFromHeader"
+    script "nf_pipeline/main.nf"
+    function "sampleIdFromHeader"
+
+    test("a GISAID header that keeps the EPI_ISL_ prefix") {
+        when {
+            function {
+                """
+                input[0] = "EPI_ISL_20298047|NP|2025-11-27|A/Chicken/England/113374/2025|Animal_and_Plant_Health_Agency_(APHA)"
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == "EPI_ISL_20298047"
+        }
+    }
+
+    test("a GISAID header with a bare accession") {
+        when {
+            function {
+                """
+                input[0] = "01816747|HA|2024-08-20|A/Catalonia/01816747/2024|Some_Lab"
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == "01816747"
+        }
+    }
+
+    test("an own header where the segment follows the sample id after an underscore") {
+        when {
+            function {
+                """
+                input[0] = "25CR6244_HA_H5N3_Avian_A/Mallard_Duck/Netherlands/OM_17/2018_EPI_ISL_19613905"
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == "25CR6244"
+        }
+    }
+
+    test("an accession on its own") {
+        when {
+            function {
+                """
+                input[0] = "EPI_ISL_20298047"
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == "EPI_ISL_20298047"
+        }
+    }
+
+    test("a bracketed segment suffix") {
+        when {
+            function {
+                """
+                input[0] = "1913[HA]"
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == "1913"
+        }
+    }
+}
