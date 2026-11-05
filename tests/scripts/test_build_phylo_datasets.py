@@ -142,10 +142,16 @@ class TestBuild(unittest.TestCase):
         self.assertIn("UNKNOWN", self.report)
         self.assertIn("EPI_ISL_20060006", self.report)
 
-    def test_unknown_isolate_is_in_no_dataset(self):
+    def test_an_unknown_isolate_without_the_clade_is_in_no_dataset(self):
         for ds in ("lpai", "hpai", "combined"):
             headers = " ".join(fasta_headers(self.outdir / f"{ds}.fasta"))
             self.assertNotIn("EPI_ISL_20060006", headers)
+
+    def test_the_report_says_unknown_means_no_pathotype_call_not_excluded(self):
+        # HPAI membership is by clade, so an isolate with no pathotype call but clade
+        # 2.3.4.4b does belong to the HPAI dataset. The report must not claim otherwise.
+        self.assertIn("no pathotype call", self.report)
+        self.assertNotIn("in no dataset", self.report)
 
     def test_focus_metadata_row_carries_its_own_called_pathotype(self):
         meta = pandas.read_csv(self.outdir / "lpai_metadata.csv", keep_default_na=False)
@@ -165,6 +171,39 @@ class TestBuild(unittest.TestCase):
             fasta_ids = {h.split("|")[0] if h.startswith("EPI_ISL_") else h.split("_")[0]
                          for h in fasta_headers(self.outdir / f"{ds}.fasta")}
             self.assertEqual(meta_ids, fasta_ids)
+
+
+class TestBuildWithUnknownInClade(unittest.TestCase):
+    """An isolate with no pathotype call but clade 2.3.4.4b is still HPAI context."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        tmp = Path(cls.tmp.name)
+        cls.outdir = tmp / "out"
+        # blank Pathogenicity, clade recorded, and no cleavage read for it
+        context = CONTEXT + [("EPI_ISL_20060010", "", "2.3.4.4b")]
+        paths = write_fixture(tmp, context)
+        cls.counts = build_all(*[str(p) for p in paths], FOCUS, str(cls.outdir))
+        cls.report = (cls.outdir / "dataset_report.txt").read_text()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def test_it_is_in_the_hpai_dataset(self):
+        ids = {h.split("|")[0] for h in fasta_headers(self.outdir / "hpai.fasta")
+               if h.startswith("EPI_ISL_")}
+        self.assertIn("EPI_ISL_20060010", ids)
+
+    def test_it_is_not_in_the_lpai_dataset(self):
+        ids = {h.split("|")[0] for h in fasta_headers(self.outdir / "lpai.fasta")
+               if h.startswith("EPI_ISL_")}
+        self.assertNotIn("EPI_ISL_20060010", ids)
+
+    def test_the_report_counts_it_among_the_unknown_that_are_still_hpai_context(self):
+        self.assertIn("EPI_ISL_20060010", self.report)
+        self.assertIn("1 of them carry clade 2.3.4.4b", self.report)
 
 
 class TestBuildWithOverlap(unittest.TestCase):

@@ -151,7 +151,8 @@ def build_all(gisaid_meta, cleavage_csv, gisaid_fasta, own_fasta, own_meta, focu
 
     os.makedirs(outdir, exist_ok=True)
     counts = {"overlap": overlap, "unknown": sorted(set(groups["UNKNOWN"])),
-              "no_sequence": no_sequence}
+              "no_sequence": no_sequence,
+              "unknown_in_hpai": sorted(set(groups["UNKNOWN"]) & set(members["hpai"]))}
     indexed = meta.drop_duplicates("ID").set_index("ID")
     for name in DATASETS:
         ids = [i for i in members[name] if i in context_records]
@@ -176,10 +177,15 @@ def build_all(gisaid_meta, cleavage_csv, gisaid_fasta, own_fasta, own_meta, focu
         for name in DATASETS:
             fh.write(f"{name}: {counts[name]['context']} context + 1 focus "
                      f"= {counts[name]['total']}\n")
-        fh.write(f"\nUNKNOWN (no HA cleavage site call and no GISAID Pathogenicity; "
-                 f"in no dataset): {len(counts['unknown'])}\n")
+        unknown_in_hpai = sorted(set(counts["unknown"]) & set(members["hpai"]))
+        fh.write(f"\nUNKNOWN (no pathotype call: neither an HA cleavage site read nor a "
+                 f"GISAID Pathogenicity): {len(counts['unknown'])}\n")
+        fh.write(f"  They are not LPAI context, but HPAI membership is by clade, so "
+                 f"{len(unknown_in_hpai)} of them carry clade {HPAI_CLADE} and ARE in the "
+                 f"HPAI and combined datasets.\n")
         for i in counts["unknown"]:
-            fh.write(f"  {i}\n")
+            mark = f"  (in HPAI context: clade {HPAI_CLADE})" if i in unknown_in_hpai else ""
+            fh.write(f"  {i}{mark}\n")
         if no_sequence:
             fh.write(f"\nSelected but absent from the FASTA: {len(no_sequence)}\n")
             for i in no_sequence:
