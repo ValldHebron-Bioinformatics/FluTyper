@@ -28,6 +28,7 @@ include { PhyloGeography            } from './modules/phylogeny/PhyloGeography'
 include { AuspiceEnvCheck; auspiceEnvHelp } from './modules/phylogeny/AuspiceEnvCheck'
 include {
     PHYLOGENETICS as PHYLOGENETICS_H3N2; PHYLOGENETICS as PHYLOGENETICS_H1N1PDM09;
+    PHYLOGENETICS as PHYLOGENETICS_H5;
     parseAaPositions; parseAaPositionsFile; validatePhyloParams; resolvePhyloConfig; phyloSubtypeTag
 } from './subworkflows/Phylogenetics'
 
@@ -67,6 +68,7 @@ workflow {
     def phylo_subtypes = []
     def phylo_positions_h3n2 = []
     def phylo_positions_h1n1 = []
+    def phylo_positions_h5 = []
     if (run_phylogenetics) {
         def phylo_errors = validatePhyloParams(params)
         if (phylo_errors) {
@@ -80,6 +82,7 @@ workflow {
         }
         phylo_positions_h3n2 = parseAaPositions(params.aaPositions, params.aaGene)
         phylo_positions_h1n1 = parseAaPositions(params.aaPositionsH1n1, params.aaGene)
+        phylo_positions_h5 = parseAaPositions(params.aaPositionsH5, params.aaGene)
         // --aa-positions-file replaces --aa-positions/--aa-positions-h1n1 (and the aaPositions default) for the
         // subtypes it actually has rows for; a subtype it never mentions keeps its --aa-positions(-h1n1) value
         if (params.aaPositionsFile) {
@@ -90,6 +93,7 @@ workflow {
             }
             if (file_positions.containsKey('H3N2'))      phylo_positions_h3n2 = file_positions['H3N2']
             if (file_positions.containsKey('H1N1pdm09')) phylo_positions_h1n1 = file_positions['H1N1pdm09']
+            if (file_positions.containsKey('H5'))        phylo_positions_h5 = file_positions['H5']
         }
         // The flat phyloReference/phyloReferenceFallback/phyloRootStrains/phyloOutgroup params are H3N2-only
         // overrides (see resolvePhyloConfig()): warn if they were changed from their built-in default but H3N2 isn't requested
@@ -321,6 +325,7 @@ workflow {
     // PHYLOGENETICS (OPTIONAL, --phylogenetics): one annotated whole-genome tree per requested --phyloSubtype
     ch_phylogeny_h3n2 = channel.empty()
     ch_phylogeny_h1n1 = channel.empty()
+    ch_phylogeny_h5 = channel.empty()
     ch_phylo_errors = channel.empty()
     ch_phylo_report = channel.empty()
     ch_phylo_tree_problems = channel.empty()
@@ -468,6 +473,32 @@ workflow {
             ch_phylo_tree_problems = ch_phylo_tree_problems.mix(PHYLOGENETICS_H1N1PDM09.out.tree_problems)
             ch_auspice = ch_auspice.mix(PHYLOGENETICS_H1N1PDM09.out.auspice)
         }
+        // AVIAN: one H5 tree per segment. phyloSubtypeTag('H5') is 'H5', which phyloSubtypeMatches()
+        // compares against the H tag alone, so H5N1/H5N2/H5N3/H5N4 and samples whose N was never
+        // called (H5Nx) all enter the same tree.
+        if ('H5' in phylo_subtypes) {
+            def cfg_h5 = resolvePhyloConfig('H5', params)
+            PHYLOGENETICS_H5(
+                PhyloGenotypingInfo_ch,
+                PhyloSampleDirs_ch,
+                PhyloNextcladeResults_ch,
+                GetDatasets.out,
+                final_metadata_ch,
+                phylo_positions_h5.collect { pos -> pos.label },
+                'H5',
+                phyloSubtypeTag('H5'),
+                cfg_h5.reference,
+                cfg_h5.referenceFallback,
+                cfg_h5.rootStrains,
+                cfg_h5.outgroup,
+                ch_auspice_geography
+            )
+            ch_phylogeny_h5 = PHYLOGENETICS_H5.out.outputs
+            ch_phylo_errors = ch_phylo_errors.mix(PHYLOGENETICS_H5.out.errors)
+            ch_phylo_report = ch_phylo_report.mix(PHYLOGENETICS_H5.out.report)
+            ch_phylo_tree_problems = ch_phylo_tree_problems.mix(PHYLOGENETICS_H5.out.tree_problems)
+            ch_auspice = ch_auspice.mix(PHYLOGENETICS_H5.out.auspice)
+        }
         ch_phylo_errors = ch_phylo_errors.mix(ch_phylo_hist_errors)
     }
 
@@ -547,6 +578,7 @@ workflow {
     errors_merged = ErrorsMerged_ch
     phylogeny_h3n2 = ch_phylogeny_h3n2
     phylogeny_h1n1 = ch_phylogeny_h1n1
+    phylogeny_h5 = ch_phylogeny_h5
     auspice = ch_auspice
     nextclade_csv = GenotypingNextclade.out.sample_csv
 
@@ -638,6 +670,10 @@ output {
     }
     phylogeny_h1n1 {
         path { "${projectDir}/../${params.outDir}/phylogeny/H1N1pdm09" }
+        mode "copy"
+    }
+    phylogeny_h5 {
+        path { "${projectDir}/../${params.outDir}/phylogeny/H5" }
         mode "copy"
     }
     // --auspice: flutyper_<subtype>_<segment>.json of every tree + lat_longs_resolved.tsv, all in one folder so that

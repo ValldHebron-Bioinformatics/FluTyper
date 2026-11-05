@@ -1,0 +1,48 @@
+nextflow_pipeline {
+
+    name "Test Pipeline Phylogenetics AVIAN"
+    script "nf_pipeline/main.nf"
+
+    test("AVIAN H5: segment trees are built under the AVIAN protocol") {
+
+        when {
+            params {
+                protocol = "AVIAN"
+                protocols = [
+                    AVIAN: [
+                        directory: "${projectDir}/protocols/AVIAN",
+                        resources: "${projectDir}/protocols/AVIAN/v1"
+                    ]
+                ]
+                inputFasta = "${projectDir}/tests/data/AVIAN_phylo.fasta"
+                outDir = "tests/results/phylo_avian_1"
+                metadata = "${projectDir}/tests/data/avianmetadata.csv"
+                phylogenetics = true
+                auspice = false
+                phyloSubtype = "H5"
+                phyloWholeGenome = false
+                phyloSegmentTrees = "HA,NP"
+                bootstrap = 0
+                width = 6
+                height = 5
+                dpi = 72
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def outputDir = path("$baseDir/tests/results/phylo_avian_1")
+            // The H5 branch has to exist in main.nf, and its outputs have to be published
+            // under phylogeny/H5 by an output target of their own
+            ["HA", "NP"].each { seg ->
+                assert outputDir.resolve("phylogeny/H5/${seg}/tree.nwk").exists() :
+                    "phylogeny/H5/${seg}/tree.nwk was not published"
+            }
+            // H5 matches on the H tag alone, so SIXSEG (no NA segment, subtype H5Nx) is a tip
+            assert outputDir.resolve("phylogeny/H5/HA/tree.nwk").text.contains("SIXSEG")
+            assert workflow.stdout.any { it.startsWith("PHYLOGENETICS(H5):") }
+        }
+    }
+
+}
