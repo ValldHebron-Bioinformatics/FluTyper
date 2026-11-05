@@ -25,6 +25,7 @@ CONTEXT = [
     ("EPI_ISL_20060007", "HPAI", "2.3.4.4b"),
     ("EPI_ISL_20060008", "HPAI", ""),      # field says HPAI, the call says LPAI
 ]
+# the cleavage read per sample, as scripts/ha_cleavage_site.py writes it
 CALLS = {"EPI_ISL_20060005": "LPAI", "EPI_ISL_20060008": "LPAI", "25CR6244": "LPAI"}
 FOCUS = "25CR6244"
 FOCUS_SEGMENTS = ["HA", "PB2", "PB1", "NP", "MP", "NS"]
@@ -43,11 +44,11 @@ def write_fixture(tmp, context):
         for iid, patho, clade in context:
             fh.write(f"{iid},2025-07-01,Malmo,Sweden,Mallard,A / H5N3,{patho},{clade},,,,Some Lab\n")
 
-    patho_csv = tmp / "inferred_subtypes.csv"
+    patho_csv = tmp / "ha_cleavage.csv"
     with open(patho_csv, "w") as fh:
-        fh.write("Sample_ID,inferred_subtype,pathotype,Season,LOCATION\n")
+        fh.write("ID,cleavage_motif,pathotype_cleavage,basic_p1_p5,cleavage_reason\n")
         for sid, call in CALLS.items():
-            fh.write(f"{sid},H5N3,{call},Season 2025-2026,Malmo\n")
+            fh.write(f"{sid},PQRETR/GLF,{call},2,monobasic cleavage site\n")
 
     gisaid_fasta = tmp / "gisaid.fasta"
     with open(gisaid_fasta, "w") as fh:
@@ -68,21 +69,31 @@ def write_fixture(tmp, context):
 
 
 class TestClassify(unittest.TestCase):
-    def test_own_pathotype_call_wins_over_the_gisaid_field(self):
+    """classify() follows the HA cleavage site read, which is a reading of the sequence."""
+
+    def test_the_cleavage_read_wins_over_the_gisaid_field(self):
         row = {"ID": "EPI_ISL_1", "PATHOGENICITY": "HPAI", "CLADE": "2.3.4.4b"}
         self.assertEqual(classify(row, {"EPI_ISL_1": "LPAI"}), "LPAI")
 
-    def test_blank_gisaid_field_is_resolved_by_the_call(self):
+    def test_blank_gisaid_field_is_resolved_by_the_cleavage_read(self):
         row = {"ID": "EPI_ISL_2", "PATHOGENICITY": "", "CLADE": ""}
         self.assertEqual(classify(row, {"EPI_ISL_2": "LPAI"}), "LPAI")
 
-    def test_no_call_and_no_field_is_unknown_never_assumed(self):
+    def test_no_read_and_no_field_is_unknown_never_assumed(self):
         row = {"ID": "EPI_ISL_3", "PATHOGENICITY": "", "CLADE": ""}
         self.assertEqual(classify(row, {}), "UNKNOWN")
 
-    def test_a_blank_call_does_not_override_the_gisaid_field(self):
+    def test_an_indeterminate_read_falls_back_to_the_gisaid_field(self):
         row = {"ID": "EPI_ISL_4", "PATHOGENICITY": "HPAI", "CLADE": "2.3.4.4b"}
-        self.assertEqual(classify(row, {"EPI_ISL_4": ""}), "HPAI")
+        self.assertEqual(classify(row, {"EPI_ISL_4": "indeterminate"}), "HPAI")
+
+    def test_an_indeterminate_read_with_no_field_is_unknown_not_lpai(self):
+        row = {"ID": "EPI_ISL_5", "PATHOGENICITY": "", "CLADE": ""}
+        self.assertEqual(classify(row, {"EPI_ISL_5": "indeterminate"}), "UNKNOWN")
+
+    def test_a_blank_read_does_not_override_the_gisaid_field(self):
+        row = {"ID": "EPI_ISL_6", "PATHOGENICITY": "HPAI", "CLADE": "2.3.4.4b"}
+        self.assertEqual(classify(row, {"EPI_ISL_6": ""}), "HPAI")
 
 
 class TestBuild(unittest.TestCase):
@@ -167,10 +178,10 @@ class TestBuildWithOverlap(unittest.TestCase):
         context = CONTEXT + [("EPI_ISL_20060009", "", "2.3.4.4b")]
         calls = dict(CALLS, **{"EPI_ISL_20060009": "LPAI"})
         paths = list(write_fixture(tmp, context))
-        with open(paths[1], "w") as fh:   # rewrite the pathotype table with the extra call
-            fh.write("Sample_ID,inferred_subtype,pathotype,Season,LOCATION\n")
+        with open(paths[1], "w") as fh:   # rewrite the cleavage table with the extra read
+            fh.write("ID,cleavage_motif,pathotype_cleavage,basic_p1_p5,cleavage_reason\n")
             for sid, call in calls.items():
-                fh.write(f"{sid},H5N3,{call},Season 2025-2026,Malmo\n")
+                fh.write(f"{sid},PQRETR/GLF,{call},2,monobasic cleavage site\n")
         cls.counts = build_all(*[str(p) for p in paths], FOCUS, str(cls.outdir))
 
     @classmethod

@@ -9,11 +9,13 @@ sample so that its position can be read against both contexts:
   combined  the union of the two, which is the dataset that can actually show a focus
             segment sitting inside the HPAI clade
 
-The pathotype of an isolate is FluTyper's own call when the pipeline made one, and GISAID's
-Pathogenicity field only when it did not. An isolate with neither is UNKNOWN: it joins no
-dataset and is listed in dataset_report.txt, never assigned to one by assumption.
+The pathotype of an isolate is the HA cleavage site read (scripts/ha_cleavage_site.py) when
+that read produced a call, and GISAID's Pathogenicity field only when it did not. A cleavage
+site that could not be read is 'indeterminate', which is not a call. An isolate with neither
+is UNKNOWN: it joins no dataset and is listed in dataset_report.txt, never assigned by
+assumption.
 
-Usage: build_phylo_datasets.py <gisaid_meta.csv> <pathotype.csv> <gisaid.fasta> \
+Usage: build_phylo_datasets.py <gisaid_meta.csv> <ha_cleavage.csv> <gisaid.fasta> \
                                <own.fasta> <own_meta.csv> <focus_id> <outdir>
 """
 import os
@@ -30,12 +32,13 @@ META_COLUMNS = ["ID", "DATE", "LOCATION", "COUNTRY", "HOST", "SUBTYPE", "PATHOGE
                 "CLADE", "GENOTYPE", "AGE GROUP", "SEX", "ORIGINATING_LAB"]
 
 
-def classify(row, called):
+def classify(row, cleavage_by_id):
     """'LPAI', 'HPAI' or 'UNKNOWN' for one metadata row.
 
-    FluTyper's own call wins: it is computed from the HA cleavage site of this very
-    sequence, while GISAID's Pathogenicity is whatever the submitter recorded."""
-    call = str(called.get(str(row.get("ID", "")).strip(), "") or "").strip().upper()
+    The HA cleavage site read wins: it is read off this very sequence, while GISAID's
+    Pathogenicity is whatever the submitter recorded. 'indeterminate' is not a call, so the
+    GISAID field is used for those, and an isolate with neither stays UNKNOWN."""
+    call = str(cleavage_by_id.get(str(row.get("ID", "")).strip(), "") or "").strip().upper()
     if call in ("LPAI", "HPAI"):
         return call
     field = str(row.get("PATHOGENICITY", "") or "").strip().upper()
@@ -61,13 +64,19 @@ def read_table(path):
     return df
 
 
+# Pathotype column names accepted in the cleavage table, best first
+PATHOTYPE_COLUMNS = ("pathotype_cleavage", "pathotype", "pathogenicity")
+
+
 def read_calls(path):
-    """FluTyper's pathotype per sample, from the pipeline's inferred_subtypes.csv."""
+    """The HA cleavage site pathotype per sample (scripts/ha_cleavage_site.py output)."""
     df = read_table(path)
     id_col = _id_column(df, path)
-    patho = next((c for c in df.columns if c.lower() == "pathotype"), None)
+    lower = {c.lower(): c for c in df.columns}
+    patho = next((lower[name] for name in PATHOTYPE_COLUMNS if name in lower), None)
     if patho is None:
-        sys.exit(f"{path}: no 'pathotype' column. Columns: {list(df.columns)}")
+        sys.exit(f"{path}: no pathotype column (looked for "
+                 f"{', '.join(PATHOTYPE_COLUMNS)}). Columns: {list(df.columns)}")
     return dict(zip(df[id_col], df[patho]))
 
 
@@ -95,7 +104,7 @@ def read_fasta_by_id(path, key_fn, wanted=None):
     return records
 
 
-def build_all(gisaid_meta, pathotype_csv, gisaid_fasta, own_fasta, own_meta, focus_id, outdir):
+def build_all(gisaid_meta, cleavage_csv, gisaid_fasta, own_fasta, own_meta, focus_id, outdir):
     """Write the three datasets into outdir and return their counts."""
     meta = read_table(gisaid_meta)
     meta_id = _id_column(meta, gisaid_meta)
@@ -104,7 +113,7 @@ def build_all(gisaid_meta, pathotype_csv, gisaid_fasta, own_fasta, own_meta, foc
     for col in META_COLUMNS:
         if col not in meta.columns:
             meta[col] = ""
-    calls = read_calls(pathotype_csv)
+    calls = read_calls(cleavage_csv)
 
     groups = {name: [] for name in ("LPAI", "HPAI", "UNKNOWN")}
     for row in meta.to_dict("records"):
@@ -157,7 +166,7 @@ def build_all(gisaid_meta, pathotype_csv, gisaid_fasta, own_fasta, own_meta, foc
 
     with open(os.path.join(outdir, "dataset_report.txt"), "w") as fh:
         fh.write(f"Focus sample: {focus_id} "
-                 f"(pathotype called: {focus_meta['PATHOGENICITY'] or 'none'}, "
+                 f"(cleavage pathotype: {focus_meta['PATHOGENICITY'] or 'none'}, "
                  f"{len(focus_records) // 2} segments)\n")
         fh.write(f"Classified: LPAI {len(set(groups['LPAI']))}, "
                  f"clade {HPAI_CLADE} {len(set(hpai_ids))}, "
@@ -167,7 +176,7 @@ def build_all(gisaid_meta, pathotype_csv, gisaid_fasta, own_fasta, own_meta, foc
         for name in DATASETS:
             fh.write(f"{name}: {counts[name]['context']} context + 1 focus "
                      f"= {counts[name]['total']}\n")
-        fh.write(f"\nUNKNOWN (no FluTyper pathotype call and no GISAID Pathogenicity; "
+        fh.write(f"\nUNKNOWN (no HA cleavage site call and no GISAID Pathogenicity; "
                  f"in no dataset): {len(counts['unknown'])}\n")
         for i in counts["unknown"]:
             fh.write(f"  {i}\n")
