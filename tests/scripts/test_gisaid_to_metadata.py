@@ -223,3 +223,68 @@ class TestGeocodeCache(unittest.TestCase):
             self._run(dies_after_three)
         self.assertTrue(self.cache.exists())
         self.assertGreater(len(json.loads(self.cache.read_text())["places"]), 0)
+
+
+class TestOfflineMode(unittest.TestCase):
+    """--no-geocode: build the metadata without Nominatim at all.
+
+    PhyloGeography resolves country, division and coordinates offline from GeoNames using
+    LOCATION and COUNTRY, so the Auspice map never needs Nominatim. Offline mode keeps the
+    deepest level GISAID wrote and leaves the coordinates table empty rather than guessing.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        tmp = Path(self.tmp.name)
+        rows = pandas.read_csv(FIXTURE, dtype=str, keep_default_na=False)
+        self.fasta = tmp / "sequences.fasta"
+        with open(self.fasta, "w") as fh:
+            for _, r in rows.iterrows():
+                fh.write(f">{r['Isolate_Id']}|HA|{r['Collection_Date']}|"
+                         f"{r['Isolate_Name']}|Some_Reference_Lab\nACGT\n")
+        self.out_csv = tmp / "meta.csv"
+        self.out_tsv = tmp / "coords.tsv"
+
+        def forbidden(params):
+            raise AssertionError(f"offline mode must not query Nominatim (got {params})")
+
+        g2m._nominatim = forbidden
+        g2m._cache.clear()
+        g2m._country_codes.clear()
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            g2m.main(str(FIXTURE), str(self.fasta), str(self.out_csv), str(self.out_tsv),
+                     None, False)
+        self.stderr = err.getvalue()
+        self.meta = pandas.read_csv(self.out_csv, keep_default_na=False)
+
+    def tearDown(self):
+        g2m._nominatim = ORIGINAL_NOMINATIM
+        self.tmp.cleanup()
+
+    def test_every_row_survives_without_a_single_lookup(self):
+        self.assertEqual(len(self.meta), 12)
+
+    def test_location_is_the_deepest_level_gisaid_wrote(self):
+        by_id = self.meta.set_index("ID")
+        self.assertEqual(by_id.loc["EPI_ISL_20060001", "LOCATION"], "Vardo")
+        self.assertEqual(by_id.loc["EPI_ISL_20060008", "LOCATION"], "Nowhereville")
+
+    def test_a_location_with_no_city_level_keeps_its_country(self):
+        by_id = self.meta.set_index("ID")
+        self.assertEqual(by_id.loc["EPI_ISL_20060006", "LOCATION"], "Netherlands")
+        self.assertEqual(by_id.loc["EPI_ISL_20060006", "COUNTRY"], "Netherlands")
+
+    def test_country_is_the_country_level(self):
+        by_id = self.meta.set_index("ID")
+        self.assertEqual(by_id.loc["EPI_ISL_20060001", "COUNTRY"], "Norway")
+        self.assertEqual(by_id.loc["EPI_ISL_20060009", "COUNTRY"], "Spain")
+
+    def test_no_coordinate_row_is_invented(self):
+        coords = pandas.read_csv(self.out_tsv, sep="\t")
+        self.assertEqual(len(coords), 0)
+        self.assertEqual(list(coords.columns),
+                         ["Comunidad", "Provincia", "Población", "Latitud", "Longitud", "Altitud"])
+
+    def test_it_says_coordinates_were_not_resolved(self):
+        self.assertIn("no-geocode", self.stderr)

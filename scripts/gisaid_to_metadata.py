@@ -18,8 +18,14 @@ Places are geocoded with OpenStreetMap Nominatim (place names only, 1 query/s).
 Every Nominatim lookup is cached on disk (out.csv.geocache.json by default), so a run that
 is interrupted - or hits a Nominatim outage - does not pay for the same lookups twice.
 
-Usage: gisaid_to_metadata.py gisaid_epiflu_isolates.xls sequences.fasta out.csv out.tsv \
-                             [geocache.json]
+With --no-geocode nothing is looked up: LOCATION keeps the deepest level GISAID wrote,
+COUNTRY is the country level, and the coordinates table is left empty. That is enough for
+the Auspice map, which resolves country, division and coordinates offline from GeoNames
+(see nf_pipeline/modules/phylogeny/PhyloGeography.nf), and it is the mode to use when
+Nominatim is unavailable.
+
+Usage: gisaid_to_metadata.py [--no-geocode] gisaid_epiflu_isolates.xls sequences.fasta \
+                             out.csv out.tsv [geocache.json]
 """
 import json
 import os
@@ -137,7 +143,7 @@ def geocode(name, country):
     return _cache[key]
 
 
-def parse_location(loc):
+def parse_location(loc, lookup=True):
     """'Europe / Spain / Galicia / Pontevedra / Vigo' -> (place, region, country, geocoded).
 
     place is the deepest level that geocodes. When no level geocodes, place is the deepest
@@ -149,9 +155,10 @@ def parse_location(loc):
     levels = [x.title() if x.isupper() else x for x in levels if x and not x.islower() and not x.isdigit()]
     country = levels[1] if len(levels) > 1 else levels[0]
     region = levels[2] if len(levels) > 2 else country
-    for place in reversed(levels[1:]):
-        if geocode(place, country):
-            return place, region, country, True
+    if lookup:
+        for place in reversed(levels[1:]):
+            if geocode(place, country):
+                return place, region, country, True
     return (levels[-1] if levels else ""), region, country, False
 
 
@@ -170,7 +177,10 @@ def age_group(age, unit):
     return ">65"
 
 
-def main(xls, fasta, out_csv, out_tsv, cache_path=None):
+def main(xls, fasta, out_csv, out_tsv, cache_path=None, geocode_places=True):
+    if not geocode_places:
+        _convert(xls, fasta, out_csv, out_tsv, geocode_places=False)
+        return
     if cache_path is None:
         cache_path = f"{out_csv}.geocache.json"
     load_cache(cache_path)
@@ -180,11 +190,11 @@ def main(xls, fasta, out_csv, out_tsv, cache_path=None):
         save_cache(cache_path)
         sys.exit(f"gisaid_to_metadata: Nominatim is unavailable ({exc}). The lookups already "
                  f"resolved are cached in {cache_path}; rerun the same command to continue "
-                 f"from there.")
+                 f"from there, or pass --no-geocode to build the metadata without it.")
     save_cache(cache_path)
 
 
-def _convert(xls, fasta, out_csv, out_tsv):
+def _convert(xls, fasta, out_csv, out_tsv, geocode_places=True):
     labs = {}
     with open(fasta) as fh:
         for line in fh:
@@ -199,7 +209,8 @@ def _convert(xls, fasta, out_csv, out_tsv):
     if missing:
         print(f"WARNING: {len(missing)} FASTA IDs not in the GISAID table", file=sys.stderr)
 
-    places = {loc: parse_location(loc) for loc in g["Location"].dropna().unique()}
+    places = {loc: parse_location(loc, lookup=geocode_places)
+              for loc in g["Location"].dropna().unique()}
     geo = g["Location"].map(places)
 
     # A date column read from a real .xls arrives as a Timestamp; write it back as YYYY-MM-DD.
@@ -225,16 +236,16 @@ def _convert(xls, fasta, out_csv, out_tsv):
     # map level: Población == Comunidad) and per lab. Población must stay unique, so a country already present as a
     # place/region row (same name) is not added again.
     rows = {}
-    for place, region, country, _ok in places.values():
+    for place, region, country, _ok in (places.values() if geocode_places else []):
         for name in (place, region):
             if name and name not in rows and geocode(name, country):
                 rows[name] = (country, region, name, *geocode(name, country))
-    for _, _, country, _ok in places.values():
+    for _, _, country, _ok in (places.values() if geocode_places else []):
         if country not in rows and geocode(country, country):
             rows[country] = (country, "", country, *geocode(country, country))
     lab_place = (pd.DataFrame({"lab": meta["ORIGINATING_LAB"], "geo": geo})
                  .dropna().query("lab != ''").groupby("lab")["geo"].agg(lambda s: s.mode()[0]))
-    for lab, (place, region, country, ok) in lab_place.items():
+    for lab, (place, region, country, ok) in (lab_place.items() if geocode_places else []):
         if place and ok:
             if lab not in rows:
                 rows[lab] = (country, region, lab, *geocode(place, country))
@@ -242,12 +253,21 @@ def _convert(xls, fasta, out_csv, out_tsv):
     coords["Altitud"] = ""
     coords.to_csv(out_tsv, sep="\t", index=False)
 
+    if not geocode_places:
+        print("WARNING: --no-geocode: no place was looked up, so LOCATION is the deepest "
+              "level GISAID wrote and the coordinates table is empty. The Auspice map "
+              "resolves coordinates from GeoNames (PhyloGeography) and does not need it.",
+              file=sys.stderr)
+        return
+
     unresolved = [loc for loc, (_, _, _, ok) in places.items() if not ok]
     if unresolved:
         print(f"WARNING: could not geocode {unresolved}", file=sys.stderr)
 
 
 if __name__ == "__main__":
-    if len(sys.argv) not in (5, 6):
+    args = [a for a in sys.argv[1:] if a != "--no-geocode"]
+    offline = "--no-geocode" in sys.argv[1:]
+    if len(args) not in (4, 5):
         sys.exit(__doc__)
-    main(*sys.argv[1:])
+    main(*args, *([] if len(args) == 5 else [None]), geocode_places=not offline)
