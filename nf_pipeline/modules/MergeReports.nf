@@ -23,7 +23,7 @@ process MergeReports {
     PHYLO_REPORT_RE = re.compile(r'^phylogenetictreereport(?:_(?P<tag>.+))?\$', re.IGNORECASE)
     # Keep in sync with subworkflows/Phylogenetics.nf's phyloKnownSubtypes() (Groovy/Python, so not shareable
     # directly): both lists gate which subtypes the pipeline and this dashboard recognise.
-    PHYLO_KNOWN_SUBTYPES = ["H1N1pdm09", "H3N2"]  # neither is a prefix of the other's "_SEGMENT" suffix
+    PHYLO_KNOWN_SUBTYPES = ["H1N1pdm09", "H3N2", "H5"]  # none is a prefix of another's "_SEGMENT" suffix
 
     def split_subtype_tree(tag):
         # "H3N2" (whole genome) -> ("H3N2", "Whole genome"); "H3N2_HA" (segment tree) -> ("H3N2", "HA")
