@@ -65,4 +65,33 @@ nextflow_process {
             assert HA.text.contains("atggagaacatagtacttcttcttgcaatagt")
         }
     }
+
+    test("A header whose originating-lab field has a comma and a quote keeps every segment") {
+
+        when {
+            params {
+                inputFasta = "${projectDir}/tests/data/comma_header/EPI_ISL_90000001.fasta"
+            }
+            process {
+                """
+                input[0] = "EPI_ISL_90000001"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def out_dir = path(process.out.results[0][1])
+            // seqkit grep -p takes its pattern as a comma-separated LIST, so a header with a
+            // comma in it matched nothing and the segment file was written empty - no error,
+            // no warning, the sample silently lost that segment.
+            ["PB2", "PB1", "PA", "HA", "NP", "NA", "MP", "NS"].each { seg ->
+                def f = out_dir.resolve("segments/EPI_ISL_90000001_${seg}.fasta")
+                assert f.exists() : "segments/EPI_ISL_90000001_${seg}.fasta was not written"
+                assert f.text.readLines().findAll { !it.startsWith(">") && it.trim() }.size() > 0 :
+                    "segments/EPI_ISL_90000001_${seg}.fasta has a header but no sequence"
+                assert f.text.contains("EPI_ISL_90000001|${seg}|") : f.text.take(200)
+            }
+        }
+    }
 }
