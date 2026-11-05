@@ -1,0 +1,186 @@
+#!/usr/bin/env python3
+"""Build the H5 context datasets for a reassortment screen.
+
+Three datasets, each a FASTA plus a FluTyper --metadata CSV, each one containing the focus
+sample so that its position can be read against both contexts:
+
+  lpai      every isolate classified LPAI
+  hpai      every isolate whose GISAID CLADE is 2.3.4.4b
+  combined  the union of the two, which is the dataset that can actually show a focus
+            segment sitting inside the HPAI clade
+
+The pathotype of an isolate is FluTyper's own call when the pipeline made one, and GISAID's
+Pathogenicity field only when it did not. An isolate with neither is UNKNOWN: it joins no
+dataset and is listed in dataset_report.txt, never assigned to one by assumption.
+
+Usage: build_phylo_datasets.py <gisaid_meta.csv> <pathotype.csv> <gisaid.fasta> \
+                               <own.fasta> <own_meta.csv> <focus_id> <outdir>
+"""
+import os
+import sys
+
+import pandas as pd
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from gisaid_to_metadata import isolate_key  # noqa: E402
+
+HPAI_CLADE = "2.3.4.4b"
+DATASETS = ("lpai", "hpai", "combined")
+META_COLUMNS = ["ID", "DATE", "LOCATION", "COUNTRY", "HOST", "SUBTYPE", "PATHOGENICITY",
+                "CLADE", "GENOTYPE", "AGE GROUP", "SEX", "ORIGINATING_LAB"]
+
+
+def classify(row, called):
+    """'LPAI', 'HPAI' or 'UNKNOWN' for one metadata row.
+
+    FluTyper's own call wins: it is computed from the HA cleavage site of this very
+    sequence, while GISAID's Pathogenicity is whatever the submitter recorded."""
+    call = str(called.get(str(row.get("ID", "")).strip(), "") or "").strip().upper()
+    if call in ("LPAI", "HPAI"):
+        return call
+    field = str(row.get("PATHOGENICITY", "") or "").strip().upper()
+    if field in ("LPAI", "HPAI"):
+        return field
+    return "UNKNOWN"
+
+
+def _id_column(df, where):
+    for c in df.columns:
+        if c.lower().replace("_", "").replace(" ", "") in ("id", "sampleid"):
+            return c
+    sys.exit(f"{where}: no sample ID column ('ID', 'Sample_ID' or 'SampleID'). "
+             f"Columns: {list(df.columns)}")
+
+
+def read_table(path):
+    """Read a CSV whose header and values may carry stray spaces, as text throughout."""
+    df = pd.read_csv(path, dtype=str, keep_default_na=False)
+    df.columns = [str(c).strip() for c in df.columns]
+    for c in df.columns:
+        df[c] = df[c].astype(str).str.strip()
+    return df
+
+
+def read_calls(path):
+    """FluTyper's pathotype per sample, from the pipeline's inferred_subtypes.csv."""
+    df = read_table(path)
+    id_col = _id_column(df, path)
+    patho = next((c for c in df.columns if c.lower() == "pathotype"), None)
+    if patho is None:
+        sys.exit(f"{path}: no 'pathotype' column. Columns: {list(df.columns)}")
+    return dict(zip(df[id_col], df[patho]))
+
+
+def gisaid_record_id(header):
+    return isolate_key(header.split("|")[0])
+
+
+def own_record_id(header):
+    return header.split("|")[0].split("_")[0]
+
+
+def read_fasta_by_id(path, key_fn, wanted=None):
+    """Group a FASTA's records by sample, keeping each record's header and sequence verbatim."""
+    records, current = {}, None
+    with open(path) as fh:
+        for line in fh:
+            if line.startswith(">"):
+                key = key_fn(line[1:].strip())
+                current = None if (wanted is not None and key not in wanted) else \
+                    records.setdefault(key, [])
+                if current is not None:
+                    current.append(line.rstrip("\n"))
+            elif current is not None:
+                current.append(line.rstrip("\n"))
+    return records
+
+
+def build_all(gisaid_meta, pathotype_csv, gisaid_fasta, own_fasta, own_meta, focus_id, outdir):
+    """Write the three datasets into outdir and return their counts."""
+    meta = read_table(gisaid_meta)
+    meta_id = _id_column(meta, gisaid_meta)
+    if meta_id != "ID":
+        meta = meta.rename(columns={meta_id: "ID"})
+    for col in META_COLUMNS:
+        if col not in meta.columns:
+            meta[col] = ""
+    calls = read_calls(pathotype_csv)
+
+    groups = {name: [] for name in ("LPAI", "HPAI", "UNKNOWN")}
+    for row in meta.to_dict("records"):
+        groups[classify(row, calls)].append(row["ID"])
+    hpai_ids = [row["ID"] for row in meta.to_dict("records")
+                if row.get("CLADE", "").strip() == HPAI_CLADE]
+
+    members = {
+        "lpai": list(dict.fromkeys(groups["LPAI"])),
+        "hpai": list(dict.fromkeys(hpai_ids)),
+    }
+    members["combined"] = list(dict.fromkeys(members["lpai"] + members["hpai"]))
+    overlap = len(set(members["lpai"]) & set(members["hpai"]))
+
+    # Focus sample: its own records and its own metadata row, with the pathotype FluTyper
+    # called for it. It is the sample under investigation, so it is in every dataset.
+    focus_records = read_fasta_by_id(own_fasta, own_record_id, {focus_id}).get(focus_id)
+    if not focus_records:
+        sys.exit(f"{own_fasta}: no records for the focus sample {focus_id}.")
+    own = read_table(own_meta)
+    own = own.rename(columns={_id_column(own, own_meta): "ID"})
+    focus_rows = own[own["ID"] == focus_id]
+    if focus_rows.empty:
+        sys.exit(f"{own_meta}: no metadata row for the focus sample {focus_id}.")
+    focus_meta = {col: "" for col in META_COLUMNS}
+    for col in META_COLUMNS:
+        if col in focus_rows.columns:
+            focus_meta[col] = focus_rows.iloc[0][col]
+    focus_meta["ID"] = focus_id
+    focus_meta["PATHOGENICITY"] = str(calls.get(focus_id, "")).strip()
+
+    wanted = set(members["combined"])
+    context_records = read_fasta_by_id(gisaid_fasta, gisaid_record_id, wanted)
+    no_sequence = sorted(wanted - set(context_records))
+
+    os.makedirs(outdir, exist_ok=True)
+    counts = {"overlap": overlap, "unknown": sorted(set(groups["UNKNOWN"])),
+              "no_sequence": no_sequence}
+    indexed = meta.drop_duplicates("ID").set_index("ID")
+    for name in DATASETS:
+        ids = [i for i in members[name] if i in context_records]
+        with open(os.path.join(outdir, f"{name}.fasta"), "w") as fh:
+            for i in ids:
+                fh.write("\n".join(context_records[i]) + "\n")
+            fh.write("\n".join(focus_records) + "\n")
+        rows = [dict(indexed.loc[i], ID=i) for i in ids] + [focus_meta]
+        pd.DataFrame(rows)[META_COLUMNS].to_csv(
+            os.path.join(outdir, f"{name}_metadata.csv"), index=False)
+        counts[name] = {"context": len(ids), "total": len(ids) + 1}
+
+    with open(os.path.join(outdir, "dataset_report.txt"), "w") as fh:
+        fh.write(f"Focus sample: {focus_id} "
+                 f"(pathotype called: {focus_meta['PATHOGENICITY'] or 'none'}, "
+                 f"{len(focus_records) // 2} segments)\n")
+        fh.write(f"Classified: LPAI {len(set(groups['LPAI']))}, "
+                 f"clade {HPAI_CLADE} {len(set(hpai_ids))}, "
+                 f"UNKNOWN {len(set(groups['UNKNOWN']))}\n")
+        fh.write(f"LPAI and clade {HPAI_CLADE} both: {overlap} "
+                 f"(counted once in combined)\n\n")
+        for name in DATASETS:
+            fh.write(f"{name}: {counts[name]['context']} context + 1 focus "
+                     f"= {counts[name]['total']}\n")
+        fh.write(f"\nUNKNOWN (no FluTyper pathotype call and no GISAID Pathogenicity; "
+                 f"in no dataset): {len(counts['unknown'])}\n")
+        for i in counts["unknown"]:
+            fh.write(f"  {i}\n")
+        if no_sequence:
+            fh.write(f"\nSelected but absent from the FASTA: {len(no_sequence)}\n")
+            for i in no_sequence:
+                fh.write(f"  {i}\n")
+    return counts
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 8:
+        sys.exit(__doc__)
+    result = build_all(*sys.argv[1:])
+    for dataset in DATASETS:
+        print(f"{dataset}: {result[dataset]['total']} samples")
