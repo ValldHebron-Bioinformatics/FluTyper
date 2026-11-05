@@ -15,11 +15,17 @@ ORIGINATING_LAB is not in the GISAID table, so it is taken from the last field
 of the FASTA headers (>ID|SEGMENT|DATE|NAME|LAB) of the same download.
 Places are geocoded with OpenStreetMap Nominatim (place names only, 1 query/s).
 
-Usage: gisaid_to_metadata.py gisaid_epiflu_isolates.xls sequences.fasta out.csv out.tsv
+Every Nominatim lookup is cached on disk (out.csv.geocache.json by default), so a run that
+is interrupted - or hits a Nominatim outage - does not pay for the same lookups twice.
+
+Usage: gisaid_to_metadata.py gisaid_epiflu_isolates.xls sequences.fasta out.csv out.tsv \
+                             [geocache.json]
 """
 import json
+import os
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -32,6 +38,14 @@ FIXES = {"Basqsue Country": "Basque Country", "Catalunya": "Catalonia",
 
 _cache = {}
 _country_codes = {}
+
+# Nominatim statuses worth another try: rate limiting and the transient server-side ones
+RETRY_STATUS = {429, 500, 502, 503, 504}
+MAX_ATTEMPTS = 5
+
+
+class GeocodeUnavailable(RuntimeError):
+    """Nominatim could not be reached or kept failing: no answer, as opposed to 'not found'."""
 
 # Columns copied straight from the export when present: metadata column -> export column
 PASSTHROUGH = {"HOST": "Host", "SUBTYPE": "Subtype", "PATHOGENICITY": "Pathogenicity",
@@ -55,12 +69,52 @@ def read_export(path):
 
 
 def _nominatim(params):
+    """One Nominatim query, retried with backoff.
+
+    An empty result list is an answer - the place is not in Nominatim - and returns None.
+    A transport or server error is not an answer: after MAX_ATTEMPTS it raises
+    GeocodeUnavailable rather than letting the caller record the place as 'not found'."""
     q = urllib.parse.urlencode({**params, "format": "json", "limit": 1, "addressdetails": 1})
     req = urllib.request.Request(f"https://nominatim.openstreetmap.org/search?{q}",
                                  headers={"User-Agent": "FluTyper-metadata/1.0"})
-    hits = json.load(urllib.request.urlopen(req, timeout=30))
-    time.sleep(1.1)  # Nominatim usage policy
-    return hits[0] if hits else None
+    last = None
+    for attempt in range(MAX_ATTEMPTS):
+        try:
+            hits = json.load(urllib.request.urlopen(req, timeout=30))
+            time.sleep(1.1)  # Nominatim usage policy
+            return hits[0] if hits else None
+        except urllib.error.HTTPError as exc:
+            last = f"HTTP Error {exc.code}: {exc.reason}"
+            if exc.code not in RETRY_STATUS:
+                raise GeocodeUnavailable(last)
+        except (urllib.error.URLError, TimeoutError, ValueError) as exc:
+            last = f"{type(exc).__name__}: {exc}"
+        if attempt < MAX_ATTEMPTS - 1:
+            time.sleep(2 ** (attempt + 1))
+    raise GeocodeUnavailable(f"{last}, still failing after {MAX_ATTEMPTS} attempts")
+
+
+def load_cache(path):
+    """Warm the in-memory lookup caches from a previous run's cache file, if there is one."""
+    if not path or not os.path.exists(path):
+        return
+    with open(path) as fh:
+        data = json.load(fh)
+    for key, value in data.get("places", {}).items():
+        name, _, country = key.partition("\t")
+        _cache[(name, country)] = tuple(value) if value else None
+    _country_codes.update(data.get("countries", {}))
+
+
+def save_cache(path):
+    """Persist every lookup made so far, including the ones that came back 'not found'."""
+    if not path:
+        return
+    data = {"places": {f"{name}\t{country}": (list(v) if v else None)
+                       for (name, country), v in _cache.items()},
+            "countries": _country_codes}
+    with open(path, "w") as fh:
+        json.dump(data, fh, indent=0, sort_keys=True)
 
 
 def country_code(country):
@@ -116,7 +170,21 @@ def age_group(age, unit):
     return ">65"
 
 
-def main(xls, fasta, out_csv, out_tsv):
+def main(xls, fasta, out_csv, out_tsv, cache_path=None):
+    if cache_path is None:
+        cache_path = f"{out_csv}.geocache.json"
+    load_cache(cache_path)
+    try:
+        _convert(xls, fasta, out_csv, out_tsv)
+    except GeocodeUnavailable as exc:
+        save_cache(cache_path)
+        sys.exit(f"gisaid_to_metadata: Nominatim is unavailable ({exc}). The lookups already "
+                 f"resolved are cached in {cache_path}; rerun the same command to continue "
+                 f"from there.")
+    save_cache(cache_path)
+
+
+def _convert(xls, fasta, out_csv, out_tsv):
     labs = {}
     with open(fasta) as fh:
         for line in fh:
@@ -180,6 +248,6 @@ def main(xls, fasta, out_csv, out_tsv):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 5:
+    if len(sys.argv) not in (5, 6):
         sys.exit(__doc__)
     main(*sys.argv[1:])
