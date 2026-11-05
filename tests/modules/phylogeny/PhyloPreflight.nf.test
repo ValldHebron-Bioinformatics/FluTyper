@@ -203,4 +203,62 @@ nextflow_process {
         }
     }
 
+    test("AVIAN H5: resolves all 8 segments and maps the H5/N1 CDS prefixes") {
+
+        when {
+            process {
+                """
+                input[0] = groovy.json.JsonOutput.toJson([
+                    "mafft": "7.525", "iqtree2": "2.3.6", "treetime": "0.11.4", "TreeCluster.py": "1.0.4",
+                    "nextclade": "3.18.0", "Rscript": "4.5.3", "ggtree": "4.0.5", "ape": "5.8.1",
+                    "ggplot2": "4.0.3", "ggnewscale": "0.5.2", "svglite": "2.2.2"
+                ]).bytes.encodeBase64().toString()
+                input[1] = file("${projectDir}/protocols/AVIAN/v1/Avian_references.fasta", checkIfExists: true)
+                input[2] = file("${projectDir}/protocols/AVIAN/v1/CDS_references.fasta", checkIfExists: true)
+                input[3] = "H5"
+                input[4] = "A/American_wigeon/South_Dakota/23-033792-006-original/2023"
+                input[5] = "A/American_wigeon/South_Dakota/23-033792-006-original/2023"
+                input[6] = "A/American_wigeon/South_Dakota/23-033792-006-original/2023"
+                input[7] = "PB2,PB1,PA,HA,NP,NA,MP,NS"
+                input[8] = "HA1:160,PB2:627,PB2:701"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            // Every segment of the one AVIAN reference strain that has all 8, even though the
+            // reference headers spell its subtype H5N1 while the subtype key is H5
+            def coordTable = path(process.out.coordinate_table.get(0)).text.readLines()
+            assert coordTable.size() == 9 : coordTable          // header + 8 segments
+            assert coordTable.drop(1).every { it.contains("American_wigeon") } : coordTable
+
+            // The AVIAN CDS references are prefixed with the H tag (H5_PB2_...) or the N tag
+            // (N1_NA_...), never the full H5N1, so both have to be accepted
+            def genes = path(process.out.gene_map.get(0)).text
+            ["HA1", "HA2", "NA", "PB2", "PB1", "PB1-F2", "PA", "PA-X", "NP", "M1", "M2", "NS1", "NS2"].each { gene ->
+                assert genes.contains(gene) : "gene ${gene} missing from the codon map: ${genes}"
+            }
+
+            // The requested positions resolve on this reference, in HA1 and in PB2
+            def positionsText = path(process.out.positions.get(0)).text
+            assert positionsText.contains("HA1:160")
+            assert positionsText.contains("PB2:627")
+            assert positionsText.contains("PB2:701")
+
+            // Nothing fell back: all 8 segments came from the alignment reference itself
+            def notes = path(process.out.log.get(0)).text
+            assert notes.contains("\tall phylogenetics tools found.")
+            assert !notes.contains("has no") : notes
+            // The shipped H5 PB1-F2 CDS reference matches only ~69% of this strain's PB1
+            // segment (PB1-F2 is a short, variable +1-frame ORF). That is a property of the
+            // reference data, not of the mapping, and the module warns rather than failing;
+            // it is the only warning expected here, so a new one still fails this test.
+            def warnings = notes.readLines().findAll { it.contains("WARNING") }
+            assert warnings.size() == 1 : warnings
+            assert warnings[0].contains("PB1-F2") : warnings
+        }
+    }
+
 }

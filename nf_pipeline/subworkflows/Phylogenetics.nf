@@ -35,7 +35,7 @@ workflow PHYLOGENETICS {
 
     main:
     def resources = params.protocols[params.protocol].resources
-    def ref_genomes = file("${resources}/${params.protocol}_references.fasta", checkIfExists: true)
+    def ref_genomes = phyloReferenceGenomes(resources, params.protocol)
     def cds_refs = file("${resources}/CDS_references.fasta", checkIfExists: true)
     def panel_spec = file(params.phyloPanels, checkIfExists: true)
     def lab_map = params.labMap ? file(params.labMap, checkIfExists: true) : []
@@ -798,6 +798,22 @@ def isPhyloFlag(v) {
 // True when v is a plain number (not null, not a value-less flag)
 def isPhyloNumber(v) {
     return v != null && v != true && v.toString().isBigDecimal()
+}
+
+/*
+ * The protocol's whole-genome reference FASTA. HUMAN ships HUMAN_references.fasta but AVIAN
+ * ships Avian_references.fasta, so both spellings are tried and the error names both rather
+ * than renaming a file the other modules read under its current name.
+ */
+def phyloReferenceGenomes(resources, protocol) {
+    def names = [ "${protocol}_references.fasta".toString(),
+                  "${protocol.toString().toLowerCase().capitalize()}_references.fasta".toString() ].unique()
+    def found = names.collect { n -> file("${resources}/${n}") }.find { f -> f.exists() }
+    if (!found) {
+        throw new IllegalArgumentException(
+            "PHYLOGENETICS: no whole-genome reference FASTA for protocol ${protocol} in ${resources} (looked for ${names.join(' and ')}).")
+    }
+    return found
 }
 
 // Tip identifier used in the alignment and tree for a reference strain (e.g. A/Darwin/6/2021 -> REF_A_Darwin_6_2021)
