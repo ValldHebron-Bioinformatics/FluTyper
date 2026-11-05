@@ -1,0 +1,13 @@
+Isolate_Id,Isolate_Name,Subtype,Genotype,Clade,Pathogenicity,Location,Host,Collection_Date,Host_Age,Host_Age_Unit,Host_Gender
+EPI_ISL_20060001,A/Common_gull/Norway/N-0001/2025,A / H5N5,A6 (GenoFLU),2.3.4.4b,HPAI,Europe / Norway / Finnmark Fylke / Vardo,Larus canus,2025-06-10,,,
+EPI_ISL_20060002,A/Larus_argentatus/Belgium/B-0002/2025,A / H5N1,C.1 (ggFLU),2.3.4.4b,HPAI,Europe / Belgium / Provincie West-Vlaanderen / Knokke-Heist,Larus argentatus,2025-06-05,,,
+EPI_ISL_20060003,A/Mallard/Sweden/S-0003/2025,A / H5N3,,,LPAI,Europe / Sweden / Skane Lan / Malmo,Mallard,2025-07-02,,,
+EPI_ISL_20060004,A/Mallard/Sweden/S-0004/2025,A / H5N4,,,LPAI,Europe / Sweden / Skane Lan / Malmo,Mallard,2025-07-03,,,
+EPI_ISL_20060005,A/Teal/Italy/T-0005/2025,A / H5N2,,,LPAI,Europe / Italy / Veneto / Verona,Teal,2025-08-11,,,
+EPI_ISL_20060006,A/Mallard/Netherlands/NL-0006/2025,A / H5N1,B.24 (ggFLU),2.3.4.4b,HPAI,Europe / Netherlands,Anas platyrhynchos,2025-08-20,,,
+EPI_ISL_20060007,A/Chicken/Germany/G-0007/2025,A / H5N1,DI.2 (Genin),2.3.4.4b,HPAI,Europe / Germany / Niedersachsen / Hannover,Chicken,2025-09-01,,,
+EPI_ISL_20060008,A/Mallard/Atlantis/AT-0008/2025,A / H5N1,DI.2 (Genin),2.3.4.4b,HPAI,Europe / Atlantis / Nowhereland / Nowhereville,Mallard,2025-09-15,,,
+EPI_ISL_20060009,A/Gull/Spain/E-0009/2025,A / H5N1,C.1 (ggFLU),2.3.4.4b,HPAI,Europe / Spain / Catalonia / Barcelona,Larus michahellis,2025-10-01,,,
+EPI_ISL_20060010,A/Mallard/England/UK-0010/2025,A / H5,,,,Europe / United Kingdom / England / Norwich,Mallard,2025-10-20,,,
+EPI_ISL_20060011,A/Swan/Denmark/D-0011/2025,A / H5N1,B.24 (ggFLU),2.3.4.4b,HPAI,Europe / Denmark / Syddanmark / Odense,Cygnus olor,2025-11-05,,,
+EPI_ISL_20060012,A/Duck/France/F-0012/2025,A / H5N1,DI.2 (Genin),2.3.4.4b,HPAI,Europe / France / Bretagne / Brest,Duck,2025-11-20,,,
