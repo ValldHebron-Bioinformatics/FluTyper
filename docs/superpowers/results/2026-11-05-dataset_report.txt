@@ -1,0 +1,19 @@
+Focus sample: 25CR6244 (cleavage pathotype: LPAI, 6 segments)
+Classified: LPAI 33, clade 2.3.4.4b 1331, UNKNOWN 9
+LPAI and clade 2.3.4.4b both: 0 (counted once in combined)
+
+lpai: 33 context + 1 focus = 34
+hpai: 1331 context + 1 focus = 1332
+combined: 1364 context + 1 focus = 1365
+
+UNKNOWN (no pathotype call: neither an HA cleavage site read nor a GISAID Pathogenicity): 9
+  They are not LPAI context, but HPAI membership is by clade, so 4 of them carry clade 2.3.4.4b and ARE in the HPAI and combined datasets.
+  EPI_ISL_20212724
+  EPI_ISL_20246482  (in HPAI context: clade 2.3.4.4b)
+  EPI_ISL_20282939  (in HPAI context: clade 2.3.4.4b)
+  EPI_ISL_20289024
+  EPI_ISL_20289027
+  EPI_ISL_20349763
+  EPI_ISL_20354011
+  EPI_ISL_20505315  (in HPAI context: clade 2.3.4.4b)
+  EPI_ISL_20505324  (in HPAI context: clade 2.3.4.4b)
