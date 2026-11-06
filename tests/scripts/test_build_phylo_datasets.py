@@ -9,7 +9,7 @@ import pandas
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "scripts"))
 
-from build_phylo_datasets import build_all, classify  # noqa: E402
+from build_phylo_datasets import build_all, classify, read_calls  # noqa: E402
 
 META_HEADER = ("ID,DATE,LOCATION,COUNTRY,HOST,SUBTYPE,PATHOGENICITY,CLADE,GENOTYPE,"
                "AGE GROUP,SEX,ORIGINATING_LAB")
@@ -160,6 +160,17 @@ class TestBuild(unittest.TestCase):
         self.assertEqual(row["DATE"], "2025-11-26")
         self.assertEqual(row["LOCATION"], "Barcelona")
 
+    def test_context_metadata_carries_the_pathotype_the_dataset_was_built_on(self):
+        # EPI_ISL_20060008: the GISAID field says HPAI, the cleavage read says LPAI. The tree is
+        # coloured from this column, so it must show the call the membership used.
+        meta = pandas.read_csv(self.outdir / "lpai_metadata.csv", keep_default_na=False)
+        row = meta[meta["ID"] == "EPI_ISL_20060008"].iloc[0]
+        self.assertEqual(row["PATHOGENICITY"], "LPAI")
+
+    def test_the_report_counts_what_each_pathotype_call_was_based_on(self):
+        # 2 by cleavage read (20060005, 20060008), 5 by the GISAID field, 1 left UNKNOWN
+        self.assertIn("cleavage read 2, GISAID field 5, UNKNOWN 1", self.report)
+
     def test_every_dataset_metadata_has_the_pipeline_header(self):
         for ds in ("lpai", "hpai", "combined"):
             meta = pandas.read_csv(self.outdir / f"{ds}_metadata.csv")
@@ -234,6 +245,15 @@ class TestBuildWithOverlap(unittest.TestCase):
     def test_combined_counts_it_once(self):
         self.assertEqual(self.counts["combined"]["context"], 8)
         self.assertEqual(self.counts["overlap"], 1)
+
+class TestReadCalls(unittest.TestCase):
+    def test_a_bare_accession_in_the_cleavage_table_matches_its_prefixed_form(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "c.csv"
+            path.write_text("ID,pathotype_cleavage\n20060005,LPAI\n25CR6244,LPAI\n")
+            calls = read_calls(str(path))
+        self.assertEqual(calls.get("EPI_ISL_20060005"), "LPAI")
+        self.assertEqual(calls.get("25CR6244"), "LPAI")
 
 
 if __name__ == "__main__":

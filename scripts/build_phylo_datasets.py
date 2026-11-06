@@ -32,19 +32,32 @@ META_COLUMNS = ["ID", "DATE", "LOCATION", "COUNTRY", "HOST", "SUBTYPE", "PATHOGE
                 "CLADE", "GENOTYPE", "AGE GROUP", "SEX", "ORIGINATING_LAB"]
 
 
-def classify(row, cleavage_by_id):
-    """'LPAI', 'HPAI' or 'UNKNOWN' for one metadata row.
+def _key(raw):
+    """Join key for an ID: a bare accession ('20060005') becomes 'EPI_ISL_20060005'; an own
+    sample ID ('25CR6244') is left alone."""
+    text = str(raw).strip()
+    return f"EPI_ISL_{text}" if text.isdigit() else text
+
+
+def classify_with_basis(row, cleavage_by_id):
+    """(call, basis) for one metadata row: call is 'LPAI', 'HPAI' or 'UNKNOWN'; basis is
+    'cleavage read', 'GISAID field' or 'UNKNOWN'.
 
     The HA cleavage site read wins: it is read off this very sequence, while GISAID's
     Pathogenicity is whatever the submitter recorded. 'indeterminate' is not a call, so the
     GISAID field is used for those, and an isolate with neither stays UNKNOWN."""
-    call = str(cleavage_by_id.get(str(row.get("ID", "")).strip(), "") or "").strip().upper()
+    call = str(cleavage_by_id.get(_key(row.get("ID", "")), "") or "").strip().upper()
     if call in ("LPAI", "HPAI"):
-        return call
+        return call, "cleavage read"
     field = str(row.get("PATHOGENICITY", "") or "").strip().upper()
     if field in ("LPAI", "HPAI"):
-        return field
-    return "UNKNOWN"
+        return field, "GISAID field"
+    return "UNKNOWN", "UNKNOWN"
+
+
+def classify(row, cleavage_by_id):
+    """'LPAI', 'HPAI' or 'UNKNOWN' for one metadata row (see classify_with_basis)."""
+    return classify_with_basis(row, cleavage_by_id)[0]
 
 
 def _id_column(df, where):
@@ -77,7 +90,7 @@ def read_calls(path):
     if patho is None:
         sys.exit(f"{path}: no pathotype column (looked for "
                  f"{', '.join(PATHOTYPE_COLUMNS)}). Columns: {list(df.columns)}")
-    return dict(zip(df[id_col], df[patho]))
+    return {_key(i): c for i, c in zip(df[id_col], df[patho])}
 
 
 def gisaid_record_id(header):
@@ -116,8 +129,14 @@ def build_all(gisaid_meta, cleavage_csv, gisaid_fasta, own_fasta, own_meta, focu
     calls = read_calls(cleavage_csv)
 
     groups = {name: [] for name in ("LPAI", "HPAI", "UNKNOWN")}
+    called = {}
+    basis_count = {"cleavage read": 0, "GISAID field": 0, "UNKNOWN": 0}
     for row in meta.to_dict("records"):
-        groups[classify(row, calls)].append(row["ID"])
+        call, basis = classify_with_basis(row, calls)
+        groups[call].append(row["ID"])
+        if row["ID"] not in called:
+            called[row["ID"]] = call
+            basis_count[basis] += 1
     hpai_ids = [row["ID"] for row in meta.to_dict("records")
                 if row.get("CLADE", "").strip() == HPAI_CLADE]
 
@@ -143,7 +162,7 @@ def build_all(gisaid_meta, cleavage_csv, gisaid_fasta, own_fasta, own_meta, focu
         if col in focus_rows.columns:
             focus_meta[col] = focus_rows.iloc[0][col]
     focus_meta["ID"] = focus_id
-    focus_meta["PATHOGENICITY"] = str(calls.get(focus_id, "")).strip()
+    focus_meta["PATHOGENICITY"] = str(calls.get(_key(focus_id), "")).strip()
 
     wanted = set(members["combined"])
     context_records = read_fasta_by_id(gisaid_fasta, gisaid_record_id, wanted)
@@ -160,7 +179,8 @@ def build_all(gisaid_meta, cleavage_csv, gisaid_fasta, own_fasta, own_meta, focu
             for i in ids:
                 fh.write("\n".join(context_records[i]) + "\n")
             fh.write("\n".join(focus_records) + "\n")
-        rows = [dict(indexed.loc[i], ID=i) for i in ids] + [focus_meta]
+        # PATHOGENICITY is the call the membership was built on, not the submitter's field
+        rows = [dict(indexed.loc[i], ID=i, PATHOGENICITY=called[i]) for i in ids] + [focus_meta]
         pd.DataFrame(rows)[META_COLUMNS].to_csv(
             os.path.join(outdir, f"{name}_metadata.csv"), index=False)
         counts[name] = {"context": len(ids), "total": len(ids) + 1}
@@ -172,6 +192,8 @@ def build_all(gisaid_meta, cleavage_csv, gisaid_fasta, own_fasta, own_meta, focu
         fh.write(f"Classified: LPAI {len(set(groups['LPAI']))}, "
                  f"clade {HPAI_CLADE} {len(set(hpai_ids))}, "
                  f"UNKNOWN {len(set(groups['UNKNOWN']))}\n")
+        fh.write(f"Pathotype call based on: cleavage read {basis_count['cleavage read']}, "
+                 f"GISAID field {basis_count['GISAID field']}, UNKNOWN {basis_count['UNKNOWN']}\n")
         fh.write(f"LPAI and clade {HPAI_CLADE} both: {overlap} "
                  f"(counted once in combined)\n\n")
         for name in DATASETS:

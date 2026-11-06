@@ -287,8 +287,8 @@ The source and period panels are drawn only when their field exists and is non-m
 
 | Parameter | Default | Description |
 | --- | --- | --- |
-| `phylogenetics` | `false` | Enable the module (HUMAN protocol only). |
-| `phyloSubtype` | `H3N2,H1N1pdm09` | Comma-separated subtypes that each get their own tree. |
+| `phylogenetics` | `false` | Enable the module. HUMAN builds H3N2 / H1N1pdm09 trees; AVIAN builds the `H5` tree (`--protocol AVIAN --phyloSubtype H5`). |
+| `phyloSubtype` | `H3N2,H1N1pdm09` | Comma-separated subtypes that each get their own tree. `H3N2` and `H1N1pdm09` need `--protocol HUMAN`; `H5` needs `--protocol AVIAN` and must be passed explicitly. `H5` matches on the H tag alone, so H5N1/N2/N3/N4/Nx samples share one tree per segment. |
 | `phyloSubtypeConfig` | see `nextflow.config` | Map of `reference` / `referenceFallback` / `rootStrains` / `outgroup` per subtype. |
 | `phyloReference` | `A/Darwin/6/2021` | **H3N2 override** of `phyloSubtypeConfig.H3N2.reference`: a value here always wins for H3N2. |
 | `phyloReferenceFallback` | `A/Massachusetts/18/2022` | **H3N2 override**: coordinate reference for segments missing from `phyloReference` (PA). |
@@ -304,6 +304,7 @@ The source and period panels are drawn only when their field exists and is non-m
 | `clusterThreshold` | `0.005` | Single-linkage cluster threshold (substitutions/site). |
 | `minSupportLabel` | `70` | Minimum ultrafast bootstrap support (%) drawn as a node label (`0` shows every value). |
 | `aaPositions` | `HA1:62,HA1:145,HA1:239` | H3N2 amino acid heatmap columns (the paper's positions). |
+| `aaPositionsH5` | `HA1:160,PB2:627,PB2:701` | H5 amino acid heatmap columns (AVIAN). |
 | `aaPositionsH1n1` | *None* | H1N1pdm09 amino acid heatmap columns; no default (the paper is H3N2-only). |
 | `aaPositionsFile` | *None* | CSV (`protein,position[,subtype]`) of positions; replaces `aaPositions`/`aaPositionsH1n1` for the subtypes it covers. |
 | `aaGene` | `HA1` | Gene for bare positions in `aaPositions` / `aaPositionsH1n1`. |
