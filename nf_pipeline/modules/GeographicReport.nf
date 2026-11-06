@@ -105,6 +105,13 @@ process GeographicReport {
         df_meta.columns = [str(c).strip().upper() for c in df_meta.columns]
 
         # Remove overlapping columns from genotyping data to avoid conflicts
+        # Columns FluTyper computes from the sequence win over a metadata column of the same name (a GISAID
+        # export carries its own SUBTYPE/CLADE/GENOTYPE): the metadata copy is dropped, not the computed one.
+        computed = {'SUBTYPE', 'CLADE', 'GENOTYPE', 'SUB-GENOTYPE'}
+        geno_upper = [x.strip().upper() for x in df_geno.columns]
+        meta_drop = [c for c in df_meta.columns if c in computed and c in geno_upper]
+        if meta_drop:
+            df_meta = df_meta.drop(columns=meta_drop)
         geno_overlap = [
             c for c in df_geno.columns
             if c.strip().upper() in df_meta.columns.tolist() and c.strip().upper() != 'SAMPLEID'

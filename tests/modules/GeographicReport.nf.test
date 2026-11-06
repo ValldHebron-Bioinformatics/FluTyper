@@ -105,4 +105,26 @@ nextflow_process {
 
     }
 
+    test("Metadata that carries SUBTYPE/CLADE/GENOTYPE (a GISAID export) must not remove the pipeline's own columns") {
+
+        when {
+            params {
+                protocol = "AVIAN"
+            }
+            process {
+                """
+                input[0] = file("${projectDir}/tests/data/Graphs_avian/final_genotyping_results.csv")
+                input[1] = file("${projectDir}/tests/data/Graphs_avian/metadata.csv")
+                input[2] = file("${projectDir}/RESOURCES/coordenades_cat.tsv")
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.geo_report.size() == 1 : "Geographic report file was not generated"
+        }
+
+    }
+
 }
