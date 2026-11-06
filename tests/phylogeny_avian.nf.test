@@ -1,0 +1,77 @@
+nextflow_pipeline {
+
+    name "Test Pipeline Phylogenetics AVIAN"
+    script "nf_pipeline/main.nf"
+
+    test("AVIAN H5: segment trees are built, and the six-segment sample is in six of them") {
+
+        when {
+            params {
+                protocol = "AVIAN"
+                protocols = [
+                    AVIAN: [
+                        directory: "${projectDir}/protocols/AVIAN",
+                        resources: "${projectDir}/protocols/AVIAN/v1"
+                    ]
+                ]
+                inputFasta = "${projectDir}/tests/data/AVIAN_phylo.fasta"
+                outDir = "tests/results/phylo_avian_1"
+                metadata = "${projectDir}/tests/data/avianmetadata.csv"
+                phylogenetics = true
+                auspice = true
+                phyloSubtype = "H5"
+                phyloWholeGenome = false
+                phyloSegmentTrees = "HA,PB2,PB1,NP,MP,NS"
+                bootstrap = 0
+                width = 6
+                height = 5
+                dpi = 72
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            def outputDir = path("$baseDir/tests/results/phylo_avian_1")
+            // The H5 branch has to exist in main.nf, and its outputs have to be published
+            // under phylogeny/H5 by an output target of their own
+            def segments = ["HA", "PB2", "PB1", "NP", "MP", "NS"]
+            segments.each { seg ->
+                assert outputDir.resolve("phylogeny/H5/${seg}/tree.nwk").exists() :
+                    "phylogeny/H5/${seg}/tree.nwk was not published"
+            }
+
+            // SIXSEG has no PA and no NA, standing in for 25CR6244. It must be a tip of the six
+            // trees it has data for, and must not be dropped from all of them for lacking two.
+            // H5 matching on the H tag alone is what keeps it in: it is typed H5Nx.
+            segments.each { seg ->
+                assert outputDir.resolve("phylogeny/H5/${seg}/tree.nwk").text.contains("SIXSEG") :
+                    "SIXSEG is missing from the ${seg} tree"
+            }
+            def built = outputDir.resolve("phylogeny/H5").toFile().list().toList()
+            assert !built.contains("PA") : built
+            assert !built.contains("NA") : built
+            assert built.sort() == segments.sort() : built
+
+            // Coverage QC kept every candidate in the trees of the segments it has
+            def haLog = outputDir.resolve("phylogeny/H5/HA/phylo.log").text
+            assert haLog.contains("PhyloCoverageQC: 6 of 6 candidate samples enter this tree; 0 dropped.") : haLog
+            assert workflow.stdout.any { it.startsWith("PHYLOGENETICS(H5):") }
+
+            // --auspice: one dataset per tree, coloured by the avian annotations. The avian
+            // panel spec and auspice config are picked from the protocol, and PhyloReport has
+            // to put those columns in annotations.tsv for them to reach the dataset at all.
+            // Checked per path rather than by listing the directory: a directory listing taken
+            // while the publish copies are still landing is not a stable thing to assert on.
+            def expected = segments.collect { s -> "flutyper_h5_" + s.toLowerCase() + ".json" }
+            def missing = expected.findAll { name -> !outputDir.resolve("auspice/${name}").exists() }
+            assert missing.isEmpty() : "missing Auspice datasets ${missing}"
+            def js = new groovy.json.JsonSlurper().parse(
+                outputDir.resolve("auspice/flutyper_h5_ha.json").toFile())
+            def keys = js.meta.colorings.collect { it.key }
+            assert keys.containsAll(["pathotype", "clade", "genotype", "host"]) : keys
+            assert js.meta.panels.contains("map")
+        }
+    }
+
+}

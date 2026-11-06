@@ -257,7 +257,29 @@ for column, field in (("season", DATE_FIELD), ("age_group", AGE_FIELD), ("sex", 
         sources.append([column, field, "yes", "season starts in ISO week 40" if column == "season" else "raw values"])
 
 # --- Rows -----------------------------------------------------------------------------------
-BASE = ["id", "tip_type", "subclade", "cluster", "source_group", "period", "season", "age_group", "sex"]
+FIXED = ["id", "tip_type", "subclade", "cluster", "source_group", "period", "season", "age_group", "sex"]
+
+# Any other column the panel spec asks for is copied straight from --metadata, so a protocol can
+# annotate its own fields (AVIAN: pathotype, clade, genotype, host) without this module listing
+# them. The metadata field is the column name in upper case, except where the two differ.
+EXTRA_FIELDS = {"pathotype": "PATHOGENICITY"}
+spec_columns = []
+with open("${panel_spec}") as f:
+    for row in csv.DictReader(f, delimiter="\t"):
+        column = (row.get("column") or "").strip()
+        if column and column != "@aa_positions" and column not in FIXED and column not in spec_columns:
+            spec_columns.append(column)
+
+extra = [(c, EXTRA_FIELDS.get(c, c.upper())) for c in spec_columns]
+for column, field in extra:
+    if not meta_path:
+        sources.append([column, field, "no", "no --metadata provided"])
+    elif field not in meta_columns:
+        sources.append([column, field, "no", f"metadata has no {field} column"])
+    else:
+        sources.append([column, field, "yes", "raw values"])
+
+BASE = FIXED + [c for c, _ in extra]
 rows = []
 for tip in tips:
     tip_type = sub.get(tip, {}).get("source", "sample")
@@ -268,6 +290,7 @@ for tip in tips:
                  season(tip) if is_sample else "NA",
                  plain(tip, AGE_FIELD) if is_sample else "NA",
                  plain(tip, SEX_FIELD) if is_sample else "NA"]
+                + [plain(tip, field) if is_sample else "NA" for _, field in extra]
                 + [aa.get((tip, l), "NA") for l in labels])
 
 if unparsed:
@@ -312,7 +335,9 @@ fig_dpi <- as.numeric("${dpi}")
 min_support_label <- as.numeric("${min_support_label}")
 
 NA_COLOUR <- "#D9D9D9"
-BASE_COLS <- c("id", "tip_type", "subclade", "cluster", "source_group", "period", "season", "age_group", "sex")
+# Everything that is not an amino-acid column (GENE:POS) is a base column, so a protocol's own
+# panel columns need no listing here
+BASE_COLS <- NULL
 # Fixed colour per amino acid letter (Kelly's contrast colours), identical for every position and run
 RESIDUE_COLOURS <- c(A = "#F3C300", C = "#875692", D = "#F38400", E = "#A1CAF1", F = "#BE0032", G = "#C2B280",
     H = "#008856", I = "#E68FAC", K = "#0067A5", L = "#F99379", M = "#604E97", N = "#F6A600", P = "#B3446C",
@@ -326,6 +351,7 @@ read_tsv <- function(path) {
 tree <- read.tree("${tree}")
 support <- read_tsv("${support}")
 ann <- read_tsv("annotations.tsv")
+BASE_COLS <- names(ann)[!grepl(":", names(ann), fixed = TRUE)]
 sources <- read_tsv("annotation_sources.tsv")
 spec <- read_tsv("${panel_spec}")
 aa_cols <- setdiff(names(ann), BASE_COLS)
@@ -504,10 +530,16 @@ while stack:
     for child in reversed(clade.clades):
         stack.append((child, i))
 
-BASE = ["id", "tip_type", "subclade", "cluster", "source_group", "period", "season", "age_group", "sex"]
-LABELS = {"subclade": "Subclade", "cluster": "Cluster", "source_group": "Source", "period": "Period",
-          "season": "Season", "age_group": "Age group", "sex": "Sex"}
-aa_cols = [c for c in (next(iter(ann.values())).keys() if ann else []) if c not in BASE]
+# Base columns and their labels come from annotations.tsv itself: an amino-acid column is the
+# one with a colon in its name, and any other column is annotated for this protocol.
+PRETTY = {"subclade": "Subclade", "cluster": "Cluster", "source_group": "Source", "period": "Period",
+          "season": "Season", "age_group": "Age group", "sex": "Sex", "pathotype": "Pathotype",
+          "clade": "Clade", "genotype": "Genotype", "host": "Host"}
+ann_columns = list(next(iter(ann.values())).keys()) if ann else []
+BASE = [c for c in ann_columns if ":" not in c]
+LABELS = {c: PRETTY.get(c, c.replace("_", " ").capitalize())
+          for c in BASE if c not in ("id", "tip_type")}
+aa_cols = [c for c in ann_columns if c not in BASE]
 
 hover, filt = {}, {}
 for tip, r in ann.items():

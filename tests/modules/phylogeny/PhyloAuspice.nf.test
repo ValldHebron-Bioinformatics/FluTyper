@@ -921,4 +921,203 @@ nextflow_process {
 
         }
     }
+
+    test("AVIAN: the annotation columns of annotations.tsv become colourings and filters") {
+
+        when {
+            process {
+                """
+                input[0] = tuple(
+                    "H5_HA",
+                    "HA",
+                    file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_alignment.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_ancestral_nt.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_ancestral_aa", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_segments.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_gene_map.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/annotations_avian.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true)
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/auspice/geo.tsv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/auspice/lat_longs.tsv", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/auspice/metadata_auspice.csv", checkIfExists: true)
+                input[4] = file("${projectDir}/RESOURCES/auspice_config_avian.json", checkIfExists: true)
+                input[5] = file("${projectDir}/RESOURCES/auspice_clock_rates.tsv", checkIfExists: true)
+                input[6] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
+                input[7] = []
+                input[8] = 3
+                input[9] = "country,region"
+                input[10] = "1.1.0"
+                input[11] = 70
+                input[12] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def js = new JsonSlurper().parse(file(process.out.json.get(0)[1]))
+
+            // The avian columns are not in any hardcoded list: they reach the dataset because
+            // the annotation fields are read from annotations.tsv's own header
+            def keys = js.meta.colorings.collect { it.key }
+            assert keys.containsAll(["pathotype", "clade", "genotype", "host"]) : keys
+            assert js.meta.filters.containsAll(["pathotype", "clade", "genotype", "host"]) : js.meta.filters
+            assert js.meta.geo_resolutions.collect { it.key }.contains("country")
+
+            // and they carry the real values, per tip
+            def byName = [:]
+            js.tree.with { node -> }
+            def collect
+            collect = { node ->
+                if (node.name) byName[node.name] = node
+                (node.children ?: []).each { child -> collect(child) }
+            }
+            collect(js.tree)
+            assert byName["01816372"].node_attrs.pathotype.value == "HPAI"
+            assert byName["198353883"].node_attrs.pathotype.value == "LPAI"
+            assert byName["01816372"].node_attrs.host.value == "Larus argentatus"
+            assert byName["01818936"].node_attrs.genotype.value == "B.24"
+
+            // The columns the HUMAN config uses are gone from this dataset, so nothing is
+            // carried over by a stale hardcoded list
+            assert !keys.contains("age_group") : keys
+            assert !keys.contains("sex") : keys
+        }
+    }
+
+    test("H5 with no clock rate row: divergence-only export with a WARNING, still validated") {
+
+        when {
+            process {
+                """
+                input[0] = tuple(
+                    "H5_HA",
+                    "HA",
+                    file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_alignment.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_ancestral_nt.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_ancestral_aa", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_segments.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_gene_map.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/annotations_avian.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true)
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/auspice/geo.tsv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/auspice/lat_longs.tsv", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/auspice/metadata_auspice.csv", checkIfExists: true)
+                input[4] = file("${projectDir}/RESOURCES/auspice_config_avian.json", checkIfExists: true)
+                input[5] = file("${projectDir}/tests/data/phylo/auspice/clock_rates_no_h5.tsv", checkIfExists: true)
+                input[6] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
+                input[7] = []
+                input[8] = 3
+                input[9] = "country,region"
+                input[10] = "1.1.0"
+                input[11] = 70
+                input[12] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def log = path(process.out.step_log.get(0)[1]).text
+            // Review Focus 5: no rate is ever guessed for a subtype the table does not cover
+            assert log.contains("WARNING") : log
+            assert log.toLowerCase().contains("divergence") : log
+            def status = path(process.out.status.get(0)[2]).text
+            assert status.contains("divergence") : status
+            def js = new JsonSlurper().parse(file(process.out.json.get(0)[1]))
+            assert !(js.meta.colorings.collect { it.key }).contains("num_date") : js.meta.colorings
+        }
+    }
+
+    test("H5 HA uses the shipped H5 clock rate and exports a time tree") {
+
+        when {
+            process {
+                """
+                input[0] = tuple(
+                    "H5_HA",
+                    "HA",
+                    file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_alignment.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_ancestral_nt.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_ancestral_aa", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_segments.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_gene_map.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/annotations_avian.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true)
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/auspice/geo.tsv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/auspice/lat_longs.tsv", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/auspice/metadata_auspice.csv", checkIfExists: true)
+                input[4] = file("${projectDir}/RESOURCES/auspice_config_avian.json", checkIfExists: true)
+                input[5] = file("${projectDir}/RESOURCES/auspice_clock_rates.tsv", checkIfExists: true)
+                input[6] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
+                input[7] = []
+                input[8] = 3
+                input[9] = "country,region"
+                input[10] = "1.1.0"
+                input[11] = 70
+                input[12] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def log = path(process.out.step_log.get(0)[1]).text
+            // h5nx HA rate of nextstrain/avian-flu segment-focused/config.yaml@3e3a74e8
+            assert log.contains("clock rate 0.0048") : log
+            assert log.contains("for H5 HA") : log
+            def js = new JsonSlurper().parse(file(process.out.json.get(0)[1]))
+            assert (js.meta.colorings.collect { it.key }).contains("num_date") : js.meta.colorings
+        }
+    }
+    test("H5 HA with the all-H5N1 table uses the h5n1 rate") {
+
+        when {
+            process {
+                """
+                input[0] = tuple(
+                    "H5_HA",
+                    "HA",
+                    file("${projectDir}/tests/data/phylo/phylo_tree.nwk", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_alignment.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_ancestral_nt.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_ancestral_aa", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_segments.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/ha_gene_map.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/auspice/annotations_avian.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/phylo/node_support.tsv", checkIfExists: true)
+                )
+                input[1] = file("${projectDir}/tests/data/phylo/auspice/geo.tsv", checkIfExists: true)
+                input[2] = file("${projectDir}/tests/data/phylo/auspice/lat_longs.tsv", checkIfExists: true)
+                input[3] = file("${projectDir}/tests/data/phylo/auspice/metadata_auspice.csv", checkIfExists: true)
+                input[4] = file("${projectDir}/RESOURCES/auspice_config_avian.json", checkIfExists: true)
+                input[5] = file("${projectDir}/RESOURCES/auspice_clock_rates_h5n1.tsv", checkIfExists: true)
+                input[6] = file("${projectDir}/tests/data/phylo/root_strains.tsv", checkIfExists: true)
+                input[7] = []
+                input[8] = 3
+                input[9] = "country,region"
+                input[10] = "1.1.0"
+                input[11] = 70
+                input[12] = file("${projectDir}/tests/data/phylo/auspice/nextstrain_env.txt", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def log = path(process.out.step_log.get(0)[1]).text
+            // h5n1 HA rate of the same file: the table to pass for an all-H5N1 run
+            assert log.contains("clock rate 0.00455") : log
+            assert log.contains("for H5 HA") : log
+            def js = new JsonSlurper().parse(file(process.out.json.get(0)[1]))
+            assert (js.meta.colorings.collect { it.key }).contains("num_date") : js.meta.colorings
+        }
+    }
+
 }

@@ -317,7 +317,7 @@ nextflow_function {
         }
     }
 
-    test("validatePhyloParams: AVIAN protocol is rejected") {
+    test("validatePhyloParams: AVIAN protocol with a HUMAN subtype is rejected") {
         function "validatePhyloParams"
         when {
             function {
@@ -351,7 +351,7 @@ nextflow_function {
         }
         then {
             assert function.success
-            assert function.result.any { it.contains("--phylogenetics is only available for the HUMAN protocol") }
+            assert function.result.any { it.contains("--phyloSubtype 'H3N2' is only available for the HUMAN protocol") }
         }
     }
 
@@ -857,6 +857,244 @@ nextflow_function {
             assert !function.success
             assert function.failed
             assert function.stdout.join("\n").contains("file not found")
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // H5 (AVIAN): one subtype keyed on the H tag alone, so that H5N1/H5N2/H5N3/H5N4 and an
+    // isolate whose N was never called all share one tree per segment
+    // ---------------------------------------------------------------------------------------
+
+    test("phyloKnownSubtypes: H5 is a known subtype") {
+        function "phyloKnownSubtypes"
+        when { function { """ """ } }
+        then {
+            assert function.success
+            assert function.result.contains("H5")
+        }
+    }
+
+    test("phyloSubtypeTag: H5 matches on the H tag alone") {
+        function "phyloSubtypeTag"
+        when {
+            function {
+                """
+                input[0] = "H5"
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == "H5"
+        }
+    }
+
+    test("phyloSubtypeMatches: H5 includes every N tag") {
+        function "phyloSubtypeMatches"
+        when {
+            function {
+                """
+                input[0] = "H5"
+                input[1] = "H5"
+                input[2] = "N3"
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == true
+        }
+    }
+
+    test("phyloSubtypeMatches: H5 includes a sample whose N tag is Nx") {
+        function "phyloSubtypeMatches"
+        when {
+            function {
+                """
+                input[0] = "H5"
+                input[1] = "H5"
+                input[2] = "Nx"
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == true
+        }
+    }
+
+    test("phyloSubtypeMatches: H5 excludes another H tag") {
+        function "phyloSubtypeMatches"
+        when {
+            function {
+                """
+                input[0] = "H5"
+                input[1] = "H7"
+                input[2] = "N1"
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == false
+        }
+    }
+
+    test("phyloSubtypeMatches: H3N2 still requires both tags") {
+        function "phyloSubtypeMatches"
+        when {
+            function {
+                """
+                input[0] = "H3N2"
+                input[1] = "H3"
+                input[2] = "N1"
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == false
+        }
+    }
+
+    test("phyloSubtypeMatches: H3N2 matches an H3N2 sample") {
+        function "phyloSubtypeMatches"
+        when {
+            function {
+                """
+                input[0] = "H3N2"
+                input[1] = "H3"
+                input[2] = "N2"
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == true
+        }
+    }
+
+    test("resolvePhyloConfig: H5 defaults to the only 8-segment AVIAN reference") {
+        function "resolvePhyloConfig"
+        when {
+            function {
+                """
+                input[0] = "H5"
+                input[1] = [:]
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result.reference == "A/American_wigeon/South_Dakota/23-033792-006-original/2023"
+            assert function.result.referenceFallback == "A/American_wigeon/South_Dakota/23-033792-006-original/2023"
+            assert function.result.outgroup == "A/American_wigeon/South_Dakota/23-033792-006-original/2023"
+            assert function.result.rootStrains == "A/American_wigeon/South_Dakota/23-033792-006-original/2023"
+        }
+    }
+
+    test("validatePhyloParams: AVIAN with H5 is accepted") {
+        function "validatePhyloParams"
+        when {
+            function {
+                """
+                input[0] = [
+                    protocol: "AVIAN",
+                    phyloSubtype: "H5",
+                    phyloMinCoverage: 0.95,
+                    minPanelCoverage: 0.8,
+                    clusterThreshold: 0.005,
+                    minSupportLabel: 70,
+                    phyloSegmentTrees: "all",
+                    bootstrap: 1000,
+                    seed: 12345,
+                    model: "GTR+G4",
+                    periodBin: "month",
+                    width: 12,
+                    height: 10,
+                    dpi: 300,
+                    phyloSegmentOrder: "PB2,PB1,PA,HA,NP,NA,MP,NS",
+                    segments: ["PB2","PB1","PA","HA","NP","NA","MP","NS"],
+                    labMap: null,
+                    aaPositions: null,
+                    aaGene: "HA1"
+                ]
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == []
+        }
+    }
+
+    test("validatePhyloParams: AVIAN with H3N2 is rejected naming the protocol") {
+        function "validatePhyloParams"
+        when {
+            function {
+                """
+                input[0] = [
+                    protocol: "AVIAN",
+                    phyloSubtype: "H3N2",
+                    phyloMinCoverage: 0.95,
+                    minPanelCoverage: 0.8,
+                    clusterThreshold: 0.005,
+                    minSupportLabel: 70,
+                    phyloSegmentTrees: "all",
+                    bootstrap: 1000,
+                    seed: 12345,
+                    model: "GTR+G4",
+                    periodBin: "month",
+                    width: 12,
+                    height: 10,
+                    dpi: 300,
+                    phyloSegmentOrder: "PB2,PB1,PA,HA,NP,NA,MP,NS",
+                    segments: ["PB2","PB1","PA","HA","NP","NA","MP","NS"],
+                    labMap: null,
+                    aaPositions: null,
+                    aaGene: "HA1"
+                ]
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result.any { it.contains("H3N2") && it.contains("AVIAN") }
+        }
+    }
+
+    test("validatePhyloParams: HUMAN with H5 is rejected naming the protocol") {
+        function "validatePhyloParams"
+        when {
+            function {
+                """
+                input[0] = [
+                    protocol: "HUMAN",
+                    phyloSubtype: "H5",
+                    phyloMinCoverage: 0.95,
+                    minPanelCoverage: 0.8,
+                    clusterThreshold: 0.005,
+                    minSupportLabel: 70,
+                    phyloSegmentTrees: "all",
+                    bootstrap: 1000,
+                    seed: 12345,
+                    model: "GTR+G4",
+                    periodBin: "month",
+                    width: 12,
+                    height: 10,
+                    dpi: 300,
+                    phyloSegmentOrder: "PB2,PB1,PA,HA,NP,NA,MP,NS",
+                    segments: ["PB2","PB1","PA","HA","NP","NA","MP","NS"],
+                    labMap: null,
+                    aaPositions: null,
+                    aaGene: "HA1"
+                ]
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result.any { it.contains("H5") && it.contains("HUMAN") }
         }
     }
 

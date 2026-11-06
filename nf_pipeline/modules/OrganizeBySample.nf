@@ -55,13 +55,19 @@ process OrganizeBySample {
 
         target_file="samples/${sample_id}/segments/${sample_id}_\${seg_type}.fasta"
 
-        # Check the orientation score
+        # The pattern goes through a file, not -p: seqkit grep reads -p as a COMMA-SEPARATED
+        # LIST of patterns, so a header whose originating-lab field contains a comma (many
+        # GISAID records) matched nothing and the segment file was written empty - with no
+        # error and no warning, the sample silently lost that segment. -f reads one pattern
+        # per line and splits nothing. A double quote in the header broke -p outright.
         if grep -F "rev_\$seq_name" "${sample_id}_orientation.tsv" | cut -f 4 | grep -q "[0-9]"; then
             # The reverse complement is correct: extract it and remove the '_rev' tag
-            seqkit grep -p "rev_\$seq_name" "\$combined_fasta" | sed 's/^>rev_/>/' >> "\$target_file"
+            printf '%s\\n' "rev_\$seq_name" > seqkit_pattern.txt
+            seqkit grep -f seqkit_pattern.txt "\$combined_fasta" | sed 's/^>rev_/>/' >> "\$target_file"
         else
             # The original orientation is correct
-            seqkit grep -p "\$seq_name" "\$combined_fasta" >> "\$target_file"
+            printf '%s\\n' "\$seq_name" > seqkit_pattern.txt
+            seqkit grep -f seqkit_pattern.txt "\$combined_fasta" >> "\$target_file"
         fi
     done < <(grep "^>" "\$raw_sample" | tr -d '>')
 

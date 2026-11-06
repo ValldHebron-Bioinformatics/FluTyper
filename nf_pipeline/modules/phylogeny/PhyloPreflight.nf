@@ -133,12 +133,30 @@ def ref_id(strain):
 # Protocol headers are {SUBTYPE}_{SEGMENT}_{STRAIN}[_EPI_ISL_...]
 genomes = list(SeqIO.parse("${ref_genomes}", "fasta"))
 
+# An H-only subtype key ('H5', AVIAN) covers every N of that H as the reference headers spell
+# it: the AVIAN references name the strain H5N1_HA_..., while the tree is keyed on H5 so that
+# every N shares it. A full key ('H3N2', 'H1N1') keeps matching exactly.
+h_only = re.fullmatch(r"H\\d+", ref_subtype) is not None
+matched_subtypes = set()
+
+def subtype_field_matches(field):
+    if field == ref_subtype:
+        return True
+    return h_only and re.fullmatch(re.escape(ref_subtype) + r"N\\d+", field) is not None
+
 def find_segment(strain, seg):
-    prefix = f"{ref_subtype}_{seg}_{strain.replace(' ', '_')}"
-    hits = [r for r in genomes if r.description == prefix or r.description.startswith(prefix + "_")]
+    want = f"{seg}_{strain.replace(' ', '_')}"
+    hits = []
+    for r in genomes:
+        field, _, rest = r.description.partition("_")
+        if subtype_field_matches(field) and (rest == want or rest.startswith(want + "_")):
+            hits.append((field, r))
     if len(hits) > 1:
-        say(f"WARNING {len(hits)} records match {prefix}; using the first one.", seg)
-    return str(hits[0].seq).upper().replace("U", "T") if hits else None
+        say(f"WARNING {len(hits)} records match {ref_subtype}*_{want}; using the first one.", seg)
+    if not hits:
+        return None
+    matched_subtypes.add(hits[0][0])
+    return str(hits[0][1].seq).upper().replace("U", "T")
 
 coord = {}
 for seg in segments:
@@ -178,10 +196,19 @@ with open("phylo_references.fasta", "w") as out:
 write_tsv("root_strains.tsv", ["strain", "tip_id", "segments_present", "segments_missing"], root_rows)
 
 # ---- 4. Codon map of every protein onto the coordinate references --------------------------------------------------
+# CDS headers are {PREFIX}_{GENE}_... where PREFIX is the full subtype under HUMAN
+# (H3N2_HA_...) but the H tag or the N tag under AVIAN (H5_PB2_..., N1_NA_...), so the
+# accepted prefixes include the H and N tags of whichever reference the segments matched.
+cds_prefixes = {subtype, ref_subtype}
+for matched in matched_subtypes:
+    pair = re.fullmatch(r"(H\\d+)(N\\d+)", matched)
+    if pair:
+        cds_prefixes.update(pair.groups())
+
 cds = {}
 for r in SeqIO.parse("${cds_refs}", "fasta"):
     parts = r.id.split("_")
-    if len(parts) > 2 and parts[0] in {subtype, ref_subtype}:
+    if len(parts) > 2 and parts[0] in cds_prefixes:
         cds.setdefault(parts[1], str(r.seq).upper().replace("U", "T"))
 
 def align_pair(seg_seq, cds_seq):

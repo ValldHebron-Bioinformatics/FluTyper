@@ -35,9 +35,9 @@ workflow PHYLOGENETICS {
 
     main:
     def resources = params.protocols[params.protocol].resources
-    def ref_genomes = file("${resources}/${params.protocol}_references.fasta", checkIfExists: true)
+    def ref_genomes = phyloReferenceGenomes(resources, params.protocol)
     def cds_refs = file("${resources}/CDS_references.fasta", checkIfExists: true)
-    def panel_spec = file(params.phyloPanels, checkIfExists: true)
+    def panel_spec = file(phyloProtocolResource(params.phyloPanels, 'phylo_panels.tsv', params.protocol), checkIfExists: true)
     def lab_map = params.labMap ? file(params.labMap, checkIfExists: true) : []
     def auspice_on = isPhyloFlag(params.auspice)
 
@@ -58,7 +58,7 @@ workflow PHYLOGENETICS {
     // --append historical sample dropped for lacking segments/, or an appendDir folder that never existed) would
     // otherwise be silently dropped by a plain inner join(); warn instead of losing it quietly.
     def subtype_matched_ch = genotyping_info
-        .filter { _sample_id, h_tag, n_tag, _pathotype -> "${h_tag}${n_tag}" == subtype_tag }
+        .filter { _sample_id, h_tag, n_tag, _pathotype -> phyloSubtypeMatches(subtype_tag, h_tag, n_tag) }
         .map { sample_id, _h_tag, _n_tag, _pathotype -> tuple(sample_id) }
     // Plain inner join, exactly as before this round's changes: this is what actually drives the tree(s), so its
     // behaviour for a normal (non-append) run must stay identical to before.
@@ -78,7 +78,7 @@ workflow PHYLOGENETICS {
     // (not from subtype_matched_ch's tuple(sample_id) items): a single-element tuple's arity is ambiguous under a
     // 1-arg .map{}, so re-deriving the plain sample_id string here with its real 4-arg destructuring avoids that.
     def matched_ids_ch = genotyping_info
-        .filter { _sample_id, h_tag, n_tag, _pathotype -> "${h_tag}${n_tag}" == subtype_tag }
+        .filter { _sample_id, h_tag, n_tag, _pathotype -> phyloSubtypeMatches(subtype_tag, h_tag, n_tag) }
         .map { sample_id, _h_tag, _n_tag, _pathotype -> sample_id }
         .toList()
         .map { list -> [ids: list] }
@@ -298,7 +298,7 @@ workflow PHYLOGENETICS {
             auspice_geography.map { geo, _ll, _log, _env -> geo },
             auspice_geography.map { _geo, ll, _log, _env -> ll },
             metadata.first(),
-            file(params.auspiceConfig, checkIfExists: true),
+            file(phyloProtocolResource(params.auspiceConfig, 'auspice_config.json', params.protocol), checkIfExists: true),
             file(params.auspiceClockRates, checkIfExists: true),
             PhyloPreflight.out.root_table,
             params.auspiceRootDates ? file(params.auspiceRootDates, checkIfExists: true) : [],
@@ -619,9 +619,6 @@ def parseAaPositionsFile(value) {
 def validatePhyloParams(Map p) {
     def errors = []
 
-    if (p.protocol != 'HUMAN') {
-        errors << "--phylogenetics is only available for the HUMAN protocol (got '${p.protocol}')."
-    }
     def known_subtypes = phyloKnownSubtypes()
     def subtypes = (p.phyloSubtype ?: '').toString().split(',').collect { s -> s.trim() }.findAll { s -> s }
     def unknown = subtypes.findAll { s -> !(s in known_subtypes) }
@@ -629,6 +626,14 @@ def validatePhyloParams(Map p) {
         errors << "--phyloSubtype must list at least one subtype (${known_subtypes.join(', ')})."
     } else if (unknown) {
         errors << "--phyloSubtype '${p.phyloSubtype}' has unknown subtype(s) ${unknown.join(', ')}: only ${known_subtypes.join(', ')} are supported."
+    }
+    // Each subtype's references live in one protocol's resources, so a subtype requested under
+    // another protocol is rejected naming both (an AVIAN run cannot build an H3N2 tree).
+    def subtype_protocols = phyloSubtypeProtocols()
+    subtypes.findAll { s -> s in known_subtypes }.each { s ->
+        if (subtype_protocols[s] != p.protocol) {
+            errors << "--phyloSubtype '${s}' is only available for the ${subtype_protocols[s]} protocol (got '${p.protocol}')."
+        }
     }
     // Per-subtype reference / fallback / root strains / outgroup bundle (resolvePhyloConfig(): flat H3N2 overrides,
     // phyloSubtypeConfig, then the built-in defaults)
@@ -795,6 +800,43 @@ def isPhyloNumber(v) {
     return v != null && v != true && v.toString().isBigDecimal()
 }
 
+/*
+ * Swap a shipped resource for its protocol-specific twin: under AVIAN, RESOURCES/phylo_panels.tsv
+ * becomes phylo_panels_avian.tsv and auspice_config.json becomes auspice_config_avian.json, in
+ * the same directory. The human and avian versions annotate different things - season, age group
+ * and sex against pathotype, clade, genotype and host - so each protocol needs its own.
+ * A path the user pointed somewhere else (any other basename) is left exactly as given.
+ */
+def phyloProtocolResource(configured, String shipped_name, protocol) {
+    def path = configured?.toString()
+    if (!path || protocol.toString().toUpperCase() != 'AVIAN') {
+        return path
+    }
+    def f = file(path)
+    if (f.name != shipped_name) {
+        return path
+    }
+    def avian = shipped_name.replaceFirst(/(\.[^.]+)$/, '_avian$1')
+    def twin = file("${f.parent}/${avian}")
+    return twin.exists() ? twin.toString() : path
+}
+
+/*
+ * The protocol's whole-genome reference FASTA. HUMAN ships HUMAN_references.fasta but AVIAN
+ * ships Avian_references.fasta, so both spellings are tried and the error names both rather
+ * than renaming a file the other modules read under its current name.
+ */
+def phyloReferenceGenomes(resources, protocol) {
+    def names = [ "${protocol}_references.fasta".toString(),
+                  "${protocol.toString().toLowerCase().capitalize()}_references.fasta".toString() ].unique()
+    def found = names.collect { n -> file("${resources}/${n}") }.find { f -> f.exists() }
+    if (!found) {
+        throw new IllegalArgumentException(
+            "PHYLOGENETICS: no whole-genome reference FASTA for protocol ${protocol} in ${resources} (looked for ${names.join(' and ')}).")
+    }
+    return found
+}
+
 // Tip identifier used in the alignment and tree for a reference strain (e.g. A/Darwin/6/2021 -> REF_A_Darwin_6_2021)
 def phyloRefId(String strain) {
     return 'REF_' + strain.replaceAll(/[^A-Za-z0-9.-]/, '_')
@@ -804,7 +846,14 @@ def phyloRefId(String strain) {
 // PHYLO_KNOWN_SUBTYPES (Groovy/Python, so not shareable directly): both lists gate which subtypes the pipeline
 // (this file) and the dashboard (MergeReports.nf) recognise.
 def phyloKnownSubtypes() {
-    return ['H3N2', 'H1N1pdm09']
+    return ['H3N2', 'H1N1pdm09', 'H5']
+}
+
+// Protocol each subtype's references and markers live in: a subtype can only be built under
+// its own protocol, so --phyloSubtype and --protocol are checked against each other rather
+// than the module being gated on one protocol.
+def phyloSubtypeProtocols() {
+    return [H3N2: 'HUMAN', H1N1pdm09: 'HUMAN', H5: 'AVIAN']
 }
 
 // Built-in reference / fallback / root strains / outgroup per subtype, mirroring nextflow.config's
@@ -817,18 +866,41 @@ def phyloSubtypeDefaults() {
                outgroup: "A/Darwin/6/2021"],
         H1N1pdm09: [reference: "A/Wisconsin/67/2022", referenceFallback: "A/Wisconsin/67/2022",
                rootStrains: "A/Victoria/2570/2019,A/Sydney/5/2021,A/Wisconsin/67/2022",
-               outgroup: "A/Victoria/2570/2019"]
+               outgroup: "A/Victoria/2570/2019"],
+        // AVIAN: A/American_wigeon/South_Dakota/23-033792-006-original/2023 is the only strain in protocols/AVIAN/v1/Avian_references.fasta with
+        // all 8 segments (H5N1, HPAI, clade 2.3.4.4b), so it is reference, fallback, the only
+        // root strain and the outgroup at once.
+        H5: [reference: "A/American_wigeon/South_Dakota/23-033792-006-original/2023", referenceFallback: "A/American_wigeon/South_Dakota/23-033792-006-original/2023",
+               rootStrains: "A/American_wigeon/South_Dakota/23-033792-006-original/2023",
+               outgroup: "A/American_wigeon/South_Dakota/23-033792-006-original/2023"]
     ]
 }
 
 // GenotypingInfo_ch tag for `subtype` (e.g. "H1N1pdm09" -> "H1N1"): SubtypeDetection emits e.g. "A(H1N1)pdm09" ->
 // h_tag "H1", n_tag "N1", so H1N1pdm09 samples carry tag "H1N1". Throws for an unknown subtype.
 def phyloSubtypeTag(String subtype) {
-    def tags = [H3N2: 'H3N2', H1N1pdm09: 'H1N1']
+    def tags = [H3N2: 'H3N2', H1N1pdm09: 'H1N1', H5: 'H5']
     if (!(subtype in tags.keySet())) {
         throw new IllegalArgumentException("Unknown phylogenetics subtype '${subtype}': only ${phyloKnownSubtypes().join(', ')} are supported.")
     }
     return tags[subtype]
+}
+
+/*
+ * True when a sample's (h_tag, n_tag) from SubtypeDetection belongs to the tree of `tag`
+ * (phyloSubtypeTag()'s value).
+ *
+ * An H-only tag such as 'H5' matches on the H tag alone, so H5N1, H5N2, H5N3, H5N4 and a
+ * sample whose N could not be called ('Nx') all enter the same tree. That is what an avian
+ * H5 screen needs: splitting by N would cut the LPAI context into four trees and drop the
+ * isolates with no N call, and the N subtype of each tip is carried as an annotation instead.
+ * A full H+N tag such as 'H3N2' keeps requiring both, exactly as before.
+ */
+def phyloSubtypeMatches(String tag, String h_tag, String n_tag) {
+    if (tag ==~ /^H\d+$/) {
+        return tag == h_tag
+    }
+    return tag == "${h_tag}${n_tag}".toString()
 }
 
 /*
